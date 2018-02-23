@@ -1,0 +1,27 @@
+.navbar {
+  border: 1px solid blue;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1em;
+  width: 100%;
+  position: fixed;
+}
+
+.navbar__list {
+  display: flex;
+  list-style: none;
+  padding: 0;
+}
+
+.navbar__link {  
+  a {
+    text-decoration: none;
+    width: 100%;
+    padding: 0 1em;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}

@@ -5,7 +5,7 @@ export default class Work extends Component {
 	
   render() {
 		return (
-			<div>
+			<div className="work">
         This is from Work!
 			</div>
 		);

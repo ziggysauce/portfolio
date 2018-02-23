@@ -5,7 +5,7 @@ export default class Intro extends Component {
 	
   render() {
 		return (
-			<div>
+			<div className="intro">
         This is from Intro!
 			</div>
 		);
