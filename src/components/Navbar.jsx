@@ -6,9 +6,9 @@ export default class Navbar extends Component {
   render() {
 		return (
 			<div className="navbar">
-				<div>
-					Brand
-				</div>
+				<a href="#" className="navbar__logo">
+					dtn.
+				</a>
 				<ul className="navbar__list">
 					<li className="navbar__link"><a href="#">About</a></li>
 					<li className="navbar__link"><a href="#">Projects</a></li>

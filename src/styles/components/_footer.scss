@@ -1,10 +1,11 @@
 .footer {
-  border: 1px solid cyan;
   padding: 2em;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  background: $bg-grey;
+  color: $text-grey;
 }
 
 .footer-left {
@@ -15,9 +16,9 @@
   min-width: 320px;
 
   h2 {
-    font-size: 2.5em;
     margin: 0;
     padding: 0.2em 0;
+    color: $off-white;
   }
 
   p {
@@ -33,13 +34,14 @@
   min-width: 320px;
 
   & > a {
-    color: black;
+    font-weight: lighter;
+    color: $off-white;
     text-decoration: none;
     padding: 0.2em 1em;
-    border-bottom: 1px solid black;
+    border-bottom: 1px solid $text-grey;
 
     &:hover {
-      border-bottom: 1px solid red;
+      border-bottom: 1px solid $off-white;
     }
   }
 }
@@ -53,10 +55,10 @@
 .footer__link {
   margin: 0 0.5em;
   font-size: 1.5em;
-  color: black;
+  color: $text-grey;
 
   &:hover {
-    color: red;
+    color: $off-white;
   }
 }
 

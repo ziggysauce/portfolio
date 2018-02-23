@@ -1,4 +1,50 @@
 .work {
-  border: 1px solid purple;
-  padding: 2em 0;
+  padding: 2em;
+  background: $bg-soft-green;
+  color: $off-black;
+
+  h2 {
+    margin: 1em 2em;
+  }
+}
+
+.project {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  
+  img {
+    margin: 1em 0;
+    max-width: 468px;
+    border-radius: 3px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+  }
+
+  h3 {
+    font-weight: lighter;
+    font-size: 2.5em;
+  }
+
+  h3, p {
+    margin: 0.2em;
+  }
+}
+
+.project__links {
+  display: flex;
+  align-items: center;
+  font-size: 3em;
+
+  a {
+    text-decoration: none;
+    font-size: 1rem;
+    margin: 0 1.5em;
+    color: $off-black;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
 }

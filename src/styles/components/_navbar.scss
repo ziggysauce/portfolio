@@ -1,11 +1,22 @@
 .navbar {
-  border: 1px solid blue;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 1em;
+  padding: 1em 4em;
   width: 100%;
   position: fixed;
+  background: $bg-soft-blue;
+}
+
+.navbar__logo {
+  border: 2px solid $off-black;
+  padding: 1em 0.5em 0.2em 0.5em;
+  text-decoration: none;
+  color: $off-black;
+
+  &:hover {
+    background: darken($bg-soft-blue, 10%);
+  }
 }
 
 .navbar__list {
@@ -17,11 +28,14 @@
 .navbar__link {  
   a {
     text-decoration: none;
+    text-transform: uppercase;
+    font-size: .8em;
     width: 100%;
     padding: 0 1em;
+    color: $off-black;
   }
 
   a:hover {
-    text-decoration: underline;
+    border-bottom: 1px solid $off-black;
   }
 }
