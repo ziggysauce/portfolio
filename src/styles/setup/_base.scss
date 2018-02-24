@@ -12,10 +12,38 @@ html, body {
 h2 {
   font-weight: lighter;
   font-size: 3em;
+  text-align: center;
+}
+
+img {
+  margin: 1em 0;
+  max-width: 80vw;
+  border-radius: 3px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+}
+
+.paragraph-icon {
+  padding: 0 0.5em;
+  color: $soft-salmon;
+  font-size: 1.5em;
+}
+
+.paragraph-link {
+  text-decoration: none;
+  color: $soft-salmon;
+  border-bottom: 1px solid transparent;
+  transition: 0.3s;
 }
 
 @media (min-width: 768px) {
   h2 {
     font-size: 4em;
+    text-align: left;
+  }
+
+  .paragraph-link:hover {
+    color: lighten($soft-salmon, 10%);
+    border-bottom: 1px solid lighten($soft-salmon, 10%);
+    transition: 0.3s;
   }
 }

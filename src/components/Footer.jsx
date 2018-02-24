@@ -8,7 +8,10 @@ export default class Footer extends Component {
 			<footer className="footer">
 				<div className="footer-left">
 					<h2>Let's talk.</h2>
-					<p>Got a great idea?</p>
+					<p>Got a great idea?
+						<span className="paragraph-icon">
+							<i className="far fa-comment-alt"></i>
+						</span></p>
 					<p>Contact me about collaborating.</p>
 				</div>
 				<div className="footer-right">

@@ -4,7 +4,7 @@
   color: $off-black;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .intro-left, .intro-right {
@@ -20,22 +20,20 @@
 }
 
 .intro-left {
-  h2, p {
-    margin: 0;
-  }
-
   h2 {
+    margin: 0;
     font-size: 6em;
   }
 
   p {
+    margin: 0;
     font-size: 2em;
   }
 }
 
 .intro-right p {
   margin: 0;
-  padding: 0;
+  padding: 1em 0 0 0;
   font-size: 2em;
 }
 
@@ -46,7 +44,7 @@
   }
 
   .intro-left, .intro-right {
-    margin: 1em 1em;
+    margin: 0em 1em;
     text-align: left;
     justify-content: flex-end;
     height: 50vh;

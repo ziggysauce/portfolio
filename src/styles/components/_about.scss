@@ -3,7 +3,7 @@
   background: $off-white;
   color: $off-black;
 
-  p {
+  div {
     max-width: 768px;
     line-height: 1.5;
   }
@@ -19,6 +19,18 @@
   }
 }
 
+.about__description-top {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  
+  img {
+    margin: 1em;
+    max-height: 50vh;
+  }
+}
+
 .about__tools {
   display: none;
 }
@@ -30,7 +42,16 @@
 @media (min-width: 320px) {
   .about__tools {
     display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: 1em 2em;
+
+    h3 {
+      text-transform: uppercase;
+      font-weight: 400;
+      font-size: 1.5em;
+      margin: 0;
+    }
 
     ul {
       list-style-type: none;
@@ -63,6 +84,15 @@
 
     h2 {
       font-size: 4em;
+    }
+  }
+
+  .about__description-top {
+    flex-wrap: nowrap;
+
+    img {
+      max-width: 200px;
+      max-height: 200px;
     }
   }
 
