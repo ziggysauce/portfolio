@@ -1,10 +1,10 @@
 .about {
-  padding: 2em;
+  padding: 8em 2em 2em 2em;
   background: $off-white;
   color: $off-black;
 
   p {
-    max-width: 960px;
+    max-width: 768px;
     line-height: 1.5;
   }
 }
@@ -28,10 +28,6 @@
 }
 
 @media (min-width: 320px) {
-  .about__description h2 {
-    font-size: 2em;
-  }
-
   .about__tools {
     display: flex;
     padding: 1em 2em;

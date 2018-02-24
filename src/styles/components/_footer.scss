@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 2em 0;
+  margin: 2em;
   min-width: 320px;
 
   h2 {
@@ -39,10 +39,7 @@
     text-decoration: none;
     padding: 0.2em 1em;
     border-bottom: 1px solid $text-grey;
-
-    &:hover {
-      border-bottom: 1px solid $off-white;
-    }
+    transition: 0.3s;
   }
 }
 
@@ -56,10 +53,7 @@
   margin: 0 0.5em;
   font-size: 1.5em;
   color: $text-grey;
-
-  &:hover {
-    color: $off-white;
-  }
+  transition: 0.3s;
 }
 
 @media (min-width: 768px) {
@@ -67,11 +61,24 @@
     flex-direction: row;
     justify-content: space-around;
   }
+
   .footer-left {
     align-items: flex-start;
   }
+
   .footer-right {
     justify-content: center;
     align-items: center;
+  }
+  
+  .footer-right > a:hover {
+    color: $soft-salmon;
+    border-bottom: 1px solid $soft-salmon;
+    transition: 0.3s;
+  }
+
+  .footer__link:hover {
+    color: $soft-salmon;
+    transition: 0.3s;
   }
 }
