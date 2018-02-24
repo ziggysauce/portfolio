@@ -34,7 +34,7 @@ export default class About extends Component {
 						<span className="paragraph-icon">
 							<i className="fas fa-gamepad"></i>
 						</span>
-					When I'm not <a className="paragraph-link" href="https://github.com/ziggysauce">coding</a> you can find me in the kitchen experimenting with new dishes, outside getting a run in, at the local Michigan bar cheering on my alma mater (GO BLUE!), or still behind a keyboard playing video games.</p>
+					When I'm not <a className="paragraph-link underline" href="https://github.com/ziggysauce">coding</a> you can find me in the kitchen experimenting with new dishes, outside getting a run in, at the local Michigan bar cheering on my alma mater <span className="michigan">GO BLUE!</span>, or still behind a keyboard playing video games.</p>
 				</div>
 			</div>
 		);

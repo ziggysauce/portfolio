@@ -1,4 +1,5 @@
 .navbar {
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -41,6 +42,7 @@
     margin: 0 1em;
     color: $off-black;
     transition: 0.3s;
+    position: relative;
   }
 
   a:hover {

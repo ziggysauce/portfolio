@@ -12,8 +12,8 @@ export default class Work extends Component {
 					<h3>Project Title</h3>
 					<p>Short project description</p>
 					<span className="project__links">
-						<a href="#">Demo</a>//
-						<a href="#">Repo</a>
+						<a className="underline" href="#">Demo</a>//
+						<a className="underline" href="#">Repo</a>
 					</span>
 				</div>
 			</div>

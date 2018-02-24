@@ -8,9 +8,9 @@ export default class Navbar extends Component {
 			<header className="navbar">
 				<a href="#" className="navbar__logo">dtn.</a>
 				<ul className="navbar__list">
-					<li className="navbar__link"><a href="#">About</a></li>
-					<li className="navbar__link"><a href="#">Projects</a></li>
-					<li className="navbar__link"><a href="#">Contact</a></li>
+					<li className="navbar__link"><a className="underline" href="#">About</a></li>
+					<li className="navbar__link"><a className="underline" href="#">Projects</a></li>
+					<li className="navbar__link"><a className="underline" href="#">Contact</a></li>
 				</ul>
 			</header>
 		);

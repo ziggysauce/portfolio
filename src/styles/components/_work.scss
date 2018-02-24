@@ -36,6 +36,8 @@
     margin: 0 1.5em;
     color: $off-black;
     transition: 0.3s;
+    border-bottom: 1px solid transparent;
+    position: relative;
   }
 }
 
@@ -49,8 +51,8 @@
   }
 
   .project__links a:hover {
-    color: lighten($off-black, 20%);
-    text-decoration: underline;
+    color: $soft-salmon;
+    // border-bottom: 1px solid $soft-salmon;
     transition: 0.3s;
   }
 }
