@@ -1,5 +1,5 @@
 .work {
-  padding: 6em 2em 2em 2em;
+  padding: 6em 2em;
   background: $bg-soft-green;
   color: $off-black;
 
@@ -8,10 +8,17 @@
   }
 }
 
+.project-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+}
+
 .project {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  flex: 1;
+  padding: 1em;
   align-items: center;
   text-align: center;
 
@@ -22,6 +29,10 @@
 
   h3, p {
     margin: 0.2em;
+  }
+
+  p {
+    max-width: 768px;
   }
 }
 
