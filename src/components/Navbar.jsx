@@ -1,13 +1,15 @@
 import React from 'react';
 
-const Navbar = () => {
+const Navbar = (props) => {
+	console.log('from navbar.jsx: ', props);
+
 	return (
 		<header className="navbar">
-			<a href="#intro" className="navbar__logo">dtn.</a>
+			<a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} href="#intro" className="navbar__logo">dtn.</a>
 			<ul className="navbar__list">
-				<li className="navbar__link"><a className="underline" href="#about">About</a></li>
-				<li className="navbar__link"><a className="underline" href="#work">Projects</a></li>
-				<li className="navbar__link"><a className="underline" href="#footer">Contact</a></li>
+				<li className="navbar__link"><a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} className="underline" href="#about">About</a></li>
+				<li className="navbar__link"><a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} className="underline" href="#work">Projects</a></li>
+				<li className="navbar__link"><a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} className="underline" href="#footer">Contact</a></li>
 			</ul>
 		</header>
 	);

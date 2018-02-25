@@ -1,5 +1,10 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
+
+// React smooth scroll
+import { Link, DirectLink, Element , Events, animateScroll as scroll, scrollSpy, scroller } from 'react-scroll'
+
+// Import component files
 import Navbar from './components/Navbar.jsx';
 import Intro from './components/Intro.jsx';
 import About from './components/About.jsx';
@@ -19,10 +24,16 @@ export default class App extends Component {
     console.log('componentWillMount: ', this.state);
   }
 
+  // Smooth scroll to specific element's position in window
+  scrollTo(destination) {
+    let pos = document.querySelector(destination).getBoundingClientRect().y;
+    scroll.scrollMore(pos);
+  }
+
   render() {
     return (
       <div>
-        <Navbar />
+        <Navbar scrollTo={this.scrollTo} />
         <Intro />
         <About />
         <Work projects={this.state.projects} />
