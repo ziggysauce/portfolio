@@ -36,14 +36,13 @@ img {
   position: relative;
 }
 
-
-
 .michigan {
   color: #23344a;
   background: #f7cd47;
   border-radius: 10px;
   padding: 0 0.5em;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 @media (min-width: 768px) {

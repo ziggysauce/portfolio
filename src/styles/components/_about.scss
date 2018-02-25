@@ -1,6 +1,7 @@
 .about {
   padding: 8em 2em 2em 2em;
   background: $off-white;
+  // background: linear-gradient(to bottom, $bg-soft-blue 0%, $off-white 50%);
   color: $off-black;
 
   div {
@@ -35,11 +36,7 @@
   display: none;
 }
 
-.about__extra {
-  // add scss here
-}
-
-@media (min-width: 320px) {
+@media (min-width: 480px) {
   .about__tools {
     display: flex;
     flex-direction: column;
@@ -91,8 +88,8 @@
     flex-wrap: nowrap;
 
     img {
-      max-width: 200px;
-      max-height: 200px;
+      // max-width: 200px;
+      max-height: 40vh;
     }
   }
 

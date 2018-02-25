@@ -7,7 +7,6 @@ import Work from './components/Work.jsx';
 import Footer from './components/Footer.jsx';
 import API from './api/Projects.jsx';
 
-
 export default class App extends Component {
   state = {
     projects: API.projects

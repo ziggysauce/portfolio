@@ -29,7 +29,7 @@ export default class About extends Component {
 						<li><i className="fab fa-gulp"></i></li>
 					</ul>
 				</div>
-				<div className="about__extra">
+				<div>
 					<p>
 						<span className="paragraph-icon">
 							<i className="fas fa-gamepad"></i>
