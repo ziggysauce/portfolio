@@ -20,9 +20,9 @@ module.exports = {
       name: "duongnewsletter",
       title: "Duong's 11 Newsletter",
       description: "A webpage to showcase/archive each newsletter submission.",
-      live: "#",
+      live: "https://duongs11.herokuapp.com/",
       repo: "https://github.com/ziggysauce/duongs_11",
-      img: "https://s19.postimg.org/c6jf9ak2r/duongs11_showcase.png"
+      img: "https://s19.postimg.org/nogephhr7/newsletter-portfolio.png"
     },
   ]
 };

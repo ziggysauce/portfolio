@@ -37,7 +37,7 @@ export default class App extends Component {
         <Intro />
         <About />
         <Work projects={this.state.projects} />
-        <Footer />
+        <Footer scrollTo={this.scrollTo} />
       </div>
     );
   }

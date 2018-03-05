@@ -1,6 +1,7 @@
 import React from 'react';
 
-const Footer = () => {
+const Footer = (props) => {
+
 	return (
 		<footer id="footer" className="footer">
 			<div className="footer-left">
@@ -10,6 +11,10 @@ const Footer = () => {
 						<i className="far fa-comment-alt"></i>
 					</span></p>
 				<p>Contact me about collaborating.</p>
+			</div>
+			<div className="to-top">
+				<span className="rocket"><a onClick={(e) => props.scrollTo(e.currentTarget.getAttribute('href'))} href="#intro"><i className="fas fa-rocket"></i></a></span>
+				<span className="rocket-fire"><i className="fas fa-fire"></i></span>
 			</div>
 			<div className="footer-right">
 				<a className="underline" href="mainto:dtn3423@gmail.com">dtn3423@gmail.com</a>

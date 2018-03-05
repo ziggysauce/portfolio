@@ -55,6 +55,35 @@
   font-size: 1.5em;
   color: $text-grey;
   transition: 0.3s;
+  cursor: pointer;
+}
+
+.to-top {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  bottom: 13em;
+  padding: 0;
+  margin: 0;
+}
+
+.rocket {
+  transform: rotateZ(-45deg);
+
+  a {
+    padding: 0;
+    margin: 0;
+    font-size: 1.5em;
+    color: $text-grey;
+    transition: 0.3s;
+    cursor: pointer;
+  }
+}
+
+.rocket-fire {
+  visibility: hidden;
 }
 
 @media (min-width: 768px) {
@@ -81,5 +110,32 @@
   .footer__link:hover {
     color: $soft-salmon;
     transition: 0.3s;
+  }
+
+  .to-top {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    bottom: 6em;
+    transition: 0.3s;
+
+    &:hover {
+      .rocket a {
+        color: $soft-salmon;
+        transition: 0.3s;
+      }
+      .rocket-fire {
+        visibility: visible;
+        transform: rotateZ(180deg);
+        color: $soft-salmon;
+        transition: 0.3s;
+      }
+    }
+  }
+  
+  .rocket {
+    transform: rotateZ(-45deg);
   }
 }

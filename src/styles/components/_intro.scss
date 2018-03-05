@@ -4,6 +4,7 @@
   color: $off-black;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 100vh;
 }
 
@@ -40,7 +41,7 @@
 @media (min-width: 768px) {
   .intro {
     flex-direction: row;
-    justify-content: space-around;
+    justify-content: center;
   }
 
   .intro-left, .intro-right {
