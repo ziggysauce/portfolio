@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 2em 0em 0em 0em;
+  margin: 1em 0em;
   min-width: 320px;
 
   h2 {
@@ -52,6 +52,16 @@
 
 .footer__link {
   margin: 0 0.5em;
+  text-decoration: none;
+  font-size: 1.5em;
+  color: $text-grey;
+  transition: 0.3s;
+  cursor: pointer;
+}
+
+.footer__link-header {
+  margin: 0;
+  text-decoration: none;
   font-size: 1.5em;
   color: $text-grey;
   transition: 0.3s;
@@ -64,7 +74,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  bottom: 13em;
+  // bottom: 13em;
   padding: 0;
   margin: 0;
 }
@@ -86,19 +96,13 @@
   visibility: hidden;
 }
 
-@media (min-width: 860px) {
-  .footer {
-    flex-direction: row;
-    justify-content: space-evenly;
-  }
-
+@media (min-width: 768px) {
   .footer-left {
-    align-items: flex-start;
-    font-size: 1.5em;
+    font-size: 1.2em;
   }
 
   .footer-right {
-    font-size: 1.5em;
+    // font-size: 1.5em;
     justify-content: center;
     align-items: center;
   }
@@ -114,13 +118,18 @@
     transition: 0.3s;
   }
 
+  .footer__link-header:hover {
+    color: $soft-salmon;
+    transition: 0.3s;
+  }
+
   .to-top {
     position: relative;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    bottom: 8em;
+    // bottom: 8em;
     transition: 0.3s;
 
     &:hover {

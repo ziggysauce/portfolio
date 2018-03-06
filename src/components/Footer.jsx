@@ -5,9 +5,13 @@ const Footer = (props) => {
 
 	return (
 		<footer id="footer" className="footer">
+			<div className="to-top">
+			<span className="rocket"><a onClick={(e) => props.scrollTo(e.currentTarget.getAttribute('href'))} href="#intro"><i className="fas fa-rocket"></i></a></span>
+			<span className="rocket-fire"><i className="fas fa-fire"></i></span>
+		</div>
 			<Fade left>
 				<div className="footer-left">
-					<h2>Let's talk.</h2>
+					<h2><a className="footer__link-header" href="mainto:dtn3423@gmail.com">Let's talk.</a></h2>
 					<p>Got a great idea?
 						<span className="paragraph-icon">
 							<i className="far fa-comment-alt"></i>
@@ -15,10 +19,6 @@ const Footer = (props) => {
 					<p>Contact me about collaborating.</p>
 				</div>
 			</Fade>
-			<div className="to-top">
-				<span className="rocket"><a onClick={(e) => props.scrollTo(e.currentTarget.getAttribute('href'))} href="#intro"><i className="fas fa-rocket"></i></a></span>
-				<span className="rocket-fire"><i className="fas fa-fire"></i></span>
-			</div>
 			<Fade right>
 				<div className="footer-right">
 					<a className="underline" href="mainto:dtn3423@gmail.com">dtn3423@gmail.com</a>
