@@ -3,6 +3,10 @@
   background: $bg-soft-green;
   // background: linear-gradient(to bottom, $off-white 0%, $bg-soft-green 50%);
   color: $off-black;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 
   h2 {
     margin: 1em 0;
@@ -57,6 +61,7 @@
 @media (min-width: 480px) {
   .work h2 {
     margin: 1em 2em;
+    width: 768px;
   }
 
   .project {
