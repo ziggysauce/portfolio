@@ -2,4 +2,4 @@
 > Built with React
 
 
-## [Live Portfolio](http://dtn.surge.sh)
+## [Live Portfolio](http://danieltnguyen.com)

@@ -7,7 +7,7 @@
     "start": "webpack-dev-server",
     "build": "webpack",
     "predeploy": "npm run build",
-    "deploy": "git push --prefix public upstream gh-pages",
+    "deploy": "git subtree push --prefix public origin gh-pages",
     "homepage": "https://ziggysauce.github.io/portfolio/public/"
   },
   "author": "Dan Nguyen",
