@@ -1,12 +1,11 @@
 import React from 'react';
-import Zoom from 'react-reveal/Zoom';
 import Fade from 'react-reveal/Fade';
 
 const About = () => {
 	return (
 		<div id="about" className="about">
 			<div className="about__description">
-			<Fade bottom>
+			<Fade left>
 				<h2>About me.</h2>
 				<div className="about__description-top">
 					<img src="https://s19.postimg.org/4ill5ahxv/Tea_Time_copy.jpg" alt="profile picture of daniel nguyen"/>
@@ -18,7 +17,7 @@ const About = () => {
 				</div>
 			</Fade>
 			</div>
-			<Zoom bottom>
+			<Fade right>
 				<div className="about__tools">
 					<h3>Technologies</h3>
 					<ul>
@@ -31,8 +30,8 @@ const About = () => {
 						<li><i className="fab fa-gulp"></i></li>
 					</ul>
 				</div>
-			</Zoom>
-			<Fade bottom>
+			</Fade>
+			<Fade right>
 				<div>
 					<p>
 						<span className="paragraph-icon">
