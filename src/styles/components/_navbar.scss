@@ -7,18 +7,17 @@
   width: 100vw;
   position: fixed;
   background: $bg-soft-blue;
-  // background: $off-white;
+  background: $off-white;
+  box-shadow: 0 1px 1px rgba(10, 10, 10, .1);
 }
 
 .navbar__logo {
-  // border: 2px solid $off-black;
   border-radius: 100%;
   padding: .6em .25em;
   text-decoration: none;
   background: $soft-salmon;
   color: $off-white;
-  // color: $bg-soft-blue;
-  font-size: 2em;
+  font-size: 1.5em;
   transition: 0.3s;
 
   &:hover {
@@ -56,13 +55,13 @@
   }
 
   .navbar {
-    padding: 1em 4em;
+    padding: .25em 4em;
   }
 }
 
 @media (min-width: 768px) {
   .navbar {
-    padding: 1em 4em;
+    padding: .25em 4em;
   }
 
   .navbar__list {

@@ -1,7 +1,6 @@
 import React from 'react';
 
 const Navbar = (props) => {
-	console.log('from navbar.jsx: ', props);
 
 	return (
 		<header className="navbar">

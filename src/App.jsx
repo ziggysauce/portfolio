@@ -21,7 +21,6 @@ export default class App extends Component {
     this.setState({
       projects: API.projects
     });
-    console.log('componentWillMount: ', this.state);
   }
 
   // Smooth scroll to specific element's position in window
