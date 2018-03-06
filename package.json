@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "webpack-dev-server",
-    "build": "webpack -w"
+    "build": "webpack",
+    "predeploy": "npm run build",
+    "deploy": "git push --prefix public upstream gh-pages",
+    "homepage": "https://ziggysauce.github.io/portfolio/public/"
   },
   "author": "Dan Nguyen",
   "license": "MIT",
