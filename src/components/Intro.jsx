@@ -1,7 +1,7 @@
 import React from 'react';
 import Fade from 'react-reveal/Fade';
 
-const Intro = () => {
+const Intro = (props) => {
 	return (
 		<div id="intro" className="intro">
 			<Fade left>
@@ -12,7 +12,7 @@ const Intro = () => {
 			</Fade>
 			<Fade right>
 				<div className="intro-right">
-					<p>I'm a passionate front-end web developer based in DC.</p>
+					<p>I'm a passionate web developer based in DC. Interested in <a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} href="#footer" className="paragraph-link underline">connecting?</a></p>
 				</div>
 			</Fade>
 		</div>

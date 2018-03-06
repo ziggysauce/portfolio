@@ -12,7 +12,7 @@ const Work = (props) => {
 					return (
 						<Fade key={index} clear>
 							<div className="project">
-								<img src={project.img} alt="screenshot of project"/>
+								<a href={project.live} target="_blank"><img src={project.img} alt="screenshot of project"/></a>
 								<h3>{project.title}</h3>
 								<p>{project.description}</p>
 								<span className="project__links">

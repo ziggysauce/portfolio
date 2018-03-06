@@ -16,13 +16,14 @@ module.exports = {
       repo: "https://github.com/ziggysauce/anjali_taneja",
       img: "https://s19.postimg.org/btnfpmchv/anjali_showcase.png"
     },
-    {
-      name: "duongnewsletter",
-      title: "Duong's 11 Newsletter",
-      description: "A webpage to showcase/archive each newsletter submission.",
-      live: "https://duongs11.herokuapp.com/",
-      repo: "https://github.com/ziggysauce/duongs_11",
-      img: "https://s19.postimg.org/nogephhr7/newsletter-portfolio.png"
-    },
   ]
 };
+
+// {
+//   name: "duongnewsletter",
+//   title: "Duong's 11 Newsletter",
+//   description: "A webpage to showcase/archive each newsletter submission.",
+//   live: "https://duongs11.herokuapp.com/",
+//   repo: "https://github.com/ziggysauce/duongs_11",
+//   img: "https://s19.postimg.org/nogephhr7/newsletter-portfolio.png"
+// },

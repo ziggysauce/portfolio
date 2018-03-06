@@ -33,7 +33,7 @@ export default class App extends Component {
     return (
       <div>
         <Navbar scrollTo={this.scrollTo} />
-        <Intro />
+        <Intro scrollTo={this.scrollTo} />
         <About />
         <Work projects={this.state.projects} />
         <Footer scrollTo={this.scrollTo} />

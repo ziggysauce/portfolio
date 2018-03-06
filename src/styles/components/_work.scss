@@ -1,5 +1,5 @@
 .work {
-  padding: 6em 2em;
+  padding: 4em 2em;
   background: $bg-soft-green;
   // background: linear-gradient(to bottom, $off-white 0%, $bg-soft-green 50%);
   color: $off-black;
@@ -59,8 +59,13 @@
     margin: 1em 2em;
   }
 
+  .project {
+    justify-content: flex-start;
+  }
+
   .project img {
     width: 468px;
+    height: 320px;
   }
 
   .project__links a:hover {
