@@ -21,7 +21,7 @@
   transition: 0.3s;
 
   &:hover {
-    background: lighten($soft-salmon, 10%);
+    background: darken($soft-salmon, 10%);
     transition: 0.3s;
   }
 }
