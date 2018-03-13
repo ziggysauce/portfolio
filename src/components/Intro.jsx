@@ -4,11 +4,11 @@ const Intro = (props) => {
 	return (
 		<div id="intro" className="intro">
 			<div className="intro-bg"></div>
-			<div className="intro-left fade-in">
+			<div className="intro-left">
 				<h2>Hello.</h2>
 				<p>My name is Daniel Nguyen.</p>
 			</div>
-			<div className="intro-right fade-in">
+			<div className="intro-right">
 				<p>I'm a passionate web developer based in DC.</p>
 				<a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} href="#footer" className="intro-cta">Let's connect</a>
 			</div>
