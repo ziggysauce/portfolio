@@ -13,7 +13,8 @@ const About = () => {
 						<span className="paragraph-icon">
 							<i className="fas fa-code"></i>
 						</span>
-					I'm a freelance web-developer with skills in both front-end and back-end applications development. I desire to meet and collaborate with other professionals to build innovative and useful applications. I strive to add my own flavor while focusing on code efficiency, speed optimization, and seamless user experience with design that is pleasing to the eye. I am continuously learning and always pushing towards mastering my craft.</p>
+						I am a developer with skills in both front-end and back-end applications. I desire to collaborate with other professionals to build innovative and useful applications. I strive to add my own flavor into captivating designs while focusing on code efficiency, speed optimization, and seamless user experience. I am continuously learning and pushing towards mastering my craft.
+					</p>
 				</div>
 			</Fade>
 			</div>
