@@ -7,7 +7,7 @@
     "start": "webpack-dev-server",
     "build:dev": "webpack",
     "build:prod": "webpack -p --env production",
-    "predeploy": "npm run build",
+    "predeploy": "npm run build:prod",
     "deploy": "git subtree push --prefix public origin gh-pages",
     "homepage": "https://ziggysauce.github.io/portfolio/public/"
   },

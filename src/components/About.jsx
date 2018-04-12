@@ -8,7 +8,7 @@ const About = () => {
 			<Fade left>
 				<h2>About me.</h2>
 				<div className="about__description-top">
-					<img src="https://s19.postimg.org/4ill5ahxv/Tea_Time_copy.jpg" alt="profile picture of daniel nguyen"/>
+					<img src="https://image.ibb.co/eSMGz7/Tea_Time_copy.jpg" alt="profile picture of daniel nguyen"/>
 					<p>
 						<span className="paragraph-icon">
 							<i className="fas fa-code"></i>
