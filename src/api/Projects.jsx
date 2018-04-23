@@ -1,6 +1,14 @@
 module.exports = {
   projects: [
     {
+      name: "gecho",
+      title: "Gecho",
+      description: "A video-music playing app that utilizes YouTube's API.",
+      live: "https://gecho.herokuapp.com/",
+      repo: "https://github.com/chingu-voyage4/Geckos-Team-32",
+      img: "https://image.ibb.co/mPFbmx/homepage.png"
+    },
+    {
       name: "devtab",
       title: "DevTab",
       description: "A frontend developer focused new tab extension for your web browser with features including sticky notes, quicklinks, a color picker, and more.",
