@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 
-const Intro = (props) => {
+const Intro = (props:any) => {
   return (
     <div id="intro" className="intro">
       <Image className="intro-pic"
@@ -14,7 +14,7 @@ const Intro = (props) => {
       </div>
       <div className="intro-right">
         <p>I'm a passionate web developer based in DC.</p>
-        <a onClick={(e) => props.scrollTo(e.target.getAttribute('href'))} href="#footer" className="intro-cta">Let's connect</a>
+        <a onClick={(e:MouseEvent<HTMLAnchorElement, MouseEvent>) => props.scrollTo(e.target.getAttribute('href'))} href="#footer" className="intro-cta">Let's connect</a>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import React from 'react';
 import Fade from 'react-reveal/Fade';
 
-const Work = (props) => {
+const Work = (props:any) => {
   return (
     <div id="work" className="work">
       <Fade bottom>
