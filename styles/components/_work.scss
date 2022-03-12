@@ -70,8 +70,8 @@
   }
 
   .project img {
-    width: 480px;
-    height: 280px;
+    width: 480px !important;
+    height: 280px !important;
     transition: 0.3s;
   
     &:hover {
