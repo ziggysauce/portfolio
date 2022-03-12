@@ -6,9 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "homepage": "https://ziggysauce.github.io/portfolio/public/"
+    "export": "next export",
+    "lint": "next lint"
   },
+  "homepage": "https://ziggysauce.github.io/portfolio/public/",
   "author": "Dan Nguyen",
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^5.14.0",
