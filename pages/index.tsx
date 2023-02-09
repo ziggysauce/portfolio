@@ -4,6 +4,29 @@ import Navbar from './components/Navbar';
 import Carousel from './components/Carousel';
 
 export default function Home() {
+  const toolkitData = [
+    {
+      title: 'About',
+      asset: 'someicon',
+      description: 'some text',
+    },
+    {
+      title: 'Projects',
+      asset: 'someicon',
+      description: 'some text',
+    },
+    {
+      title: 'Skills',
+      asset: 'someicon',
+      description: 'some text',
+    },
+    {
+      title: 'Social Links',
+      asset: 'someicon',
+      description: 'some text',
+    },
+  ];
+
   return (
     <div className={styles.container}>
       <Head>
@@ -24,8 +47,7 @@ export default function Home() {
 
           {/* Toolkit Section */}
           <div>
-            <p>Links here: About, Projects, Skills, Social Links</p>
-            <Carousel />
+            <Carousel data={toolkitData} />
           </div>
 
           {/* Skills Section */}
