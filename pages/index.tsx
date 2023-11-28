@@ -1,32 +1,11 @@
 import Head from 'next/head';
 import styles from '../styles/Home.module.css';
 import Navbar from './components/Navbar';
-import Carousel from './components/Carousel';
+import Hero from './components/Hero';
+import Skills from './components/Skills';
+import Projects from './components/Projects';
 
 export default function Home() {
-  const toolkitData = [
-    {
-      title: 'About',
-      asset: 'someicon',
-      description: 'some text',
-    },
-    {
-      title: 'Projects',
-      asset: 'someicon',
-      description: 'some text',
-    },
-    {
-      title: 'Skills',
-      asset: 'someicon',
-      description: 'some text',
-    },
-    {
-      title: 'Social Links',
-      asset: 'someicon',
-      description: 'some text',
-    },
-  ];
-
   return (
     <div className={styles.container}>
       <Head>
@@ -36,48 +15,23 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <div>
-          {/* Narbar*/}
+        <div class="flex flex-col">
           <Navbar />
-
-          {/* Hero Section */}
-          <div>
-            <h1 className="text-green-400">Hero Section goes here!</h1>
-          </div>
-
-          {/* Toolkit Section */}
-          <div>
-            <Carousel data={toolkitData} />
-          </div>
-
-          {/* Skills Section */}
-          <div>
-            <p>JS, SQL, PostgrSQL, Express, NodeJS, etc.</p>
-            <Carousel />
-          </div>
-
-          {/* Projects Section */}
-          <div>
-            <p>Showcase of projects</p>
-            <Carousel />
-          </div>
-
-          {/* About Section */}
-          <div>
-            <p>Blurb about me</p>
-            <Carousel />
-          </div>
-
-          {/* Social Links Section */}
-          <div>
-            <p>This should maybe be the footer with social links</p>
-            <Carousel />
-          </div>
+          <Hero />
+          <Skills />
+          <Projects />
         </div>
       </main>
 
       <footer className={styles.footer}>
-        <p>Footer will go here.</p>
+        <div className="flex flex-wrap justify-center items-center">
+          <span className="p-2 mx-2">[Email]</span>
+          <span className="p-2 mx-2">[LinkedIn]</span>
+          <span className="p-2 mx-2">[Github]</span>
+          <span className="p-2 mx-2">[Codepen]</span>
+          <span className="p-2 mx-2">[Medium]</span>
+          <span className="p-2 mx-2">[Resume]</span>
+        </div>
       </footer>
     </div>
   )
