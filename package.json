@@ -12,6 +12,11 @@
   "homepage": "https://ziggysauce.github.io/portfolio/public/",
   "author": "Dan Nguyen",
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.5.0",
+    "@fortawesome/free-brands-svg-icons": "^6.5.0",
+    "@fortawesome/free-solid-svg-icons": "^6.5.0",
+    "@fortawesome/react-fontawesome": "^0.2.0",
+    "fortawesome": "^0.0.1-security",
     "latest": "^0.2.0",
     "n": "^9.2.0",
     "next": "13.1.6",

@@ -1,4 +1,8 @@
 import Head from 'next/head';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLinkedin, faGithub, faCodepen, faMedium } from "@fortawesome/free-brands-svg-icons";
+import { faFilePdf } from "@fortawesome/free-solid-svg-icons";
+
 import styles from '../styles/Home.module.css';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -24,13 +28,15 @@ export default function Home() {
       </main>
 
       <footer className={styles.footer}>
-        <div className="flex flex-wrap justify-center items-center">
-          <span className="p-2 mx-2">[Email]</span>
-          <span className="p-2 mx-2">[LinkedIn]</span>
-          <span className="p-2 mx-2">[Github]</span>
-          <span className="p-2 mx-2">[Codepen]</span>
-          <span className="p-2 mx-2">[Medium]</span>
-          <span className="p-2 mx-2">[Resume]</span>
+        <div className="flex flex-wrap justify-between items-center w-full">
+          <span className="p-2 mx-2">dtn3423@gmail.com</span>
+          <div>
+            <FontAwesomeIcon icon={faLinkedin} size="xl" className="mx-2" />
+            <FontAwesomeIcon icon={faGithub} size="xl" className="mx-2" />
+            <FontAwesomeIcon icon={faCodepen} size="xl" className="mx-2" />
+            <FontAwesomeIcon icon={faMedium} size="xl" className="mx-2" />
+            <FontAwesomeIcon icon={faFilePdf} size="xl" className="mx-2" />
+          </div>
         </div>
       </footer>
     </div>
