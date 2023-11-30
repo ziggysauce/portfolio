@@ -2,7 +2,7 @@ import Image from 'next/image'
 
 function Hero() {
   return (
-    <div className="border border-green-400 p-2 flex justify-around items-center">
+    <div className="border border-green-400 p-2 flex flex-wrap md:flex-nowrap justify-around items-center">
       <Image
         src="https://image.ibb.co/eSMGz7/Tea_Time_copy.jpg"
         width={500}

@@ -17,7 +17,7 @@ function Skills() {
   });
 
   return (
-    <div className="border border-yellow-400 p-2 flex justify-around items-center">
+    <div className="border border-yellow-400 p-2 flex flex-wrap justify-around items-center">
       <h2>Skills</h2>
       {skillKitComponent}
     </div>

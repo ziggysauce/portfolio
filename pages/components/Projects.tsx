@@ -16,7 +16,7 @@ function Projects() {
   });
 
   return (
-    <div className="border border-purple-400 p-2 flex justify-around items-center">
+    <div className="border border-purple-400 p-2 flex flex-wrap justify-around items-center">
       <h2>Projects</h2>
       {projectListComponent}
     </div>
