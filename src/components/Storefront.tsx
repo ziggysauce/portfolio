@@ -67,7 +67,7 @@ function LetterBoard({ className = "" }: { className?: string }) {
       <span className="letterboard">
         <span>NOW</span>
         <span>SERVING</span>
-        <span className="col-span-2">TECHNICAL PM</span>
+        <span className="col-span-2">PRODUCT</span>
         <span className="col-span-2">ENGINEERING</span>
       </span>
       <span className="mt-5 flex items-center justify-between">
@@ -90,14 +90,10 @@ export function Storefront() {
     <>
       <section className="page grid gap-8 pb-7 pt-2 md:pt-10 lg:grid-cols-[1.15fr_1fr] lg:items-stretch lg:gap-14">
         <div className="lg:py-4">
-          <p className="flex items-center gap-2 text-sm">
-            <span aria-hidden="true" className="size-2.5 rounded-full bg-open" />
-            {site.status}
-          </p>
-          <h1 className="mt-3 font-display text-[44px] leading-[1.05] tracking-tight md:text-[64px]">{site.name}</h1>
+          <h1 className="font-display text-[44px] leading-[1.05] tracking-tight md:text-[64px]">{site.name}</h1>
           <p className="mt-3 max-w-xl text-[16px] leading-relaxed md:text-[17px]">{activeLens.pitch}</p>
           <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted md:text-sm">
-            This portfolio works like an ordering app. Browse my skills and projects, add what fits your role, then check out to get in touch. In a hurry? Skip the line.
+            This portfolio works like an ordering app. Browse my skills and projects, add what interests you, then check out to get in touch. In a hurry? Skip the line.
           </p>
           <div className="mt-5 grid grid-cols-2 gap-3 sm:flex">
             <a href="#menu" className="btn btn-primary px-3 sm:px-[26px]">
@@ -115,7 +111,7 @@ export function Storefront() {
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-1">
           <div>
           <p id="lens-label" className="text-[13px] text-muted">
-            Hiring for
+            Show me
           </p>
           <div role="group" aria-labelledby="lens-label" className="flex flex-wrap items-center gap-x-4 sm:gap-x-6">
             {lenses.map((option) => (
@@ -195,7 +191,7 @@ export function Storefront() {
             <h2 id="start-here" className="aisle-title">
               Start Here
             </h2>
-            <p className="mt-1 text-sm text-muted">Chef&rsquo;s picks for {activeLens.label === "Everything" ? "anyone hiring" : `${activeLens.label} roles`}</p>
+            <p className="mt-1 text-sm text-muted">Chef&rsquo;s picks {activeLens.picks}</p>
             <div className="mt-5">
               <Shelf items={featured[lens].map(requireItem)} label="Start here" />
             </div>

@@ -21,7 +21,7 @@ import { Price } from "./Price";
 import { ProductArt } from "./ProductArt";
 import { Shelf } from "./ProductCard";
 
-const TIPS = ["A role", "A referral", "A coffee", "Custom"];
+const TIPS = ["A project", "A question", "A coffee", "Custom"];
 
 function SheetHeader() {
   return (
@@ -243,7 +243,7 @@ export function Checkout() {
         <form onSubmit={submit} noValidate className="mt-8 self-start lg:sticky lg:top-20 lg:mt-5">
           <fieldset>
             <legend className="aisle-title">Leave a Tip</legend>
-            <p className="mt-1 text-sm text-muted">100% of your tip goes to my next chapter.</p>
+            <p className="mt-1 text-sm text-muted">Tell me what brings you here.</p>
             <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-xl border border-control">
               {TIPS.map((option) => (
                 <label key={option} className="relative cursor-pointer border-l border-control first:border-l-0">
@@ -316,7 +316,7 @@ export function Checkout() {
                 id="order-note"
                 rows={3}
                 value={note}
-                placeholder="The role, the team, or what you'd like to talk about"
+                placeholder="What you'd like to talk about"
                 onChange={(event) => setNote(event.target.value)}
                 className="field h-auto py-3 placeholder:text-muted"
               />

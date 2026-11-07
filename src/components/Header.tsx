@@ -79,7 +79,7 @@ export function Header() {
         <div className="flex items-start justify-between">
           <div>
             <p className="font-display text-5xl">{site.firstName}</p>
-            <p className="mt-2 text-sm text-muted">{site.status}</p>
+            <p className="mt-2 text-sm text-muted">{site.location}</p>
           </div>
           <button
             type="button"

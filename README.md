@@ -1,6 +1,6 @@
 # Daniel Nguyen's portfolio (v3)
 
-A portfolio built like a restaurant ordering app. Skills and projects are products, the menu reorders for the role you're hiring for, and checkout is how you get in touch. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
+A portfolio built like a restaurant ordering app. Skills and projects are products, the menu reorders by what you're interested in, and checkout is how you get in touch. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
 
 Next.js static export, TypeScript and Tailwind. There is no backend: `npm run build` writes plain files to `out/`, so it runs on any static host.
 
@@ -17,8 +17,8 @@ npm run typecheck
 
 | To change | Edit |
 |---|---|
-| Name, links, résumé, pitch per role, work history, education | `src/content/site.ts` |
-| Menu items, aisles, Start Here picks, aisle order per role | `src/content/catalog.ts` |
+| Name, links, résumé, pitch per tab, work history, education | `src/content/site.ts` |
+| Menu items, aisles, Start Here picks, aisle order per tab | `src/content/catalog.ts` |
 | Colors, button and component styles | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
 | Packaging art (cups, cans, bags, jars, boxes, bottles) | `src/components/ProductArt.tsx` |
@@ -34,11 +34,9 @@ Add an entry to `items` in `src/content/catalog.ts`. The page, card, search resu
 
 ## Publishing a case study
 
-Edit the `gotab-case-studies` item, or copy it for each case study. Remove `soon` and `badge`, then replace the "Coming soon" price and the "SOON" label:
+Add `sections` to any item in the GoTab Work aisle, such as `menu-management`. When they're all published, delete the `gotab-case-studies` placeholder.
 
 ```ts
-price: { text: "Case study" },
-art: bag("#c9a77c", "STUDY"),
 sections: [
   { heading: "The problem", body: "..." },
   { heading: "My role", body: "..." },
@@ -51,12 +49,12 @@ sections: [
 
 | Ordering app | Portfolio |
 |---|---|
-| Delivery / Pickup tabs | Technical PM / Engineering / Everything |
+| Delivery / Pickup tabs | Product / Engineering / Everything |
 | Product price | Years of experience, how often I do it, or $0.00 for public projects |
 | Rewards | Add 3 items and the first coffee's on me |
 | Ingredients | The skills in a project |
 | Order history | Work history |
-| Tip | What you're bringing: a role, a referral, a coffee |
+| Tip | What brings you here: a project, a question, a coffee |
 | Total | Market price |
 | Pay | Send order, which opens an email draft |
 | Skip the line | `/contact`, no order needed |

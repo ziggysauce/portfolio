@@ -38,7 +38,7 @@ function detailFor(item: Item): { label: string; value: string } {
   }
   if ("free" in item.price) return { label: "Source", value: "Public on GitHub" };
   if (item.soon) return { label: "Status", value: item.price.text };
-  return { label: item.category === "case-studies" ? "Format" : "How often", value: item.price.text };
+  return { label: item.category === "case-studies" ? "At a glance" : "How often", value: item.price.text };
 }
 
 export default async function ItemPage({ params }: Props) {

@@ -6,7 +6,7 @@ export const site = {
   wordmark: "dtn.",
   location: "Washington, DC",
   replyTime: "Replies within a day",
-  status: "Open to new roles",
+  tagline: "Technical Product Management and Software Engineering",
   email: "dtn3423@gmail.com",
   linkedin: "https://www.linkedin.com/in/dtn3423/",
   github: "https://github.com/ziggysauce",
@@ -14,69 +14,81 @@ export const site = {
   url: "https://www.danieltnguyen.com",
   ogImage: { url: "/og.png", width: 1200, height: 630, alt: "Daniel Nguyen's portfolio, built like an ordering app" },
   description:
-    "Daniel Nguyen is an engineering manager and full-stack developer in restaurant technology, looking for Technical Product Manager and software engineering roles.",
+    "Daniel Nguyen is a technical product leader and hands-on engineer with eight years at GoTab, a hospitality commerce platform.",
 };
 
 export type Lens = "pm" | "eng" | "all";
 
-export const lenses: { id: Lens; label: string; pitch: string }[] = [
+export const lenses: { id: Lens; label: string; picks: string; pitch: string }[] = [
   {
     id: "pm",
-    label: "Technical PM",
+    label: "Product",
+    picks: "from the product side",
     pitch:
-      "Engineering manager at GoTab, moving into Technical Product Management. I scope the work, track it through delivery, and can still read the code and the production data behind it.",
+      "Director of Technical Product Management at GoTab. I own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues, and I still write production code.",
   },
   {
     id: "eng",
     label: "Engineering",
+    picks: "from the engineering side",
     pitch:
-      "Full-stack developer and engineering manager at GoTab. JavaScript, Node and PostgreSQL in production for restaurants since 2018.",
+      "Hands-on engineer with eight years at GoTab. I wrote the first production version of its Kitchen Display System and still ship fixes, UI improvements and small features.",
   },
   {
     id: "all",
     label: "Everything",
+    picks: "from the whole menu",
     pitch:
-      "Engineering manager and full-stack developer at GoTab, where I've built restaurant technology since 2018. Looking for my next Technical PM or engineering role.",
+      "Technical product leader and hands-on engineer with eight years at GoTab, from software developer through engineering management to Director of Technical Product Management.",
   },
 ];
 
-// Work history, shown as store locations on the Profile page.
-export const locations = [
+export const company = {
+  name: "GoTab",
+  place: "Washington, DC",
+  about: "Hospitality commerce platform for ordering, point of sale, kitchen operations and payments.",
+};
+
+// Work history, newest first, shown as order history on the Profile page.
+export const roles = [
   {
-    name: "GoTab",
-    role: "Engineering Manager & Software Developer",
-    place: "Washington, DC",
-    dates: "June 2018 to present",
-    open: true,
+    title: "Director, Technical Product Management",
+    dates: "July 2026 to present",
+    current: true,
     notes: [
-      "Plan, build and maintain features that grow the client base, bring in revenue and automate restaurant workflows.",
-      "Manage developers, review and test code, and help hire as the team grows.",
+      "Own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues. Set priorities for 3 to 4 engineers and directly manage a team of 2.",
+      "Ship production fixes, UI improvements and small features. Eliminated more than 15 recurring sources of support requests in two months by fixing underlying product and engineering issues.",
+      "Direct the gift card rebuild across issuance, purchase, claiming and redemption in QR ordering and POS.",
+      "Lead ADA and WCAG remediation for guest ordering based on prospective enterprise client requirements.",
+      "Define UI and UX standards for guest, staff and manager products through design and code review.",
+      "Scoped seven platform requirements for an enterprise launch.",
     ],
   },
   {
-    name: "Freelance",
-    role: "Web Developer",
-    place: "Washington, DC",
-    dates: "October 2017 to present",
-    open: true,
+    title: "Engineering Manager",
+    dates: "June 2021 to July 2026",
+    current: false,
     notes: [
-      "Build full web applications for small clients, mobile-first, including a site for a DC music artist.",
+      "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard. A deciding factor for prospective clients at launch, it remains core infrastructure.",
+      "Built and scaled merchant onboarding. The assisted flow activates about 50 venues a month at a 65-75% application-to-activation rate; roughly 97% of those locations remain live.",
+      "Extended onboarding into self-serve signup with automated identity and fraud screening, removing manual setup by Customer Success.",
+      "Grew and managed a team of junior and mid-level engineers; led code reviews, technical hiring and onboarding.",
+      "Ran POS, KDS, TDS and Kiosk releases, handling branching, versioning, cutover and release conflicts.",
     ],
   },
   {
-    name: "Insomnia Escape Room",
-    role: "Manager & Head Game Master",
-    place: "Washington, DC",
-    dates: "January 2017 to October 2017",
-    open: false,
+    title: "Software Developer",
+    dates: "June 2018 to June 2021",
+    current: false,
     notes: [
-      "Ran operations and staff, grew monthly bookings through promotions and marketing, and added a booking chatbot to the company's Facebook page.",
+      "Wrote the first production version of GoTab's Kitchen Display System. Much of the original system remains in production.",
+      "Shipped full-stack features for ordering and display systems in JavaScript, Node.js, MarkoJS and PostgreSQL.",
     ],
   },
 ];
 
 export const education = [
-  { school: "Rutgers University", degree: "Master of Biomedical Science", year: "2016" },
+  { school: "Rutgers University", degree: "M.S., Biomedical Science", year: "2016" },
   { school: "University of Michigan", degree: "B.S., Evolutionary Anthropology", year: "2015" },
 ];
 

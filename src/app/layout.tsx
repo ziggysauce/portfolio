@@ -13,7 +13,7 @@ const body = Sora({ subsets: ["latin"], variable: "--font-body", weight: ["300",
 const fat = Abril_Fatface({ subsets: ["latin"], variable: "--font-fat", weight: "400" });
 const stencil = Big_Shoulders_Stencil({ subsets: ["latin"], variable: "--font-sten", weight: ["600", "700"] });
 
-const title = `${site.name}: Technical PM & Software Engineer`;
+const title = `${site.name}: ${site.tagline}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),

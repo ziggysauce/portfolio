@@ -46,7 +46,7 @@ export type Item = {
 };
 
 export const categories: { id: CategoryId; title: string; note: string }[] = [
-  { id: "case-studies", title: "Case Studies", note: "From the GoTab kitchen" },
+  { id: "case-studies", title: "GoTab Work", note: "Signature dishes. Full case studies are on the way." },
   { id: "product", title: "Product & Delivery", note: "Single origin, roasted in production" },
   { id: "leadership", title: "Team & Leadership", note: "Served family style" },
   { id: "frontend", title: "Frontend", note: "Poured fresh daily" },
@@ -55,7 +55,7 @@ export const categories: { id: CategoryId; title: string; note: string }[] = [
   { id: "projects", title: "Projects", note: "Made to order" },
 ];
 
-// Which aisles come first, and what goes on the "Start Here" shelf, per role.
+// Which aisles come first, and what goes on the "Start Here" shelf, per tab.
 export const categoryOrder: Record<Lens, CategoryId[]> = {
   pm: ["case-studies", "product", "leadership", "projects", "backend", "frontend", "tools"],
   eng: ["case-studies", "frontend", "backend", "tools", "projects", "product", "leadership"],
@@ -63,9 +63,9 @@ export const categoryOrder: Record<Lens, CategoryId[]> = {
 };
 
 export const featured: Record<Lens, string[]> = {
-  pm: ["restaurant-tech", "scoping", "feature-lifecycle", "evidence", "ai-delivery", "engineering-management"],
-  eng: ["javascript", "postgresql", "nodejs", "marko", "anjali-taneja", "ai-delivery"],
-  all: ["restaurant-tech", "scoping", "javascript", "postgresql", "anjali-taneja", "engineering-management"],
+  pm: ["menu-management", "merchant-onboarding", "roadmap", "accessibility", "release-management", "ai-delivery"],
+  eng: ["kitchen-display", "javascript", "postgresql", "nodejs", "marko", "anjali-taneja"],
+  all: ["kitchen-display", "menu-management", "merchant-onboarding", "roadmap", "postgresql", "anjali-taneja"],
 };
 
 const bag = (tint: string, label: string): Art => ({ pack: "bag", tint, ink: "#111111", label });
@@ -76,13 +76,61 @@ const jar = (tint: string, label: string): Art => ({ pack: "jar", tint, ink: "#1
 const box = (tint: string, label: string, ink = "#ffffff"): Art => ({ pack: "box", tint, ink, label });
 
 export const items: Item[] = [
-  // ---------- Case studies ----------
+  // ---------- GoTab work ----------
   {
-    slug: "gotab-case-studies",
-    name: "GoTab Case Studies",
+    slug: "kitchen-display",
+    name: "Kitchen Display System",
     category: "case-studies",
     blurb:
-      "Write-ups of real product work at GoTab: the problem, my role, what shipped and what changed. Still in the kitchen. Ask for the story at checkout and I'll walk you through it.",
+      "I wrote the first production version of GoTab's Kitchen Display System. Much of the original system remains in production.",
+    price: { text: "In production" },
+    art: can("#b4472e", "KITCHEN"),
+    gotab: true,
+    badge: "GoTab",
+    ingredients: ["javascript", "nodejs", "marko", "postgresql"],
+    keywords: "kds restaurant engineering",
+  },
+  {
+    slug: "menu-management",
+    name: "Menu Management",
+    category: "case-studies",
+    blurb:
+      "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard. It was a deciding factor for prospective clients at launch and remains core infrastructure.",
+    price: { text: "Core infrastructure" },
+    art: can("#2f6f5e", "MENUS"),
+    gotab: true,
+    badge: "GoTab",
+    keywords: "menus platform qr ordering pos kiosk",
+  },
+  {
+    slug: "merchant-onboarding",
+    name: "Merchant Onboarding",
+    category: "case-studies",
+    blurb:
+      "Built and scaled merchant onboarding. The assisted flow activates about 50 venues a month at a 65-75% application-to-activation rate, and roughly 97% of those locations remain live. I then extended it into self-serve signup with automated identity and fraud screening, removing manual setup by Customer Success.",
+    price: { text: "~50 venues a month" },
+    art: can("#3d5a98", "ONBOARD"),
+    gotab: true,
+    badge: "GoTab",
+    keywords: "activation self-serve signup fraud identity growth",
+  },
+  {
+    slug: "gift-cards",
+    name: "Gift Card Rebuild",
+    category: "case-studies",
+    blurb: "Directing the gift card rebuild across issuance, purchase, claiming and redemption in QR ordering and POS.",
+    price: { text: "In progress" },
+    art: can("#a8557f", "GIFT CARDS"),
+    gotab: true,
+    badge: "GoTab",
+    keywords: "payments redemption qr ordering pos",
+  },
+  {
+    slug: "gotab-case-studies",
+    name: "Full Case Studies",
+    category: "case-studies",
+    blurb:
+      "Longer write-ups of this work: the problem, my role, what shipped and what changed. Still in the kitchen. Ask for the story at checkout and I'll walk you through it.",
     price: { text: "Coming soon" },
     art: bag("#c9a77c", "SOON"),
     soon: true,
@@ -96,41 +144,82 @@ export const items: Item[] = [
     name: "Restaurant Tech",
     category: "product",
     blurb:
-      "Years of building for operators: ordering, the kitchen, the people on shift, and all the configuration that makes every venue a little different.",
+      "Eight years on a hospitality commerce platform: QR ordering, point of sale, kiosks, kitchen operations, payments and the manager tools behind them.",
     price: { since: 2018 },
     art: bag("#f1c9a5", "RESTO"),
     gotab: true,
     badge: "GoTab",
-    keywords: "domain hospitality pos kitchen ordering",
+    keywords: "domain hospitality pos kitchen ordering payments",
+  },
+  {
+    slug: "roadmap",
+    name: "Roadmap & Prioritization",
+    category: "product",
+    blurb:
+      "I own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues, and set priorities for the engineers building them.",
+    price: { text: "Daily" },
+    art: bag("#d8dcc0", "ROADMAP"),
+    gotab: true,
+    keywords: "product strategy planning product management",
   },
   {
     slug: "scoping",
-    name: "Scoping & Slicing",
+    name: "Technical Scoping",
     category: "product",
     blurb:
-      "Turning a fuzzy feature ask into a write-up anyone can read, then an epic with slices that can each merge on their own.",
+      "Turning a fuzzy ask into a write-up anyone can read, an estimate, and slices that can each merge on their own. Most recently, scoping seven platform requirements for an enterprise launch.",
     price: { text: "Daily" },
-    art: bag("#d8dcc0", "SCOPE"),
+    art: bag("#c6d8e4", "SCOPE"),
     gotab: true,
-    keywords: "tickets epics requirements discovery planning product management",
+    keywords: "estimation tickets epics requirements discovery planning",
   },
   {
-    slug: "feature-lifecycle",
-    name: "Feature Lifecycle Tracking",
+    slug: "prds-specs",
+    name: "PRDs & Technical Specs",
+    category: "product",
+    blurb: "Writing requirements and technical specs that engineers can build from and stakeholders can read.",
+    price: { text: "Daily" },
+    art: bag("#e6dcb0", "SPECS"),
+    gotab: true,
+    keywords: "requirements documentation product management",
+  },
+  {
+    slug: "ui-ux",
+    name: "UI/UX & Design Review",
+    category: "product",
+    blurb: "Defining UI and UX standards for guest, staff and manager products through design and code review.",
+    price: { text: "Daily" },
+    art: bag("#d9d0c3", "DESIGN"),
+    gotab: true,
+    keywords: "user experience interface standards",
+  },
+  {
+    slug: "accessibility",
+    name: "Accessibility (ADA / WCAG)",
     category: "product",
     blurb:
-      "Following work from discussed to written, assigned, PR open and merged on a GitHub project board, and watching cycle time to spot where it stalls.",
-    price: { text: "Daily" },
-    art: bag("#c6d8e4", "TRACK"),
+      "Leading ADA and WCAG remediation for guest ordering, based on prospective enterprise client requirements, and holding UI work to AA: keyboard paths, focus, labels and contrast.",
+    price: { text: "Every UI PR" },
+    art: bag("#d6cfe6", "A11Y"),
     gotab: true,
-    keywords: "project board roadmap sprint planning cycle time delivery",
+    keywords: "wcag ada a11y aria inclusive",
+  },
+  {
+    slug: "release-management",
+    name: "Release Management",
+    category: "product",
+    blurb: "Ran POS, KDS, TDS and Kiosk releases, handling branching, versioning, cutover and release conflicts.",
+    price: { since: 2021 },
+    art: bag("#e3c8a0", "RELEASE"),
+    gotab: true,
+    keywords: "versioning deploy cutover delivery",
   },
   {
     slug: "bug-triage",
     name: "Bug Triage",
     category: "product",
     blurb:
-      "Reproduce it, size the impact, set a severity and find the owner. The first question is always whether it happens for a second venue with a different config.",
+      "Reproduce it, size the impact, set a severity and find the owner. I eliminated more than 15 recurring sources of support requests in two months by fixing the underlying product and engineering issues.",
     price: { text: "Daily" },
     art: bag("#efc4bd", "TRIAGE"),
     gotab: true,
@@ -143,20 +232,9 @@ export const items: Item[] = [
     blurb:
       "Checking rules, schema and assumptions against real production data before designing around them, and putting the query and the numbers in the PR.",
     price: { text: "Daily" },
-    art: bag("#e6dcb0", "DATA"),
+    art: bag("#cfe0d2", "DATA"),
     gotab: true,
     keywords: "analytics sql data-driven metrics",
-  },
-  {
-    slug: "accessibility",
-    name: "Accessibility Reviews",
-    category: "product",
-    blurb:
-      "Holding UI work to WCAG 2.1 AA: keyboard paths, focus, labels, contrast and color that isn't the only signal.",
-    price: { text: "Every UI PR" },
-    art: bag("#d6cfe6", "A11Y"),
-    gotab: true,
-    keywords: "wcag a11y aria inclusive",
   },
   {
     slug: "ai-delivery",
@@ -176,12 +254,12 @@ export const items: Item[] = [
     name: "Engineering Management",
     category: "leadership",
     blurb:
-      "Leading developers at GoTab: planning the work, unblocking reviews and keeping delivery moving while staying close enough to the code to help.",
-    price: { text: "Daily" },
+      "Grew and managed a team of junior and mid-level engineers from 2021. Today I set priorities for 3 to 4 engineers and directly manage a team of 2.",
+    price: { since: 2021 },
     art: bottle("#c9d6c3", "LEAD"),
     gotab: true,
     badge: "GoTab",
-    keywords: "manager team people",
+    keywords: "manager team people director",
   },
   {
     slug: "code-review",
@@ -196,13 +274,13 @@ export const items: Item[] = [
   },
   {
     slug: "hiring-mentoring",
-    name: "Hiring & Mentoring",
+    name: "Hiring & Onboarding",
     category: "leadership",
-    blurb: "Helping hire as the team grew, and bringing junior developers up through review and pairing.",
-    price: { text: "Ongoing" },
+    blurb: "Technical hiring and onboarding as the team grew, and bringing junior engineers along through code review.",
+    price: { since: 2021 },
     art: bottle("#e7cfc0", "GROW"),
     gotab: true,
-    keywords: "interviews coaching junior developers",
+    keywords: "interviews coaching mentoring junior developers",
   },
 
   // ---------- Frontend ----------
@@ -324,32 +402,36 @@ export const items: Item[] = [
     badge: "GoTab",
     keywords: "sql database postgres migrations data",
   },
+
   {
-    slug: "mysql",
-    name: "MySQL",
+    slug: "sql",
+    name: "SQL",
     category: "backend",
-    blurb: "Relational modeling and SQL outside the Postgres world.",
+    blurb: "Writing the queries behind features, and reading production data to answer product questions.",
     price: { since: 2018 },
-    art: jar("#e0a458", "MYSQL"),
-    keywords: "sql database",
+    art: jar("#e0a458", "SQL"),
+    gotab: true,
+    keywords: "queries data analytics database",
   },
   {
-    slug: "graphql",
-    name: "GraphQL",
+    slug: "schema-design",
+    name: "Schema Design",
     category: "backend",
-    blurb: "Schemas and clients, including Apollo.",
-    price: { since: 2019 },
-    art: can("#d6249f", "GRAPHQL"),
-    keywords: "apollo api",
+    blurb: "Modeling data so features hold up across products and venues.",
+    price: { since: 2018 },
+    art: jar("#7cb88a", "SCHEMA"),
+    gotab: true,
+    keywords: "database modeling migrations",
   },
   {
-    slug: "mongodb",
-    name: "MongoDB",
+    slug: "rest-apis",
+    name: "REST APIs",
     category: "backend",
-    blurb: "Document modeling with Mongoose.",
+    blurb: "Designing and building the APIs between clients and services.",
     price: { since: 2018 },
-    art: jar("#7cb88a", "MONGO"),
-    keywords: "database nosql mongoose",
+    art: can("#5c6bc0", "REST"),
+    gotab: true,
+    keywords: "api services backend",
   },
 
   // ---------- Tools ----------
@@ -371,15 +453,6 @@ export const items: Item[] = [
     price: { text: "Every PR" },
     art: box("#8f5a3c", "TEST"),
     keywords: "unit integration e2e qa",
-  },
-  {
-    slug: "cloudflare",
-    name: "Cloudflare Workers",
-    category: "tools",
-    blurb: "Small edge services and static hosting for side projects.",
-    price: { since: 2025 },
-    art: box("#ee7f1f", "EDGE", "#111111"),
-    keywords: "serverless wrangler hosting",
   },
   {
     slug: "vercel",
