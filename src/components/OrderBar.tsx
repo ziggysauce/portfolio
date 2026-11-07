@@ -75,6 +75,8 @@ export function AddedToast() {
             Checkout
           </Link>
         </div>
+      ) : item ? (
+        <p className="sr-only">{item.name} added to your order</p>
       ) : null}
     </div>
   );

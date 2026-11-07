@@ -367,7 +367,7 @@ export const items: Item[] = [
     slug: "testing",
     name: "Jest & Cypress",
     category: "tools",
-    blurb: "Unit and component tests with Jest, browser tests with Cypress. Tests run before anything gets pushed.",
+    blurb: "Unit and component tests with Jest, browser tests with Cypress.",
     price: { text: "Every PR" },
     art: box("#8f5a3c", "TEST"),
     keywords: "unit integration e2e qa",
@@ -508,8 +508,12 @@ export function related(item: Item, limit = 6): Item[] {
   return out;
 }
 
+// Years of experience count up to this year. Bump it each January. It's fixed
+// rather than read from the clock so prerendered HTML and the browser always agree.
+const CONTENT_YEAR = 2026;
+
 export function yearsSince(since: number): number {
-  return Math.max(1, new Date().getFullYear() - since);
+  return Math.max(1, CONTENT_YEAR - since);
 }
 
 export function search(query: string): Item[] {

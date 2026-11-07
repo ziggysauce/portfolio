@@ -36,7 +36,7 @@ function detailFor(item: Item): { label: string; value: string } {
     const years = yearsSince(item.price.since);
     return { label: "Experience", value: `${years} ${years === 1 ? "year" : "years"}, since ${item.price.since}` };
   }
-  if ("free" in item.price) return { label: "Price", value: "Free. The code is public." };
+  if ("free" in item.price) return { label: "Source", value: "Public on GitHub" };
   if (item.soon) return { label: "Status", value: item.price.text };
   return { label: item.category === "case-studies" ? "Format" : "How often", value: item.price.text };
 }

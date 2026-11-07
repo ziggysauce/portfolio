@@ -44,6 +44,7 @@ export function clearOrder() {
 }
 
 export type OrderDetails = {
+  number: string;
   name: string;
   company: string;
   tip: string;
@@ -66,6 +67,6 @@ export function orderText(order: OrderDetails): string {
 }
 
 export function orderMailto(order: OrderDetails): string {
-  const subject = `New order from ${order.name}${order.company ? ` at ${order.company}` : ""}`;
+  const subject = `Order ${order.number} from ${order.name}${order.company ? ` at ${order.company}` : ""}`;
   return `mailto:${site.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(orderText(order))}`;
 }

@@ -47,10 +47,26 @@ function SheetHeader() {
 }
 
 function OrderLines({ items }: { items: Item[] }) {
+  const list = useRef<HTMLUListElement>(null);
+  const emptyHeading = useRef<HTMLParagraphElement>(null);
+
+  // The pressed button is about to disappear, so hand focus to the nearest line
+  // or the empty state. Otherwise keyboard users land back at the top of the page.
+  function remove(slug: string, index: number) {
+    removeFromOrder(slug);
+    requestAnimationFrame(() => {
+      const buttons = list.current?.querySelectorAll("button");
+      const next = buttons?.length ? buttons[Math.min(index, buttons.length - 1)] : emptyHeading.current;
+      next?.focus();
+    });
+  }
+
   if (!items.length) {
     return (
       <div className="py-10 text-center">
-        <p className="font-display text-2xl">Nothing in your order yet</p>
+        <p ref={emptyHeading} tabIndex={-1} className="font-display text-2xl outline-none">
+          Nothing in your order yet
+        </p>
         <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
           That&rsquo;s fine. Browse the menu, or leave me a note below and send it as is.
         </p>
@@ -61,8 +77,8 @@ function OrderLines({ items }: { items: Item[] }) {
     );
   }
   return (
-    <ul className="divide-y divide-line">
-      {items.map((item) => (
+    <ul ref={list} className="divide-y divide-line">
+      {items.map((item, index) => (
         <li key={item.slug} className="flex gap-4 py-5">
           <Link href={`/item/${item.slug}`} tabIndex={-1} aria-hidden="true" className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden bg-tile">
             <ProductArt art={item.art} sizes="112px" />
@@ -76,7 +92,7 @@ function OrderLines({ items }: { items: Item[] }) {
             </div>
             <button
               type="button"
-              onClick={() => removeFromOrder(item.slug)}
+              onClick={() => remove(item.slug, index)}
               aria-label={`Remove ${item.name} from your order`}
               className="label-caps shrink-0 rounded-sm py-1 underline-offset-4 hover:underline"
             >
@@ -89,7 +105,7 @@ function OrderLines({ items }: { items: Item[] }) {
   );
 }
 
-function Receipt({ order, onReset }: { order: OrderDetails & { number: string }; onReset: () => void }) {
+function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -168,12 +184,12 @@ export function Checkout() {
   const [company, setCompany] = useState("");
   const [note, setNote] = useState("");
   const [nameError, setNameError] = useState(false);
-  const [placed, setPlaced] = useState<(OrderDetails & { number: string }) | null>(null);
+  const [placed, setPlaced] = useState<OrderDetails | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
 
-  const inOrder = new Set(items.map((item) => item.slug));
-  const last = items.at(-1);
-  const suggestions = (last ? related(last) : featured[lens].map(requireItem)).filter((item) => !inOrder.has(item.slug)).slice(0, 6);
+  // Keyed to the first line so adding a suggestion doesn't reshuffle the row under
+  // the pointer. Items already in the order stay put and show a check mark.
+  const suggestions = items[0] ? related(items[0]) : featured[lens].map(requireItem);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -228,9 +244,9 @@ export function Checkout() {
           <fieldset>
             <legend className="aisle-title">Leave a Tip</legend>
             <p className="mt-1 text-sm text-muted">100% of your tip goes to my next chapter.</p>
-            <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-xl border border-line">
+            <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-xl border border-control">
               {TIPS.map((option) => (
-                <label key={option} className="relative cursor-pointer border-l border-line first:border-l-0">
+                <label key={option} className="relative cursor-pointer border-l border-control first:border-l-0">
                   <input
                     type="radio"
                     name="tip"
@@ -315,7 +331,7 @@ export function Checkout() {
               Skip the form
             </Link>
           </div>
-          <p className="mt-3 text-xs text-muted">Send order opens your email app with the order drafted. Nothing is stored here.</p>
+          <p className="mt-3 text-xs text-muted">Send order opens your email app with the order drafted. Nothing goes to a server, and your order only lives in this browser.</p>
         </form>
       </div>
     </div>

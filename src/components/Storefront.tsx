@@ -141,7 +141,7 @@ export function Storefront() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="What are you looking for?"
             aria-label="Search the menu"
-            className="h-14 w-full rounded-full border border-line bg-white pl-14 pr-5 text-[16px] placeholder:text-muted"
+            className="h-14 w-full rounded-full border border-control bg-white pl-14 pr-5 text-[16px] placeholder:text-muted"
           />
         </div>
       </div>
