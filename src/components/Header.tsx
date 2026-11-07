@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 const nav = [
   { label: "Menu", href: "/" },
   { label: "Profile", href: "/about" },
+  { label: "Orders", href: "/orders" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -102,8 +103,8 @@ export function Header() {
             </Link>
           </li>
           <li>
-            <Link href="/about#history" onClick={() => menu.current?.close()}>
-              Order History
+            <Link href="/orders" onClick={() => menu.current?.close()}>
+              Orders
             </Link>
             <p className="font-sans text-sm text-muted">My work history</p>
           </li>

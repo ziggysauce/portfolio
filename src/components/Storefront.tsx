@@ -90,8 +90,9 @@ export function Storefront() {
     <>
       <section className="page grid gap-8 pb-7 pt-2 md:pt-10 lg:grid-cols-[1.15fr_1fr] lg:items-stretch lg:gap-14">
         <div className="lg:py-4">
-          <h1 className="font-display text-[44px] leading-[1.05] tracking-tight md:text-[64px]">{site.name}</h1>
-          <p className="mt-3 max-w-xl text-[16px] leading-relaxed md:text-[17px]">{activeLens.pitch}</p>
+          <p className="label-caps text-[15px]">{site.name}</p>
+          <h1 className="mt-2 font-display text-[40px] leading-[1.05] tracking-tight md:text-[60px]">{site.headline}</h1>
+          <p className="mt-4 max-w-xl text-[16px] leading-relaxed md:text-[17px]">{activeLens.pitch}</p>
           <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted md:text-sm">
             This portfolio works like an ordering app. Browse my skills and projects, add what interests you, then check out to get in touch. In a hurry? Skip the line.
           </p>

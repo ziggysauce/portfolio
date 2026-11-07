@@ -32,22 +32,22 @@ export default function AboutPage() {
         <p className="mt-1 text-sm text-muted">
           {company.name}, {company.place}. {company.about}
         </p>
-        <ul className="mt-5 space-y-4">
+        <ul className="mt-5 divide-y divide-line border-y border-line">
           {roles.map((role) => (
-            <li key={role.title} className="rounded-2xl border border-line p-5 md:p-6">
-              <h3 className="font-display text-[24px] leading-tight">{role.title}</h3>
-              <p className="mt-2 flex items-center gap-2 text-sm">
-                {role.current ? <span aria-hidden="true" className="size-2.5 rounded-full bg-open" /> : null}
-                <span>{role.dates}</span>
-              </p>
-              <ul className="mt-3 list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-muted">
-                {role.notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
+            <li key={role.id}>
+              <Link href={`/orders#${role.id}`} className="group flex items-center justify-between gap-4 py-4">
+                <span className="min-w-0">
+                  <span className="block text-[16px] group-hover:underline group-hover:underline-offset-4">{role.title}</span>
+                  <span className="block text-sm text-muted">{role.dates}</span>
+                </span>
+                <span className={role.current ? "status status-live" : "status"}>{role.current ? "In progress" : "Delivered"}</span>
+              </Link>
             </li>
           ))}
         </ul>
+        <Link href="/orders" className="btn btn-outline mt-5">
+          See all orders
+        </Link>
       </section>
 
       <section aria-labelledby="education-title" className="mt-14">

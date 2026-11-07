@@ -7,6 +7,7 @@ export const site = {
   location: "Washington, DC",
   replyTime: "Replies within a day",
   tagline: "Technical Product Management and Software Engineering",
+  headline: "From the line to the leadership table.",
   email: "dtn3423@gmail.com",
   linkedin: "https://www.linkedin.com/in/dtn3423/",
   github: "https://github.com/ziggysauce",
@@ -49,12 +50,16 @@ export const company = {
   about: "Hospitality commerce platform for ordering, point of sale, kitchen operations and payments.",
 };
 
-// Work history, newest first, shown as order history on the Profile page.
+// Work history, newest first. Each role is an order on /orders and a line on the Profile page.
+// `items` are menu slugs this role's notes back up; an unknown slug fails the build.
 export const roles = [
   {
+    id: "director",
+    code: "DIR",
     title: "Director, Technical Product Management",
     dates: "July 2026 to present",
     current: true,
+    items: ["gift-cards", "roadmap", "accessibility", "ui-ux", "scoping", "bug-triage"],
     notes: [
       "Own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues. Set priorities for 3 to 4 engineers and directly manage a team of 2.",
       "Ship production fixes, UI improvements and small features. Eliminated more than 15 recurring sources of support requests in two months by fixing underlying product and engineering issues.",
@@ -65,9 +70,12 @@ export const roles = [
     ],
   },
   {
+    id: "engineering-manager",
+    code: "MGR",
     title: "Engineering Manager",
     dates: "June 2021 to July 2026",
     current: false,
+    items: ["menu-management", "merchant-onboarding", "engineering-management", "code-review", "hiring-mentoring", "release-management"],
     notes: [
       "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard. A deciding factor for prospective clients at launch, it remains core infrastructure.",
       "Built and scaled merchant onboarding. The assisted flow activates about 50 venues a month at a 65-75% application-to-activation rate; roughly 97% of those locations remain live.",
@@ -77,9 +85,12 @@ export const roles = [
     ],
   },
   {
+    id: "software-developer",
+    code: "DEV",
     title: "Software Developer",
     dates: "June 2018 to June 2021",
     current: false,
+    items: ["kitchen-display", "javascript", "nodejs", "marko", "postgresql"],
     notes: [
       "Wrote the first production version of GoTab's Kitchen Display System. Much of the original system remains in production.",
       "Shipped full-stack features for ordering and display systems in JavaScript, Node.js, MarkoJS and PostgreSQL.",

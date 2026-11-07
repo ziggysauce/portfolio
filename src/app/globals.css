@@ -244,6 +244,41 @@ html:has(dialog[open]) {
     padding: 16px 18px;
   }
 
+  /* Order status on /orders. Text colors hold 4.5:1 on their fills. */
+  .status {
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--color-tile);
+    color: var(--color-muted);
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+  .status-live {
+    background: #e3f4e8;
+    color: #0b6b39;
+  }
+
+  /* The <summary> that opens a role's receipt, styled as a small pill. */
+  .receipt-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--color-tile);
+    font-size: 14px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .receipt-toggle::-webkit-details-marker {
+    display: none;
+  }
+  @media (hover: hover) {
+    .receipt-toggle:hover {
+      background: #e6e7ea;
+    }
+  }
+
   .no-scrollbar {
     scrollbar-width: none;
   }

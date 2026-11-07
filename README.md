@@ -17,7 +17,8 @@ npm run typecheck
 
 | To change | Edit |
 |---|---|
-| Name, links, pitch per tab, work history, education | `src/content/site.ts` |
+| Name, links, headline, pitch per tab, education | `src/content/site.ts` |
+| Work history on `/orders`, and which menu items each role links to (`items`) | `roles` in `src/content/site.ts` |
 | Résumé PDF (replace the file, keep the name) | `public/Daniel_Nguyen_Resume.pdf` |
 | Menu items, aisles, Start Here picks, aisle order per tab | `src/content/catalog.ts` |
 | Colors, button and component styles | `src/app/globals.css` |
@@ -54,7 +55,7 @@ sections: [
 | Product price | Years of experience, how often I do it, or $0.00 for public projects |
 | Rewards | Add 3 items and the first coffee's on me |
 | Ingredients | The skills in a project |
-| Order history | Work history |
+| Orders and receipts | Work history at `/orders`: each role, its highlights and what came out of it |
 | Tip | What brings you here: a project, a question, a coffee |
 | Total | Market price |
 | Pay | Send order, which opens an email draft |
