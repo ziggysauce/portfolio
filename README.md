@@ -1,40 +1,62 @@
-# Daniel Nguyen's Portfolio
-> Built with NextJS
+# Daniel Nguyen's portfolio (v3)
 
+A portfolio built like a restaurant ordering app. Skills and projects are products, the menu reorders for the role you're hiring for, and checkout is how you get in touch. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
 
-## [Live Portfolio](http://danieltnguyen.com)
-
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
-
-## Getting Started
-
-First, run the development server:
+Next.js static export, TypeScript and Tailwind. There is no backend: `npm run build` writes plain files to `out/`, so it runs on any static host.
 
 ```bash
-npm run dev
-# or
-yarn dev
+npm install
+npm run dev        # http://localhost:5001
+npm run build      # static site in out/
+npm run start      # serve out/ locally
+npm run lint
+npm run typecheck
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Where things live
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+| To change | Edit |
+|---|---|
+| Name, links, résumé, pitch per role, work history, education | `src/content/site.ts` |
+| Menu items, aisles, Start Here picks, aisle order per role | `src/content/catalog.ts` |
+| Colors, button and component styles | `src/app/globals.css` |
+| Fonts | `src/app/layout.tsx` |
+| Packaging art (cups, cans, bags, jars, boxes, bottles) | `src/components/ProductArt.tsx` |
+| Order email wording, rewards threshold | `src/lib/order.ts` |
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+## Adding to the menu
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+Add an entry to `items` in `src/content/catalog.ts`. The page, card, search result and cart behavior come from that entry.
 
-## Learn More
+- **Price slot:** `{ since: 2018 }` shows years, `{ free: true }` shows $0.00, `{ text: "Daily" }` shows the word.
+- **Art:** `bag(tint, "LABEL")`, or the matching helper for another pack, or `{ image, alt }` for a screenshot in `public/projects/`.
+- **Linking:** a project's `ingredients` list links it to its skills, and each skill's page links back.
 
-To learn more about Next.js, take a look at the following resources:
+## Publishing a case study
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Edit the `gotab-case-studies` item, or copy it for each case study. Remove `soon` and `badge`, then replace the "Coming soon" price and the "SOON" label:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```ts
+price: { text: "Case study" },
+art: bag("#c9a77c", "STUDY"),
+sections: [
+  { heading: "The problem", body: "..." },
+  { heading: "My role", body: "..." },
+  { heading: "What shipped", body: "..." },
+  { heading: "What changed", body: "..." },
+],
+```
 
-## Deploy on Vercel
+## How the metaphor maps
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+| Ordering app | Portfolio |
+|---|---|
+| Delivery / Pickup tabs | Technical PM / Engineering / Everything |
+| Product price | Years of experience, how often I do it, or $0.00 for public projects |
+| Rewards | Add 3 items and the first coffee's on me |
+| Ingredients | The skills in a project |
+| Order history | Work history |
+| Tip | What you're bringing: a role, a referral, a coffee |
+| Total | Market price |
+| Pay | Send order, which opens an email draft |
+| Skip the line | `/contact`, no order needed |
