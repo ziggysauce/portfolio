@@ -17,7 +17,8 @@ npm run typecheck
 
 | To change | Edit |
 |---|---|
-| Name, links, résumé, pitch per tab, work history, education | `src/content/site.ts` |
+| Name, links, pitch per tab, work history, education | `src/content/site.ts` |
+| Résumé PDF (replace the file, keep the name) | `public/Daniel_Nguyen_Resume.pdf` |
 | Menu items, aisles, Start Here picks, aisle order per tab | `src/content/catalog.ts` |
 | Colors, button and component styles | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |

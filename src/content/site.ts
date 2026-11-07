@@ -10,7 +10,7 @@ export const site = {
   email: "dtn3423@gmail.com",
   linkedin: "https://www.linkedin.com/in/dtn3423/",
   github: "https://github.com/ziggysauce",
-  resume: "https://drive.google.com/file/d/1VdoxUOacJ6HNdt8ZyIqjZT9s1QxdWzi1/view",
+  resume: "/Daniel_Nguyen_Resume.pdf",
   url: "https://www.danieltnguyen.com",
   ogImage: { url: "/og.png", width: 1200, height: 630, alt: "Daniel Nguyen's portfolio, built like an ordering app" },
   description:

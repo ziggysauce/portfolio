@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const links = [
   { label: "LinkedIn", detail: "linkedin.com/in/dtn3423", href: site.linkedin },
   { label: "GitHub", detail: "github.com/ziggysauce", href: site.github },
-  { label: "Résumé", detail: "View on Google Drive", href: site.resume },
+  { label: "Résumé", detail: "PDF, one page", href: site.resume },
 ];
 
 export default function ContactPage() {

@@ -464,6 +464,15 @@ export const items: Item[] = [
     keywords: "hosting deploy",
   },
   {
+    slug: "cloudflare",
+    name: "Cloudflare",
+    category: "tools",
+    blurb: "Workers for small edge services, plus static hosting for side projects.",
+    price: { since: 2025 },
+    art: box("#ee7f1f", "EDGE", "#111111"),
+    keywords: "workers serverless wrangler hosting deploy edge",
+  },
+  {
     slug: "claude-code",
     name: "Claude Code",
     category: "tools",
