@@ -20,10 +20,10 @@ npm run typecheck
 | Name, links, headline, pitch per tab, education | `src/content/site.ts` |
 | Work history on `/orders`, and which menu items each role links to (`items`) | `roles` in `src/content/site.ts` |
 | Résumé PDF (replace the file, keep the name) | `public/Daniel_Nguyen_Resume.pdf` |
-| Menu items, aisles, Start Here picks, aisle order per tab | `src/content/catalog.ts` |
+| Menu items, sections, Popular picks, section order per tab | `src/content/catalog.ts` |
 | Colors, button and component styles | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
-| Packaging art (cups, cans, bags, jars, boxes, bottles) | `src/components/ProductArt.tsx` |
+| How a menu row looks | `src/components/MenuItem.tsx` |
 | Order email wording, rewards threshold | `src/lib/order.ts` |
 
 ## Adding to the menu
@@ -31,12 +31,13 @@ npm run typecheck
 Add an entry to `items` in `src/content/catalog.ts`. The page, card, search result and cart behavior come from that entry.
 
 - **Price slot:** `{ since: 2018 }` shows years, `{ free: true }` shows $0.00, `{ text: "Daily" }` shows the word.
-- **Art:** `bag(tint, "LABEL")`, or the matching helper for another pack, or `{ image, alt }` for a screenshot in `public/projects/`.
+- **Photo (optional):** `image: { src, alt }` for a real screenshot in `public/projects/`. Most items have none, like most dishes on a menu.
+- **Tag (optional):** `badge: "New"` shows a small label on the row.
 - **Linking:** a project's `ingredients` list links it to its skills, and each skill's page links back.
 
 ## Publishing a case study
 
-Add `sections` to any item in the GoTab Work aisle, such as `menu-management`. When they're all published, delete the `gotab-case-studies` placeholder.
+Add `sections` to any item in the GoTab Work section, such as `menu-management`. When they're all published, delete the `gotab-case-studies` placeholder.
 
 ```ts
 sections: [

@@ -18,11 +18,11 @@ const links = [
 export default function ContactPage() {
   return (
     <div className="page max-w-2xl pt-6 md:pt-12">
-      <h1 className="font-display text-[44px] leading-[1.05] tracking-tight md:text-[64px]">Skip the Line</h1>
+      <h1 className="font-display text-[44px] leading-[1.08] md:text-[60px]">Skip the line</h1>
       <p className="mt-4 text-[17px] leading-relaxed">No order needed. Here&rsquo;s how to reach me directly. I usually reply within a day.</p>
 
       <div className="mt-8 rounded-2xl border border-line p-5 md:p-6">
-        <p className="text-sm text-muted">Email</p>
+        <p className="text-[15px] text-muted">Email</p>
         <a href={`mailto:${site.email}`} className="mt-1 block break-all font-display text-[26px] leading-tight underline-offset-4 hover:underline">
           {site.email}
         </a>
@@ -39,7 +39,7 @@ export default function ContactPage() {
           <li key={link.label}>
             <a href={link.href} target="_blank" rel="noreferrer" className="option-card flex items-center justify-between gap-4 transition-colors hover:border-ink">
               <span>
-                <span className="block text-[17px]">{link.label}</span>
+                <span className="block font-medium">{link.label}</span>
                 <span className="block text-[15px] text-muted">{link.detail}</span>
               </span>
               <Icon name="arrowRight" size={24} />

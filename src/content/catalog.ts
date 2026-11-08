@@ -3,12 +3,6 @@
 
 import type { Lens } from "./site";
 
-export type Pack = "cup" | "can" | "bag" | "jar" | "box" | "bottle";
-
-export type Art =
-  | { pack: Pack; tint: string; ink: string; label: string }
-  | { image: string; alt: string };
-
 // What shows in the price slot.
 //   since: years of experience, worked out from a start year.
 //   free:  public projects, shown as $0.00.
@@ -30,7 +24,9 @@ export type Item = {
   category: CategoryId;
   blurb: string;
   price: Price;
-  art: Art;
+  /** A real screenshot in public/projects/. Most items have none, like most dishes on a menu. */
+  image?: { src: string; alt: string };
+  /** A small tag on the menu row, such as "GoTab" or "New". */
   badge?: string;
   /** Used at GoTab. Shown under "Where I've used it". */
   gotab?: boolean;
@@ -55,7 +51,7 @@ export const categories: { id: CategoryId; title: string; note: string }[] = [
   { id: "projects", title: "Projects", note: "Made to order" },
 ];
 
-// Which aisles come first, and what goes on the "Start Here" shelf, per tab.
+// Which sections come first, and what goes under "Popular", per tab.
 export const categoryOrder: Record<Lens, CategoryId[]> = {
   pm: ["case-studies", "product", "leadership", "projects", "backend", "frontend", "tools"],
   eng: ["case-studies", "frontend", "backend", "tools", "projects", "product", "leadership"],
@@ -68,13 +64,6 @@ export const featured: Record<Lens, string[]> = {
   all: ["kitchen-display", "menu-management", "merchant-onboarding", "roadmap", "postgresql", "anjali-taneja"],
 };
 
-const bag = (tint: string, label: string): Art => ({ pack: "bag", tint, ink: "#111111", label });
-const bottle = (tint: string, label: string): Art => ({ pack: "bottle", tint, ink: "#111111", label });
-const cup = (tint: string, label: string, ink = "#ffffff"): Art => ({ pack: "cup", tint, ink, label });
-const can = (tint: string, label: string, ink = "#ffffff"): Art => ({ pack: "can", tint, ink, label });
-const jar = (tint: string, label: string): Art => ({ pack: "jar", tint, ink: "#111111", label });
-const box = (tint: string, label: string, ink = "#ffffff"): Art => ({ pack: "box", tint, ink, label });
-
 export const items: Item[] = [
   // ---------- GoTab work ----------
   {
@@ -84,7 +73,6 @@ export const items: Item[] = [
     blurb:
       "I wrote the first production version of GoTab's Kitchen Display System. Much of the original system remains in production.",
     price: { text: "In production" },
-    art: can("#b4472e", "KITCHEN"),
     gotab: true,
     badge: "GoTab",
     ingredients: ["javascript", "nodejs", "marko", "postgresql"],
@@ -97,7 +85,6 @@ export const items: Item[] = [
     blurb:
       "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard. It was a deciding factor for prospective clients at launch and remains core infrastructure.",
     price: { text: "Core infrastructure" },
-    art: can("#2f6f5e", "MENUS"),
     gotab: true,
     badge: "GoTab",
     keywords: "menus platform qr ordering pos kiosk",
@@ -109,7 +96,6 @@ export const items: Item[] = [
     blurb:
       "Built and scaled merchant onboarding. The assisted flow activates about 50 venues a month at a 65-75% application-to-activation rate, and roughly 97% of those locations remain live. I then extended it into self-serve signup with automated identity and fraud screening, removing manual setup by Customer Success.",
     price: { text: "~50 venues a month" },
-    art: can("#3d5a98", "ONBOARD"),
     gotab: true,
     badge: "GoTab",
     keywords: "activation self-serve signup fraud identity growth",
@@ -120,7 +106,6 @@ export const items: Item[] = [
     category: "case-studies",
     blurb: "Directing the gift card rebuild across issuance, purchase, claiming and redemption in QR ordering and POS.",
     price: { text: "In progress" },
-    art: can("#a8557f", "GIFT CARDS"),
     gotab: true,
     badge: "GoTab",
     keywords: "payments redemption qr ordering pos",
@@ -132,9 +117,7 @@ export const items: Item[] = [
     blurb:
       "Longer write-ups of this work: the problem, my role, what shipped and what changed. Still in the kitchen. Ask for the story at checkout and I'll walk you through it.",
     price: { text: "Coming soon" },
-    art: bag("#c9a77c", "SOON"),
     soon: true,
-    badge: "Soon",
     keywords: "case study gotab restaurant",
   },
 
@@ -146,7 +129,6 @@ export const items: Item[] = [
     blurb:
       "Eight years on a hospitality commerce platform: QR ordering, point of sale, kiosks, kitchen operations, payments and the manager tools behind them.",
     price: { since: 2018 },
-    art: bag("#f1c9a5", "RESTO"),
     gotab: true,
     badge: "GoTab",
     keywords: "domain hospitality pos kitchen ordering payments",
@@ -158,7 +140,6 @@ export const items: Item[] = [
     blurb:
       "I own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues, and set priorities for the engineers building them.",
     price: { text: "Daily" },
-    art: bag("#d8dcc0", "ROADMAP"),
     gotab: true,
     keywords: "product strategy planning product management",
   },
@@ -169,7 +150,6 @@ export const items: Item[] = [
     blurb:
       "Turning a fuzzy ask into a write-up anyone can read, an estimate, and slices that can each merge on their own. Most recently, scoping seven platform requirements for an enterprise launch.",
     price: { text: "Daily" },
-    art: bag("#c6d8e4", "SCOPE"),
     gotab: true,
     keywords: "estimation tickets epics requirements discovery planning",
   },
@@ -179,7 +159,6 @@ export const items: Item[] = [
     category: "product",
     blurb: "Writing requirements and technical specs that engineers can build from and stakeholders can read.",
     price: { text: "Daily" },
-    art: bag("#e6dcb0", "SPECS"),
     gotab: true,
     keywords: "requirements documentation product management",
   },
@@ -189,7 +168,6 @@ export const items: Item[] = [
     category: "product",
     blurb: "Defining UI and UX standards for guest, staff and manager products through design and code review.",
     price: { text: "Daily" },
-    art: bag("#d9d0c3", "DESIGN"),
     gotab: true,
     keywords: "user experience interface standards",
   },
@@ -200,7 +178,6 @@ export const items: Item[] = [
     blurb:
       "Leading ADA and WCAG remediation for guest ordering, based on prospective enterprise client requirements, and holding UI work to AA: keyboard paths, focus, labels and contrast.",
     price: { text: "Every UI PR" },
-    art: bag("#d6cfe6", "A11Y"),
     gotab: true,
     keywords: "wcag ada a11y aria inclusive",
   },
@@ -210,7 +187,6 @@ export const items: Item[] = [
     category: "product",
     blurb: "Ran POS, KDS, TDS and Kiosk releases, handling branching, versioning, cutover and release conflicts.",
     price: { since: 2021 },
-    art: bag("#e3c8a0", "RELEASE"),
     gotab: true,
     keywords: "versioning deploy cutover delivery",
   },
@@ -221,7 +197,6 @@ export const items: Item[] = [
     blurb:
       "Reproduce it, size the impact, set a severity and find the owner. I eliminated more than 15 recurring sources of support requests in two months by fixing the underlying product and engineering issues.",
     price: { text: "Daily" },
-    art: bag("#efc4bd", "TRIAGE"),
     gotab: true,
     keywords: "support incidents severity root cause",
   },
@@ -232,7 +207,6 @@ export const items: Item[] = [
     blurb:
       "Checking rules, schema and assumptions against real production data before designing around them, and putting the query and the numbers in the PR.",
     price: { text: "Daily" },
-    art: bag("#cfe0d2", "DATA"),
     gotab: true,
     keywords: "analytics sql data-driven metrics",
   },
@@ -243,7 +217,6 @@ export const items: Item[] = [
     blurb:
       "Running scoping, PR review, triage, QA and retros through my own Claude Code skills, with a context-free second reviewer and production evidence as the bar.",
     price: { text: "Daily" },
-    art: bag("#e9b89f", "AI"),
     badge: "New",
     keywords: "claude code agents llm automation workflow",
   },
@@ -256,7 +229,6 @@ export const items: Item[] = [
     blurb:
       "Grew and managed a team of junior and mid-level engineers from 2021. Today I set priorities for 3 to 4 engineers and directly manage a team of 2.",
     price: { since: 2021 },
-    art: bottle("#c9d6c3", "LEAD"),
     gotab: true,
     badge: "GoTab",
     keywords: "manager team people director",
@@ -268,7 +240,6 @@ export const items: Item[] = [
     blurb:
       "Reviewing and testing PRs against the actual ask: does it do what was requested, what else does it touch, and how do we know it works?",
     price: { text: "Daily" },
-    art: bottle("#d9d2c0", "REVIEW"),
     gotab: true,
     keywords: "pull requests testing quality",
   },
@@ -278,7 +249,6 @@ export const items: Item[] = [
     category: "leadership",
     blurb: "Technical hiring and onboarding as the team grew, and bringing junior engineers along through code review.",
     price: { since: 2021 },
-    art: bottle("#e7cfc0", "GROW"),
     gotab: true,
     keywords: "interviews coaching mentoring junior developers",
   },
@@ -290,7 +260,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "My first language and still my daily one, on both sides of the stack. ES6 and beyond.",
     price: { since: 2017 },
-    art: cup("#e8c92c", "JS", "#111111"),
     gotab: true,
     keywords: "es6 js",
   },
@@ -300,7 +269,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "My default for new projects, including this one.",
     price: { since: 2022 },
-    art: cup("#3178c6", "TS"),
     keywords: "ts types",
   },
   {
@@ -309,7 +277,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "The UI framework behind production GoTab screens. Rarer than React, and I know its sharp edges.",
     price: { since: 2018 },
-    art: cup("#d6336c", "MARKO"),
     gotab: true,
     badge: "GoTab",
     keywords: "markojs mobx",
@@ -320,7 +287,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "Components, hooks and state. This site runs on it.",
     price: { since: 2018 },
-    art: cup("#1c8fb5", "REACT"),
     keywords: "reactjs redux hooks",
   },
   {
@@ -329,7 +295,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "My pick for React sites that need real URLs and prerendered pages.",
     price: { since: 2022 },
-    art: cup("#1b1b1b", "NEXT"),
     keywords: "nextjs ssr static",
   },
   {
@@ -338,7 +303,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "Semantic markup and responsive layouts, mobile-first.",
     price: { since: 2017 },
-    art: cup("#e2622f", "HTML"),
     keywords: "responsive mobile layout",
   },
   {
@@ -347,7 +311,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "SCSS for larger stylesheets, from client sites to production apps.",
     price: { since: 2018 },
-    art: cup("#c76494", "SASS"),
     keywords: "scss css",
   },
   {
@@ -356,7 +319,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "Utility-first styling for quick, consistent UI. This site's stylesheet.",
     price: { since: 2022 },
-    art: cup("#0e9fb8", "WIND"),
     keywords: "css utility",
   },
   {
@@ -365,7 +327,6 @@ export const items: Item[] = [
     category: "frontend",
     blurb: "A long-time standard for me, in production at GoTab and on earlier projects.",
     price: { since: 2017 },
-    art: cup("#7952b3", "BOOT"),
     gotab: true,
     keywords: "css jquery",
   },
@@ -377,7 +338,6 @@ export const items: Item[] = [
     category: "backend",
     blurb: "Services, queue handlers and scripts. The other half of my day-to-day JavaScript.",
     price: { since: 2018 },
-    art: can("#3c873a", "NODE"),
     gotab: true,
     keywords: "node server javascript backend",
   },
@@ -387,7 +347,6 @@ export const items: Item[] = [
     category: "backend",
     blurb: "REST APIs and small servers.",
     price: { since: 2018 },
-    art: can("#3a3a3a", "EXPRESS"),
     keywords: "rest api server",
   },
   {
@@ -397,7 +356,6 @@ export const items: Item[] = [
     blurb:
       "Schema design, migrations, query tuning and reading production data to settle arguments. A product person who writes their own SQL saves everyone a ticket.",
     price: { since: 2018 },
-    art: jar("#5b86ad", "POSTGRES"),
     gotab: true,
     badge: "GoTab",
     keywords: "sql database postgres migrations data",
@@ -409,7 +367,6 @@ export const items: Item[] = [
     category: "backend",
     blurb: "Writing the queries behind features, and reading production data to answer product questions.",
     price: { since: 2018 },
-    art: jar("#e0a458", "SQL"),
     gotab: true,
     keywords: "queries data analytics database",
   },
@@ -419,7 +376,6 @@ export const items: Item[] = [
     category: "backend",
     blurb: "Modeling data so features hold up across products and venues.",
     price: { since: 2018 },
-    art: jar("#7cb88a", "SCHEMA"),
     gotab: true,
     keywords: "database modeling migrations",
   },
@@ -429,7 +385,6 @@ export const items: Item[] = [
     category: "backend",
     blurb: "Designing and building the APIs between clients and services.",
     price: { since: 2018 },
-    art: can("#5c6bc0", "REST"),
     gotab: true,
     keywords: "api services backend",
   },
@@ -441,7 +396,6 @@ export const items: Item[] = [
     category: "tools",
     blurb: "Branches, reviews, project boards and release branches. Where most of my day happens.",
     price: { since: 2017 },
-    art: box("#d9502e", "GIT"),
     gotab: true,
     keywords: "version control pull requests",
   },
@@ -451,7 +405,6 @@ export const items: Item[] = [
     category: "tools",
     blurb: "Unit and component tests with Jest, browser tests with Cypress.",
     price: { text: "Every PR" },
-    art: box("#8f5a3c", "TEST"),
     keywords: "unit integration e2e qa",
   },
   {
@@ -460,7 +413,6 @@ export const items: Item[] = [
     category: "tools",
     blurb: "Previews on every PR and quick deploys. This site lives here.",
     price: { since: 2021 },
-    art: box("#1b1b1b", "SHIP"),
     keywords: "hosting deploy",
   },
   {
@@ -469,7 +421,6 @@ export const items: Item[] = [
     category: "tools",
     blurb: "Workers for small edge services, plus static hosting for side projects.",
     price: { since: 2025 },
-    art: box("#ee7f1f", "EDGE", "#111111"),
     keywords: "workers serverless wrangler hosting deploy edge",
   },
   {
@@ -478,7 +429,6 @@ export const items: Item[] = [
     category: "tools",
     blurb: "My daily coding agent, set up with custom skills, hooks and review rules.",
     price: { since: 2025 },
-    art: box("#c96f4a", "CLAUDE"),
     badge: "New",
     keywords: "ai agents llm",
   },
@@ -491,7 +441,7 @@ export const items: Item[] = [
     blurb:
       "Website for a DC music artist, built around a playable retro radio with drag-to-turn knobs and stations you can tune between.",
     price: { free: true },
-    art: { image: "/projects/anjali-taneja.jpg", alt: "A cream-colored retro radio with two speakers, under the Anjali Taneja site header" },
+    image: { src: "/projects/anjali-taneja.jpg", alt: "A cream-colored retro radio with two speakers, under the Anjali Taneja site header" },
     badge: "Live",
     ingredients: ["javascript", "html-css"],
     links: [
@@ -506,7 +456,7 @@ export const items: Item[] = [
     category: "projects",
     blurb: "A minesweeper game with easy, medium and hard boards and a classic desktop look.",
     price: { free: true },
-    art: { image: "/projects/chem-cleanup.jpg", alt: "A minesweeper board with a mine counter, smiley button and timer" },
+    image: { src: "/projects/chem-cleanup.jpg", alt: "A minesweeper board with a mine counter, smiley button and timer" },
     badge: "Live",
     ingredients: ["nextjs", "react", "typescript", "tailwind", "testing"],
     links: [
@@ -522,7 +472,6 @@ export const items: Item[] = [
     blurb:
       "You're ordering from it. A portfolio shaped like the kind of product I work on: static pages, a real cart, and no backend to keep alive.",
     price: { free: true },
-    art: box("#111111", "dtn."),
     badge: "Live",
     ingredients: ["nextjs", "react", "typescript", "tailwind", "vercel", "claude-code"],
     links: [{ label: "View code", href: "https://github.com/ziggysauce/portfolio" }],
@@ -534,7 +483,6 @@ export const items: Item[] = [
     category: "projects",
     blurb: "A font browser built on the Google Fonts API, with live text previews. Code only for now.",
     price: { free: true },
-    art: box("#4b6fd6", "Aa"),
     ingredients: ["react", "nodejs", "express", "sass", "bootstrap"],
     links: [{ label: "View code", href: "https://github.com/ziggysauce/favorite-fonts" }],
     keywords: "google fonts api typography",
@@ -545,7 +493,6 @@ export const items: Item[] = [
     category: "projects",
     blurb: "A video-music player built on YouTube's API with a small team. Code only.",
     price: { free: true },
-    art: box("#b23a48", "PLAY"),
     ingredients: ["javascript", "html-css", "nodejs"],
     links: [{ label: "View code", href: "https://github.com/chingu-voyage4/Geckos-Team-32" }],
     keywords: "youtube music video team chingu",
@@ -574,14 +521,14 @@ export function foundIn(slug: string): Item[] {
   return items.filter((item) => item.ingredients?.includes(slug));
 }
 
-/** Same aisle first, skipping the item itself and anything not ready. */
+/** Same section first, skipping the item itself and anything not ready. */
 export function related(item: Item, limit = 6): Item[] {
   const ingredients = (item.ingredients ?? []).map(requireItem);
   const usedIn = foundIn(item.slug);
-  const sameAisle = itemsIn(item.category);
+  const sameSection = itemsIn(item.category);
   const seen = new Set<string>([item.slug]);
   const out: Item[] = [];
-  for (const candidate of [...ingredients, ...usedIn, ...sameAisle]) {
+  for (const candidate of [...ingredients, ...usedIn, ...sameSection]) {
     if (seen.has(candidate.slug) || candidate.soon) continue;
     seen.add(candidate.slug);
     out.push(candidate);

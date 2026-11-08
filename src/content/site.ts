@@ -55,7 +55,6 @@ export const company = {
 export const roles = [
   {
     id: "director",
-    code: "DIR",
     title: "Director, Technical Product Management",
     dates: "July 2026 to present",
     current: true,
@@ -71,7 +70,6 @@ export const roles = [
   },
   {
     id: "engineering-manager",
-    code: "MGR",
     title: "Engineering Manager",
     dates: "June 2021 to July 2026",
     current: false,
@@ -86,7 +84,6 @@ export const roles = [
   },
   {
     id: "software-developer",
-    code: "DEV",
     title: "Software Developer",
     dates: "June 2018 to June 2021",
     current: false,

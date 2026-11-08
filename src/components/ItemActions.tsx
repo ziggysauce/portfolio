@@ -48,15 +48,15 @@ export function ShareButton({ name }: { name: string }) {
   }
 
   return (
-    <div className="absolute bottom-4 right-4 flex items-center gap-2">
-      <span aria-live="polite" className={copied ? "rounded-full bg-white px-3 py-1 text-xs" : "sr-only"}>
+    <div className="flex items-center gap-2">
+      <span aria-live="polite" className={copied ? "rounded-full bg-tile px-3 py-1 text-[13px]" : "sr-only"}>
         {copied ? "Link copied" : ""}
       </span>
       <button
         type="button"
         onClick={share}
         aria-label={`Share ${name}`}
-        className="grid size-12 place-items-center rounded-full bg-white transition-colors hover:bg-ink hover:text-white"
+        className="-mr-2 grid size-11 place-items-center rounded-full transition-colors hover:bg-tile"
       >
         <Icon name="share" size={22} />
       </button>
@@ -82,7 +82,7 @@ export function AddToOrder({ item }: { item: Item }) {
           className={`btn w-full justify-between ${inOrder ? "btn-outline" : "btn-primary"}`}
         >
           {inOrder ? "Remove from order" : "Add to order"}
-          {inOrder ? <Icon name="check" size={20} /> : <Price price={item.price} className="text-[17px] normal-case tracking-normal" />}
+          {inOrder ? <Icon name="check" size={20} /> : <Price price={item.price} className="text-[16px]" />}
         </button>
       )}
     </div>

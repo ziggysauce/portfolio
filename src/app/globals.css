@@ -2,41 +2,40 @@
 
 /* ==========================================================================
    Design tokens. Tune the look here: colors, fonts and component styles.
-   Fonts are chosen in src/app/layout.tsx. Packaging art is in ProductArt.tsx.
+   Fonts are chosen in src/app/layout.tsx.
    ========================================================================== */
 
 @theme {
-  --color-ink: #0a0a0a;
-  --color-muted: #686868;
-  --color-line: #e3e3e3; /* Decorative dividers. */
-  --color-control: #8c8c8c; /* Input and control borders: keep at 3:1 or more on white. */
-  --color-tile: #f2f3f5;
-  --color-cream: #f7f5ec;
-  --color-cream-line: #e4dcb2;
-  --color-gold: #dcc65e;
-  --color-board: #000000;
-  --color-board-muted: #a8a8a8;
-  --color-accent: #ff52cc;
+  --color-ink: #1d1b18;
+  --color-muted: #67625a; /* 6:1 on white, 5.4:1 on tile. */
+  --color-line: #e9e4dc; /* Decorative dividers. */
+  --color-control: #8c8780; /* Input and control borders: keep at 3:1 or more on white. */
+  --color-tile: #f5f2ec;
   --color-link: #0a62d8;
-  --color-open: #0f8a4a;
+  --color-open: #0b6b39; /* Status text: 6.6:1 on white. */
   --color-error: #c4210f;
 }
 
 @theme inline {
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-fat), Georgia, serif;
+  --font-display: var(--font-heading), Georgia, serif;
 }
 
 :root {
   color-scheme: light; /* Light-only by design: stops OS dark mode half-theming form controls. */
   --bar-h: 76px;
+  --sticky-top: 80px;
+}
+
+/* The menu's category tabs stick under the header, so anchors land lower there. */
+html:has(.menu-tabs) {
+  --sticky-top: 132px;
 }
 
 html {
   scroll-behavior: smooth;
   /* Keeps anchors and keyboard focus clear of the sticky header and order bar. */
-  scroll-padding-top: 80px;
+  scroll-padding-top: var(--sticky-top);
   scroll-padding-bottom: calc(var(--bar-h) + 16px);
 }
 
@@ -44,7 +43,8 @@ body {
   background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-weight: 350;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -60,7 +60,7 @@ html:has(dialog[open]) {
 @layer components {
   .page {
     width: 100%;
-    max-width: 1240px;
+    max-width: 1180px;
     margin-inline: auto;
     padding-inline: 16px;
   }
@@ -84,67 +84,65 @@ html:has(dialog[open]) {
     top: 12px;
   }
 
-  .label-caps {
-    font-size: 13px;
-    font-weight: 400;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-  }
-
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 48px;
-    padding: 12px 26px;
+    padding: 12px 22px;
     border-radius: 999px;
-    font-size: 13px;
-    font-weight: 400;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.2;
     text-align: center;
     cursor: pointer;
-    transition: background-color 150ms, color 150ms;
+    transition: background-color 150ms, color 150ms, border-color 150ms;
   }
   .btn-primary {
     background: var(--color-ink);
     color: #fff;
   }
+  .btn-outline {
+    border: 1px solid var(--color-control);
+    color: var(--color-ink);
+  }
   /* Hover only where hover exists, or a tapped button stays dark on phones. */
   @media (hover: hover) {
     .btn-primary:hover {
-      background: #333;
+      background: #3a3732;
     }
     .btn-outline:hover {
-      background: var(--color-ink);
-      color: #fff;
+      border-color: var(--color-ink);
+      background: var(--color-tile);
     }
     .nav-link:hover {
       text-decoration: underline;
     }
   }
-  .btn-outline {
-    border: 1.5px solid var(--color-ink);
-    color: var(--color-ink);
+
+  /* Small labels on menu items ("GoTab", "New"). */
+  .tag {
+    display: inline-block;
+    border-radius: 6px;
+    background: var(--color-tile);
+    padding: 1px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.6;
+    white-space: nowrap;
   }
 
-  .badge {
-    border-radius: 999px;
-    background: var(--color-accent);
-    color: var(--color-ink);
-    padding: 3px 10px;
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  .aisle-title {
+  .section-title {
     font-family: var(--font-display);
     font-size: 26px;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  @media (min-width: 768px) {
+    .section-title {
+      font-size: 28px;
+    }
   }
 
   .nav-link {
@@ -158,7 +156,7 @@ html:has(dialog[open]) {
   /* Raised, underlined units, like the cents on a menu price. */
   .price {
     font-size: 15px;
-    font-weight: 400;
+    font-weight: 500;
   }
   .price sup {
     margin-left: 2px;
@@ -169,39 +167,71 @@ html:has(dialog[open]) {
     line-height: 0;
   }
 
-  .lens-tab {
-    position: relative;
-    padding-block: 6px 14px;
-    font-family: var(--font-display);
-    font-size: 18px;
+  /* Product / Engineering / Everything, like Delivery / Pickup. */
+  .segmented {
+    display: inline-flex;
+    gap: 2px;
+    border-radius: 999px;
+    background: var(--color-tile);
+    padding: 4px;
+  }
+  .segmented button {
+    min-height: 40px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    color: var(--color-muted);
+    font-size: 15px;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    transition: color 150ms;
+    transition: background-color 150ms, color 150ms;
   }
-  .lens-tab[aria-pressed="true"]::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 2px;
-    width: 6px;
-    height: 6px;
-    background: var(--color-ink);
-    transform: translateX(-50%);
+  /* Full width on phones, three equal buttons, so it fits at 320px. */
+  @media (max-width: 767px) {
+    .segmented {
+      display: flex;
+      width: 100%;
+    }
+    .segmented button {
+      flex: 1 1 0;
+      padding-inline: 6px;
+    }
+  }
+  .segmented button[aria-pressed="true"] {
+    background: #fff;
+    color: var(--color-ink);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  }
+  @media (hover: hover) {
+    .segmented button[aria-pressed="false"]:hover {
+      color: var(--color-ink);
+    }
   }
 
-  .letterboard {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 4px 20px;
-    font-family: var(--font-sten), Impact, sans-serif;
-    font-weight: 600;
-    font-size: clamp(40px, 11.500vw, 76px);
-    line-height: 1.04;
-    letter-spacing: 0.05em;
+  /* Category tabs that stick under the header. */
+  .menu-tabs {
+    position: sticky;
+    top: 64px;
+    z-index: 20;
+    background: #fff;
+    border-bottom: 1px solid var(--color-line);
   }
-  @media (min-width: 1024px) {
-    .letterboard {
-      font-size: clamp(44px, 5.200vw, 76px);
+  .menu-tab {
+    display: block;
+    padding: 14px 2px 12px;
+    border-bottom: 2px solid transparent;
+    color: var(--color-muted);
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .menu-tab[aria-current="true"] {
+    border-color: var(--color-ink);
+    color: var(--color-ink);
+  }
+  @media (hover: hover) {
+    .menu-tab:hover {
+      color: var(--color-ink);
     }
   }
 
@@ -209,6 +239,7 @@ html:has(dialog[open]) {
     display: block;
     margin-bottom: 6px;
     font-size: 14px;
+    font-weight: 500;
   }
   .field {
     display: block;
@@ -240,7 +271,7 @@ html:has(dialog[open]) {
 
   .option-card {
     border: 1px solid var(--color-line);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 16px 18px;
   }
 
@@ -250,12 +281,13 @@ html:has(dialog[open]) {
     border-radius: 999px;
     background: var(--color-tile);
     color: var(--color-muted);
-    padding: 3px 10px;
-    font-size: 12px;
+    padding: 2px 10px;
+    font-size: 13px;
+    font-weight: 500;
   }
   .status-live {
     background: #e3f4e8;
-    color: #0b6b39;
+    color: var(--color-open);
   }
 
   /* The <summary> that opens a role's receipt, styled as a small pill. */
@@ -267,6 +299,7 @@ html:has(dialog[open]) {
     border-radius: 999px;
     background: var(--color-tile);
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
     list-style: none;
   }
@@ -275,7 +308,7 @@ html:has(dialog[open]) {
   }
   @media (hover: hover) {
     .receipt-toggle:hover {
-      background: #e6e7ea;
+      background: #ece7de;
     }
   }
 
@@ -290,7 +323,7 @@ html:has(dialog[open]) {
 /* The checkout slides up like a sheet, and the toast rises into place. */
 @keyframes sheet-up {
   from {
-    transform: translateY(48px);
+    transform: translateY(32px);
     opacity: 0;
   }
 }

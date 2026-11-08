@@ -16,32 +16,26 @@ import {
   type OrderDetails,
 } from "@/lib/order";
 import { CopyButton } from "./CopyButton";
-import { Icon, PinIcon } from "./Icon";
+import { PinIcon } from "./Icon";
+import { MenuGrid } from "./MenuItem";
 import { Price } from "./Price";
-import { ProductArt } from "./ProductArt";
-import { Shelf } from "./ProductCard";
 
 const TIPS = ["A project", "A question", "A coffee", "Custom"];
 
 function SheetHeader() {
   return (
-    <div className="rounded-t-2xl bg-board pb-8 pt-3 text-white">
-      <div aria-hidden="true" className="mx-auto h-1 w-9 rounded-full bg-[#5a5a5a]" />
-      <div className="page mt-5 flex items-center justify-between gap-4">
-        <Link href="/about#history" className="flex min-w-0 items-center gap-3 rounded-sm">
-          <PinIcon />
-          <span className="min-w-0">
-            <span className="block truncate text-xs text-board-muted">{site.replyTime}</span>
-            <span className="flex items-center gap-1.5 text-[15px]">
-              {site.location} <Icon name="arrowDown" size={16} />
-            </span>
-          </span>
+    <div className="page flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-6 pt-6 md:pt-12">
+      <div className="min-w-0">
+        <h1 className="font-display text-[40px] font-normal leading-tight md:text-[52px]">Your order</h1>
+        <Link href="/about#history" className="mt-1 inline-flex items-center gap-1.5 rounded-sm text-[15px] text-muted hover:text-ink">
+          <PinIcon size={18} className="shrink-0" />
+          {site.location} &middot; {site.replyTime}
         </Link>
-        <p className="shrink-0 text-right">
-          <span className="block text-xs text-board-muted">Total</span>
-          <span className="text-[15px]">Market price</span>
-        </p>
       </div>
+      <p className="sm:text-right">
+        <span className="text-[15px] text-muted sm:block sm:text-[13px]">Total </span>
+        <span className="text-[16px] font-medium">Market price</span>
+      </p>
     </div>
   );
 }
@@ -64,10 +58,10 @@ function OrderLines({ items }: { items: Item[] }) {
   if (!items.length) {
     return (
       <div className="py-10 text-center">
-        <p ref={emptyHeading} tabIndex={-1} className="font-display text-2xl outline-none">
+        <p ref={emptyHeading} tabIndex={-1} className="font-display text-[26px] outline-none">
           Nothing in your order yet
         </p>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+        <p className="mx-auto mt-2 max-w-sm text-[15px] text-muted">
           That&rsquo;s fine. Browse the menu, or leave me a note below and send it as is.
         </p>
         <Link href="/#menu" className="btn btn-outline mt-5">
@@ -79,26 +73,21 @@ function OrderLines({ items }: { items: Item[] }) {
   return (
     <ul ref={list} className="divide-y divide-line">
       {items.map((item, index) => (
-        <li key={item.slug} className="flex gap-4 py-5">
-          <Link href={`/item/${item.slug}`} tabIndex={-1} aria-hidden="true" className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden bg-tile">
-            <ProductArt art={item.art} sizes="112px" />
-          </Link>
-          <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Link href={`/item/${item.slug}`} className="text-[15px] leading-snug hover:underline">
-                {item.name}
-              </Link>
-              <Price price={item.price} className="mt-1.5 block" />
-            </div>
-            <button
-              type="button"
-              onClick={() => remove(item.slug, index)}
-              aria-label={`Remove ${item.name} from your order`}
-              className="label-caps shrink-0 rounded-sm py-1 underline-offset-4 hover:underline"
-            >
-              Remove
-            </button>
+        <li key={item.slug} className="flex items-start justify-between gap-4 py-4">
+          <div className="min-w-0">
+            <Link href={`/item/${item.slug}`} className="text-[16px] font-medium leading-snug underline-offset-4 hover:underline">
+              {item.name}
+            </Link>
+            <Price price={item.price} className="mt-1 block text-muted" />
           </div>
+          <button
+            type="button"
+            onClick={() => remove(item.slug, index)}
+            aria-label={`Remove ${item.name} from your order`}
+            className="shrink-0 rounded-sm py-1 text-[14px] font-medium underline underline-offset-4"
+          >
+            Remove
+          </button>
         </li>
       ))}
     </ul>
@@ -114,7 +103,7 @@ function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void 
 
   return (
     <div className="page max-w-xl py-10">
-      <h1 ref={heading} tabIndex={-1} className="font-display text-[40px] leading-tight outline-none">
+      <h1 ref={heading} tabIndex={-1} className="font-display text-[40px] font-normal leading-tight outline-none">
         One more step, {order.name.split(" ")[0]}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed">
@@ -222,7 +211,6 @@ export function Checkout() {
 
   return (
     <div className="sheet-up">
-      <h1 className="sr-only">Your order</h1>
       <SheetHeader />
       <div className="page grid grid-cols-[minmax(0,1fr)] gap-x-14 pt-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div>
@@ -230,11 +218,11 @@ export function Checkout() {
 
           {suggestions.length ? (
             <section aria-labelledby="also-like" className="mt-6 border-t border-line pt-8">
-              <h2 id="also-like" className="aisle-title">
-                You Might Also Like
+              <h2 id="also-like" className="section-title">
+                You might also like
               </h2>
-              <div className="mt-5 md:[&>div]:grid-cols-3 lg:[&>div]:grid-cols-3 xl:[&>div]:grid-cols-3">
-                <Shelf items={suggestions} label="You might also like" />
+              <div className="mt-5">
+                <MenuGrid items={suggestions} className="lg:grid-cols-1" />
               </div>
             </section>
           ) : null}
@@ -242,8 +230,8 @@ export function Checkout() {
 
         <form onSubmit={submit} noValidate className="mt-8 self-start lg:sticky lg:top-20 lg:mt-5">
           <fieldset>
-            <legend className="aisle-title">Leave a Tip</legend>
-            <p className="mt-1 text-sm text-muted">Tell me what brings you here.</p>
+            <legend className="section-title">Leave a tip</legend>
+            <p className="mt-1 text-[15px] text-muted">Tell me what brings you here.</p>
             <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-xl border border-control">
               {TIPS.map((option) => (
                 <label key={option} className="relative cursor-pointer border-l border-control first:border-l-0">

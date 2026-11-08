@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddToOrder, BackLink, ShareButton } from "@/components/ItemActions";
 import { Icon } from "@/components/Icon";
-import { ProductArt } from "@/components/ProductArt";
-import { Shelf } from "@/components/ProductCard";
+import { MenuGrid } from "@/components/MenuItem";
 import { foundIn, getItem, items, related, requireItem, yearsSince, type Item } from "@/content/catalog";
 import { site } from "@/content/site";
 
@@ -52,31 +52,37 @@ export default async function ItemPage({ params }: Props) {
 
   return (
     <>
-      <div className="page">
+      <div className="page flex max-w-3xl items-center justify-between">
         <BackLink />
+        <ShareButton name={item.name} />
       </div>
-      <article className="page mt-1 grid gap-8 lg:grid-cols-2 lg:gap-14">
-        <div className="-mx-4 md:mx-0">
-          <div className="relative aspect-[4/3] overflow-hidden bg-tile lg:sticky lg:top-20">
-            <ProductArt art={item.art} sizes="(min-width: 1024px) 50vw, 100vw" />
-            {item.badge ? <span className="badge absolute left-4 top-4">{item.badge}</span> : null}
-            <ShareButton name={item.name} />
+      <article className="page mt-1 max-w-3xl">
+        {item.image ? (
+          <div className="relative mb-6 aspect-[16/9] overflow-hidden rounded-xl bg-tile">
+            <Image
+              src={item.image.src}
+              alt={item.image.alt}
+              fill
+              sizes="(min-width: 768px) 704px, 100vw"
+              className="object-cover object-top"
+            />
           </div>
-        </div>
+        ) : null}
 
-        <div className="lg:pt-4">
-          <h1 className="text-center font-display text-[36px] leading-[1.12] tracking-tight md:text-[44px] lg:text-left">{item.name}</h1>
-          <p className="mt-3 text-center text-[16px] leading-relaxed lg:text-left">{item.blurb}</p>
+        <div>
+          {item.badge ? <span className="tag">{item.badge}</span> : null}
+          <h1 className="mt-2 font-display text-[36px] font-normal leading-[1.12] md:text-[48px]">{item.name}</h1>
+          <p className="mt-3 text-[17px] leading-relaxed">{item.blurb}</p>
 
           <div className="mt-8 space-y-3">
             <div className="option-card">
-              <p className="text-[17px]">{detail.label}</p>
+              <p className="font-medium">{detail.label}</p>
               <p className="mt-0.5 text-[15px] text-muted">{detail.value}</p>
             </div>
 
             {item.gotab || usedIn.length ? (
               <div className="option-card">
-                <p className="text-[17px]">Where I&rsquo;ve used it</p>
+                <p className="font-medium">Where I&rsquo;ve used it</p>
                 <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
                   {item.gotab ? <li>GoTab</li> : null}
                   {usedIn.map((project) => (
@@ -92,7 +98,7 @@ export default async function ItemPage({ params }: Props) {
 
             {ingredients.length ? (
               <div className="option-card">
-                <p className="text-[17px]">Ingredients</p>
+                <p className="font-medium">Ingredients</p>
                 <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
                   {ingredients.map((ingredient) => (
                     <li key={ingredient.slug}>
@@ -111,7 +117,7 @@ export default async function ItemPage({ params }: Props) {
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="option-card flex items-center justify-between text-[17px] transition-colors hover:border-ink"
+                className="option-card flex items-center justify-between font-medium transition-colors hover:border-ink"
               >
                 {link.label}
                 <Icon name="arrowRight" size={24} />
@@ -121,7 +127,7 @@ export default async function ItemPage({ params }: Props) {
 
           {item.sections?.map((section) => (
             <section key={section.heading} className="mt-8">
-              <h2 className="aisle-title">{section.heading}</h2>
+              <h2 className="section-title">{section.heading}</h2>
               <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed">{section.body}</p>
             </section>
           ))}
@@ -131,12 +137,12 @@ export default async function ItemPage({ params }: Props) {
       </article>
 
       {also.length ? (
-        <section aria-labelledby="also-like" className="page mt-14">
-          <h2 id="also-like" className="aisle-title">
-            You Might Also Like
+        <section aria-labelledby="also-like" className="page mt-14 max-w-3xl">
+          <h2 id="also-like" className="section-title">
+            You might also like
           </h2>
           <div className="mt-5">
-            <Shelf items={also} label="You might also like" />
+            <MenuGrid items={also} />
           </div>
         </section>
       ) : null}
