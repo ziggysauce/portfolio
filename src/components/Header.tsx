@@ -11,7 +11,7 @@ import { Icon } from "./Icon";
 const nav = [
   { label: "Menu", href: "/" },
   { label: "Profile", href: "/about" },
-  { label: "Orders", href: "/orders" },
+  { label: "Work history", href: "/orders" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -55,9 +55,6 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/contact" className="nav-link md:hidden">
-            Contact
-          </Link>
           <Link
             href="/checkout"
             aria-label={`Your order, ${count} ${count === 1 ? "item" : "items"}`}
@@ -104,9 +101,8 @@ export function Header() {
           </li>
           <li>
             <Link href="/orders" onClick={() => menu.current?.close()}>
-              Orders
+              Work history
             </Link>
-            <p className="font-sans text-sm text-muted">My work history</p>
           </li>
           <li>
             <a href={site.resume} target="_blank" rel="noreferrer">

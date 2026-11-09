@@ -16,8 +16,13 @@ const paths = {
   plus: <path d="M12 5v14M5 12h14" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   arrowRight: <path d="M3 12h18M15 6l6 6-6 6" />,
-  arrowDown: <path d="M12 4v16M6 14l6 6 6-6" />,
   back: <path d="M15 4l-8 8 8 8" />,
+  mail: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3.5 7l8.5 6.5L20.5 7" />
+    </>
+  ),
   share: (
     <>
       <path d="M12 15V3.5M7.5 8L12 3.5 16.5 8" />
@@ -43,18 +48,6 @@ export function Icon({ name, size = 24, className }: { name: IconName; size?: nu
       className={className}
     >
       {paths[name]}
-    </svg>
-  );
-}
-
-export function PinIcon({ size = 28, className }: { size?: number; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" className={className}>
-      <path
-        fill="currentColor"
-        fillRule="evenodd"
-        d="M12 1.5a8 8 0 0 0-8 8c0 5.2 5.6 11 7.4 12.8a.8.8 0 0 0 1.2 0C14.4 20.5 20 14.700 20 9.500a8 8 0 0 0-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"
-      />
     </svg>
   );
 }

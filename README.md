@@ -1,6 +1,6 @@
 # Daniel Nguyen's portfolio (v3)
 
-A portfolio built like a restaurant ordering app. Skills and projects are products, the menu reorders by what you're interested in, and checkout is how you get in touch. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
+A portfolio built like a restaurant ordering app. Three GoTab projects lead the page, the menu of skills and side projects reorders by what you're interested in, and the order is an optional list of topics that goes into an email. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
 
 Next.js static export, TypeScript and Tailwind. There is no backend: `npm run build` writes plain files to `out/`, so it runs on any static host.
 
@@ -17,27 +17,34 @@ npm run typecheck
 
 | To change | Edit |
 |---|---|
-| Name, links, headline, pitch per tab, education | `src/content/site.ts` |
-| Work history on `/orders`, and which menu items each role links to (`items`) | `roles` in `src/content/site.ts` |
+| Name, links, headline, homepage opening, the note under each Explore tab, Profile summary, education | `src/content/site.ts` |
+| Work history on `/orders`, which menu items each role links to (`items`), and the role line on signature cards | `roles` in `src/content/site.ts` |
 | Résumé PDF (replace the file, keep the name) | `public/Daniel_Nguyen_Resume.pdf` |
-| Menu items, sections, Popular picks, section order per tab | `src/content/catalog.ts` |
+| Menu items, sections, the three signature projects, section order per tab | `src/content/catalog.ts` |
 | Colors, button and component styles | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
 | How a menu row looks | `src/components/MenuItem.tsx` |
-| Order email wording | `src/lib/order.ts` |
+| How a signature project card looks | `src/components/SignatureCard.tsx` |
+| Email subject and body | `src/lib/order.ts` |
 
 ## Adding to the menu
 
 Add an entry to `items` in `src/content/catalog.ts`. The page, card, search result and cart behavior come from that entry.
 
-- **Price slot:** `{ since: 2018 }` shows years, `{ free: true }` shows $0.00, `{ text: "Daily" }` shows the word.
+Every card shows the same meta row in the same order, and none of it looks like a price:
+
+- **Status (work and projects):** `status: "In production" | "In progress" | "Live project" | "Code only" | "Coming soon"`, shown as a labeled pill.
+- **Experience (skills):** `since: 2018` shows "Since 2018" on the card and "8 years, since 2018" on the item page.
+- **How often (skills, optional):** `use: "Daily"` shows on the item page only.
+- **Results (optional):** `results: { scope?, points, note? }`. The first point shows on menu cards; signature cards and item pages show them all. Use `scope` and `note` to say what the numbers measure and what they don't.
+- **Grouping (optional):** `groupedUnder: "react"` lists the item on React's card ("Also: Next.js") instead of its own. Its page and URL stay.
 - **Photo (optional):** `image: { src, alt }` for a real screenshot in `public/projects/`. Most items have none, like most dishes on a menu.
 - **Tag (optional):** `badge: "New"` shows a small label on the row.
 - **Linking:** a project's `ingredients` list links it to its skills, and each skill's page links back.
 
 ## Publishing a case study
 
-Add `sections` to any item in the GoTab Work section, such as `menu-management`. When they're all published, delete the `gotab-case-studies` placeholder.
+Add `sections` to any item in the GoTab Work section, such as `menu-management`. When they're all published, delete the `gotab-case-studies` placeholder. To change which three lead the homepage, edit `signature` in `src/content/catalog.ts`.
 
 ```ts
 sections: [
@@ -52,11 +59,10 @@ sections: [
 
 | Ordering app | Portfolio |
 |---|---|
-| Delivery / Pickup tabs | Product / Engineering / Everything |
-| Product price | Years of experience, how often I do it, or $0.00 for public projects |
+| Delivery / Pickup tabs | "Explore my work": Product / Engineering / Everything |
+| Menu | Skills and side projects, below the signature work |
 | Ingredients | The skills in a project |
-| Orders and receipts | Work history at `/orders`: each role, its highlights and what came out of it |
-| Tip | What brings you here: a project, a question, a coffee |
-| Total | Market price |
-| Pay | Send order, which opens an email draft |
+| Your order | Topics you'd like to talk about. Optional |
+| Order history | Work history at `/orders`: each role and its details |
+| Checkout | "What brings you here?", then Draft email (opens your mail app) or Copy message |
 | Skip the line | `/contact`, no order needed |

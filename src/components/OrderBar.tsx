@@ -6,21 +6,24 @@ import { useEffect } from "react";
 import { getItem } from "@/content/catalog";
 import { site } from "@/content/site";
 import { toastStore, useOrderSlugs } from "@/lib/order";
-import { Icon, PinIcon } from "./Icon";
+import { Icon } from "./Icon";
 
 export function OrderBar() {
   const count = useOrderSlugs().length;
   if (usePathname() === "/checkout") return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
+    <div className="order-bar fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
       <div className="page flex h-[var(--bar-h)] items-center justify-between gap-3">
-        <Link href="/about#history" className="flex min-w-0 items-center gap-2.5 rounded-sm">
-          <PinIcon size={22} className="shrink-0" />
+        <Link href="/contact" className="group flex min-w-0 items-center gap-2.5 rounded-sm">
+          <Icon name="mail" size={22} className="shrink-0" />
           <span className="min-w-0">
-            <span className="block truncate text-[13px] leading-snug text-muted">{site.replyTime}</span>
-            <span className="flex items-center gap-1 text-[15px] font-medium leading-snug">
-              {site.location} <Icon name="arrowDown" size={14} />
+            <span className="block text-[15px] font-medium leading-snug group-hover:underline group-hover:underline-offset-4">
+              Contact me
+            </span>
+            <span className="block truncate text-[13px] leading-snug text-muted">
+              <span className="hidden sm:inline">{site.location} &middot; </span>
+              {site.replyTime}
             </span>
           </span>
         </Link>
@@ -61,10 +64,10 @@ export function AddedToast() {
           <Icon name="check" size={20} className="shrink-0" />
           <p className="min-w-0 flex-1 truncate text-[15px]">
             <span className="sr-only">{item.name}: </span>
-            Added to order
+            Added to your order
           </p>
           <Link href="/checkout" className="shrink-0 rounded-sm px-2 py-1 text-[15px] font-medium underline underline-offset-4">
-            Checkout
+            View order
           </Link>
         </div>
       ) : item ? (
