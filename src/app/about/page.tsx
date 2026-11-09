@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { company, education, lenses, offHours, roles, site } from "@/content/site";
+import { company, education, offHours, pitch, roles, site } from "@/content/site";
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -8,8 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
-  const pitch = lenses.find((lens) => lens.id === "all")?.pitch;
-
   return (
     <div className="page max-w-3xl pt-6 md:pt-12">
       <h1 className="font-display text-[44px] leading-[1.08] md:text-[60px]">{site.firstName}</h1>
@@ -27,7 +25,7 @@ export default function AboutPage() {
 
       <section id="history" aria-labelledby="history-title" className="mt-14 scroll-mt-20">
         <h2 id="history-title" className="section-title">
-          Order history
+          Work history
         </h2>
         <p className="mt-1 text-[15px] text-muted">
           {company.name}, {company.place}. {company.about}
@@ -40,13 +38,13 @@ export default function AboutPage() {
                   <span className="block font-medium group-hover:underline group-hover:underline-offset-4">{role.title}</span>
                   <span className="block text-[15px] text-muted">{role.dates}</span>
                 </span>
-                <span className={role.current ? "status status-live" : "status"}>{role.current ? "In progress" : "Delivered"}</span>
+                {role.current ? <span className="status status-live">Current role</span> : null}
               </Link>
             </li>
           ))}
         </ul>
         <Link href="/orders" className="btn btn-outline mt-5">
-          See all orders
+          See full work history
         </Link>
       </section>
 

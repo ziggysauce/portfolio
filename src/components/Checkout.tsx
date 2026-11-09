@@ -2,39 +2,57 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { featured, related, requireItem, type Item } from "@/content/catalog";
+import { categories, related, requireItem, signature, type Item } from "@/content/catalog";
 import { site } from "@/content/site";
-import {
-  clearOrder,
-  lensStore,
-  orderMailto,
-  orderText,
-  removeFromOrder,
-  useOrderItems,
-  type OrderDetails,
-} from "@/lib/order";
-import { CopyButton } from "./CopyButton";
-import { PinIcon } from "./Icon";
+import { clearOrder, orderMailto, orderText, removeFromOrder, useOrderItems, type OrderDetails } from "@/lib/order";
+import { useCopy, type CopyState } from "./CopyButton";
 import { MenuGrid } from "./MenuItem";
-import { Price } from "./Price";
 
-const TIPS = ["A project", "A question", "A coffee", "Custom"];
+const REASONS = ["A project", "A question", "A coffee", "Something else"];
 
-function SheetHeader() {
+function categoryTitle(item: Item) {
+  return categories.find((category) => category.id === item.category)?.title;
+}
+
+function EmailLink() {
   return (
-    <div className="page flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-6 pt-6 md:pt-12">
-      <div className="min-w-0">
-        <h1 className="font-display text-[40px] font-normal leading-tight md:text-[52px]">Your order</h1>
-        <Link href="/about#history" className="mt-1 inline-flex items-center gap-1.5 rounded-sm text-[15px] text-muted hover:text-ink">
-          <PinIcon size={18} className="shrink-0" />
-          {site.location} &middot; {site.replyTime}
-        </Link>
-      </div>
-      <p className="sm:text-right">
-        <span className="text-[15px] text-muted sm:block sm:text-[13px]">Total </span>
-        <span className="text-[16px] font-medium">Market price</span>
+    <a className="underline underline-offset-4" href={`mailto:${site.email}`}>
+      {site.email}
+    </a>
+  );
+}
+
+/** What happened after a copy, in words. On failure, the message itself so it can be copied by hand. */
+function CopyResult({ state, text }: { state: CopyState; text: string }) {
+  const fallback = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (state === "failed") fallback.current?.select();
+  }, [state]);
+
+  return (
+    <>
+      <p role="status" className={state === "idle" ? "sr-only" : "mt-3 text-[15px]"}>
+        {state === "copied" ? (
+          <>
+            Copied. Paste it into an email to <EmailLink />.
+          </>
+        ) : state === "failed" ? (
+          "Your browser blocked copying, so here's the message to copy yourself."
+        ) : (
+          ""
+        )}
       </p>
-    </div>
+      {state === "failed" ? (
+        <textarea
+          ref={fallback}
+          readOnly
+          rows={8}
+          value={text}
+          aria-label="Your message"
+          className="field mt-2 h-auto py-3 text-[15px]"
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -55,12 +73,12 @@ function OrderLines({ items }: { items: Item[] }) {
 
   if (!items.length) {
     return (
-      <div className="py-10 text-center">
+      <div className="py-8">
         <p ref={emptyHeading} tabIndex={-1} className="font-display text-[26px] outline-none">
           Nothing in your order yet
         </p>
-        <p className="mx-auto mt-2 max-w-sm text-[15px] text-muted">
-          That&rsquo;s fine. Browse the menu, or leave me a note below and send it as is.
+        <p className="mt-2 max-w-sm text-[15px] text-muted">
+          That&rsquo;s fine. Pick a few topics from the menu, or just write me a note.
         </p>
         <Link href="/#menu" className="btn btn-outline mt-5">
           Browse the menu
@@ -69,14 +87,14 @@ function OrderLines({ items }: { items: Item[] }) {
     );
   }
   return (
-    <ul ref={list} className="divide-y divide-line">
+    <ul ref={list} aria-label="Topics in your order" className="divide-y divide-line">
       {items.map((item, index) => (
         <li key={item.slug} className="flex items-start justify-between gap-4 py-4">
           <div className="min-w-0">
             <Link href={`/item/${item.slug}`} className="text-[16px] font-medium leading-snug underline-offset-4 hover:underline">
               {item.name}
             </Link>
-            <Price price={item.price} className="mt-1 block text-muted" />
+            <p className="mt-0.5 text-[14px] text-muted">{categoryTitle(item)}</p>
           </div>
           <button
             type="button"
@@ -92,8 +110,12 @@ function OrderLines({ items }: { items: Item[] }) {
   );
 }
 
-function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void }) {
+/** After "Draft email": the handoff to the mail app, with the same message to copy if it never opened. */
+function Drafted({ order, onReset }: { order: OrderDetails; onReset: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const { state, copy } = useCopy();
+  const text = orderText(order);
+
   useEffect(() => {
     heading.current?.focus();
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -105,48 +127,25 @@ function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void 
         One more step, {order.name.split(" ")[0]}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed">
-        Your email app should have opened with this order drafted. Nothing reaches me until you press send there. If it didn&rsquo;t open, copy the order and email it to{" "}
-        <a className="underline underline-offset-4" href={`mailto:${site.email}`}>
-          {site.email}
-        </a>
-        .
+        Your email app should have opened with this message. Nothing reaches me until you press send there. If it didn&rsquo;t open,
+        copy the message and email it to <EmailLink />.
       </p>
 
-      <div className="mt-8 rounded-2xl border border-line p-6">
-        <div className="flex justify-between text-sm text-muted">
-          <span>Order {order.number}</span>
-          <span>{site.location}</span>
-        </div>
-        <ul className="mt-4 space-y-2 border-y border-dashed border-line py-4 text-[15px]">
-          {order.items.length ? (
-            order.items.map((item) => (
-              <li key={item.slug} className="flex justify-between gap-4">
-                <span>{item.name}</span>
-                <Price price={item.price} />
-              </li>
-            ))
-          ) : (
-            <li>A note, no items</li>
-          )}
-        </ul>
-        {order.tip ? (
-          <p className="mt-4 flex justify-between text-[15px]">
-            <span>Tip</span>
-            <span>{order.tip}</span>
-          </p>
-        ) : null}
-        <p className="mt-2 flex justify-between text-[15px] font-medium">
-          <span>Total</span>
-          <span>Market price</span>
-        </p>
+      <div className="mt-6 rounded-2xl border border-line bg-tile p-5">
+        <p className="text-[13px] font-medium text-muted">Your message</p>
+        <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-relaxed">{text}</p>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
         <a href={orderMailto(order)} className="btn btn-primary">
           Open email again
         </a>
-        <CopyButton text={orderText(order)} label="Copy order" />
+        <button type="button" onClick={() => copy(text)} className="btn btn-outline">
+          Copy message
+        </button>
       </div>
+      <CopyResult state={state} text={text} />
+
       <p className="mt-6 text-sm">
         Prefer LinkedIn?{" "}
         <a className="underline underline-offset-4" href={site.linkedin} target="_blank" rel="noreferrer">
@@ -154,7 +153,7 @@ function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void 
         </a>
         .{" "}
         <button type="button" onClick={onReset} className="rounded-sm underline underline-offset-4">
-          Start a new order
+          Start over
         </button>
       </p>
     </div>
@@ -163,81 +162,85 @@ function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void 
 
 export function Checkout() {
   const items = useOrderItems();
-  const lens = lensStore.use();
-  const [tip, setTip] = useState("");
-  const [customTip, setCustomTip] = useState("");
+  const [reason, setReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [note, setNote] = useState("");
   const [nameError, setNameError] = useState(false);
-  const [placed, setPlaced] = useState<OrderDetails | null>(null);
+  const [drafted, setDrafted] = useState<OrderDetails | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
+  const { state: copyState, copy } = useCopy();
 
   // Keyed to the first line so adding a suggestion doesn't reshuffle the row under
   // the pointer. Items already in the order stay put and show a check mark.
-  const suggestions = items[0] ? related(items[0]) : featured[lens].map(requireItem);
+  const suggestions = items[0] ? related(items[0], 4) : signature.map(requireItem);
 
-  function submit(event: FormEvent) {
+  const order: OrderDetails = {
+    name: name.trim(),
+    company: company.trim(),
+    note: note.trim(),
+    reason: reason === "Something else" ? otherReason.trim() : reason,
+    items,
+  };
+
+  /** The message as it stands, or null (and focus on the name) if it isn't ready. */
+  function readyOrder(): OrderDetails | null {
+    if (order.name) return order;
+    setNameError(true);
+    nameInput.current?.focus();
+    return null;
+  }
+
+  function draftEmail(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim()) {
-      setNameError(true);
-      nameInput.current?.focus();
-      return;
-    }
-    const order = {
-      name: name.trim(),
-      company: company.trim(),
-      note: note.trim(),
-      tip: tip === "Custom" ? customTip.trim() : tip,
-      items,
-      number: `#${Math.floor(1000 + Math.random() * 9000)}`,
-    };
-    setPlaced(order);
-    window.location.href = orderMailto(order);
+    const ready = readyOrder();
+    if (!ready) return;
+    setDrafted(ready);
+    window.location.href = orderMailto(ready);
+  }
+
+  function copyMessage() {
+    const ready = readyOrder();
+    if (ready) copy(orderText(ready));
   }
 
   function reset() {
     clearOrder();
-    setPlaced(null);
-    setTip("");
-    setCustomTip("");
+    setDrafted(null);
+    setReason("");
+    setOtherReason("");
     setNote("");
   }
 
-  if (placed) return <Receipt order={placed} onReset={reset} />;
+  if (drafted) return <Drafted order={drafted} onReset={reset} />;
 
   return (
     <div className="sheet-up">
-      <SheetHeader />
-      <div className="page grid grid-cols-[minmax(0,1fr)] gap-x-14 pt-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <div>
-          <OrderLines items={items} />
+      <div className="page border-b border-line pb-6 pt-6 md:pt-12">
+        <h1 className="font-display text-[40px] font-normal leading-tight md:text-[52px]">Your order</h1>
+        <p className="mt-1 text-[15px] text-muted">
+          Topics you&rsquo;d like to talk about. They go into the email, so I know where to start.
+        </p>
+      </div>
 
-          {suggestions.length ? (
-            <section aria-labelledby="also-like" className="mt-6 border-t border-line pt-8">
-              <h2 id="also-like" className="section-title">
-                You might also like
-              </h2>
-              <div className="mt-5">
-                <MenuGrid items={suggestions} className="lg:grid-cols-1" />
-              </div>
-            </section>
-          ) : null}
-        </div>
+      <div className="page grid grid-cols-[minmax(0,1fr)] gap-x-14 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <OrderLines items={items} />
 
-        <form onSubmit={submit} noValidate className="mt-8 self-start lg:sticky lg:top-20 lg:mt-5">
+        <form onSubmit={draftEmail} noValidate className="mt-6 self-start lg:sticky lg:top-20 lg:mt-5">
           <fieldset>
-            <legend className="section-title">Leave a tip</legend>
-            <p className="mt-1 text-[15px] text-muted">Tell me what brings you here.</p>
-            <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-xl border border-control">
-              {TIPS.map((option) => (
-                <label key={option} className="relative cursor-pointer border-l border-control first:border-l-0">
+            <legend className="section-title">What brings you here?</legend>
+            <p className="mt-1 text-[15px] text-muted">Optional, but it helps.</p>
+            {/* The 1px gaps show the border color through, drawing the dividers at any column count. */}
+            <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-control bg-control sm:grid-cols-4">
+              {REASONS.map((option) => (
+                <label key={option} className="relative cursor-pointer bg-white">
                   <input
                     type="radio"
-                    name="tip"
+                    name="reason"
                     value={option}
-                    checked={tip === option}
-                    onChange={() => setTip(option)}
+                    checked={reason === option}
+                    onChange={() => setReason(option)}
                     className="peer absolute inset-0 size-full cursor-pointer opacity-0"
                   />
                   <span className="grid h-12 place-items-center px-1 text-center text-sm transition-colors peer-checked:bg-ink peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-link">
@@ -246,12 +249,12 @@ export function Checkout() {
                 </label>
               ))}
             </div>
-            {tip === "Custom" ? (
+            {reason === "Something else" ? (
               <div className="mt-4">
-                <label htmlFor="custom-tip" className="field-label">
-                  Your tip
+                <label htmlFor="other-reason" className="field-label">
+                  What is it?
                 </label>
-                <input id="custom-tip" value={customTip} onChange={(event) => setCustomTip(event.target.value)} className="field" />
+                <input id="other-reason" value={otherReason} onChange={(event) => setOtherReason(event.target.value)} className="field" />
               </div>
             ) : null}
           </fieldset>
@@ -259,7 +262,7 @@ export function Checkout() {
           <div className="mt-8 space-y-4">
             <div>
               <label htmlFor="order-name" className="field-label">
-                Name for the order <span className="text-muted">(required)</span>
+                Your name <span className="text-muted">(required)</span>
               </label>
               <input
                 id="order-name"
@@ -277,13 +280,13 @@ export function Checkout() {
               />
               {nameError ? (
                 <p id="order-name-error" className="mt-1.5 text-sm text-error">
-                  Add a name so I know who to call out when it&rsquo;s ready.
+                  Add your name so I know who I&rsquo;m writing back to.
                 </p>
               ) : null}
             </div>
             <div>
               <label htmlFor="order-company" className="field-label">
-                Company
+                Company <span className="text-muted">(optional)</span>
               </label>
               <input
                 id="order-company"
@@ -295,30 +298,52 @@ export function Checkout() {
             </div>
             <div>
               <label htmlFor="order-note" className="field-label">
-                Special instructions
+                Message <span className="text-muted">(optional)</span>
               </label>
               <textarea
                 id="order-note"
                 rows={3}
                 value={note}
-                placeholder="What you'd like to talk about"
+                placeholder="Anything you'd like me to know"
                 onChange={(event) => setNote(event.target.value)}
                 className="field h-auto py-3 placeholder:text-muted"
               />
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <button type="submit" className="btn btn-primary w-full">
-              Send order
+          <p id="draft-help" className="mt-6 text-[15px] leading-relaxed">
+            <strong className="font-medium">Draft email</strong> opens your email app with this message and your topics filled in. Nothing
+            is sent until you press send there. No email app? Copy the message instead.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button type="submit" aria-describedby="draft-help" className="btn btn-primary w-full">
+              Draft email
             </button>
-            <Link href="/contact" className="btn btn-outline w-full">
-              Skip the form
-            </Link>
+            <button type="button" onClick={copyMessage} className="btn btn-outline w-full">
+              Copy message
+            </button>
           </div>
-          <p className="mt-3 text-xs text-muted">Send order opens your email app with the order drafted. Nothing goes to a server, and your order only lives in this browser.</p>
+          <CopyResult state={copyState} text={orderText(order)} />
+          <p className="mt-4 text-[15px] text-muted">
+            Rather write your own? Email <EmailLink /> or{" "}
+            <Link href="/contact" className="underline underline-offset-4">
+              see other ways to reach me
+            </Link>
+            .
+          </p>
         </form>
       </div>
+
+      {suggestions.length ? (
+        <section aria-labelledby="also-like" className="page mt-14 border-t border-line pt-8">
+          <h2 id="also-like" className="section-title">
+            You might also like
+          </h2>
+          <div className="mt-5">
+            <MenuGrid items={suggestions} />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

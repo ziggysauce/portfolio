@@ -3,11 +3,8 @@
 
 import type { Lens } from "./site";
 
-// What shows in the price slot.
-//   since: years of experience, worked out from a start year.
-//   free:  public projects, shown as $0.00.
-//   text:  anything else ("Daily", "Market price").
-export type Price = { since: number } | { free: true } | { text: string };
+// Where a piece of work stands. Shown as a labeled pill, so color is never the only cue.
+export type Status = "In production" | "In progress" | "Live project" | "Code only" | "Coming soon";
 
 export type CategoryId =
   | "case-studies"
@@ -23,10 +20,19 @@ export type Item = {
   name: string;
   category: CategoryId;
   blurb: string;
-  price: Price;
+  /** Work and projects: where it stands. */
+  status?: Status;
+  /** Skills: the year I started, shown as "Since 2018". */
+  since?: number;
+  /** Skills: how often, shown on the item page only ("Daily", "Every PR"). */
+  use?: string;
+  /** What came of it, from the résumé. `scope` names what the numbers measure; `note` says what they don't. */
+  results?: { scope?: string; points: string[]; note?: string };
+  /** Shown on another item's menu card instead of its own, e.g. Next.js on React's. Its page still exists. */
+  groupedUnder?: string;
   /** A real screenshot in public/projects/. Most items have none, like most dishes on a menu. */
   image?: { src: string; alt: string };
-  /** A small tag on the menu row, such as "GoTab" or "New". */
+  /** A small tag on the menu row, such as "New". */
   badge?: string;
   /** Used at GoTab. Shown under "Where I've used it". */
   gotab?: boolean;
@@ -42,26 +48,24 @@ export type Item = {
 };
 
 export const categories: { id: CategoryId; title: string; note: string }[] = [
-  { id: "case-studies", title: "GoTab Work", note: "Signature dishes. Full case studies are on the way." },
-  { id: "product", title: "Product & Delivery", note: "Single origin, roasted in production" },
-  { id: "leadership", title: "Team & Leadership", note: "Served family style" },
-  { id: "frontend", title: "Frontend", note: "Poured fresh daily" },
-  { id: "backend", title: "Backend & Data", note: "From the pantry" },
-  { id: "tools", title: "Tools & Platforms", note: "Stocked and ready" },
-  { id: "projects", title: "Projects", note: "Made to order" },
+  { id: "case-studies", title: "GoTab Work", note: "Full case studies are on the way." },
+  { id: "product", title: "Product & Delivery", note: "How I run product work from week to week." },
+  { id: "leadership", title: "Team & Leadership", note: "Running a team and growing it." },
+  { id: "frontend", title: "Frontend", note: "What I build screens with." },
+  { id: "backend", title: "Backend & Data", note: "Services, and the data underneath them." },
+  { id: "tools", title: "Tools & Platforms", note: "Where the work gets reviewed and shipped." },
+  { id: "projects", title: "Projects", note: "Things I've built outside GoTab." },
 ];
 
-// Which sections come first, and what goes under "Popular", per tab.
-export const categoryOrder: Record<Lens, CategoryId[]> = {
-  pm: ["case-studies", "product", "leadership", "projects", "backend", "frontend", "tools"],
-  eng: ["case-studies", "frontend", "backend", "tools", "projects", "product", "leadership"],
-  all: ["case-studies", "projects", "product", "leadership", "frontend", "backend", "tools"],
-};
+// The three GoTab projects that lead the homepage, in order. They sit above the
+// menu, so their section isn't repeated in it.
+export const signature = ["merchant-onboarding", "menu-management", "kitchen-display"];
 
-export const featured: Record<Lens, string[]> = {
-  pm: ["menu-management", "merchant-onboarding", "roadmap", "accessibility", "release-management", "ai-delivery"],
-  eng: ["kitchen-display", "javascript", "postgresql", "nodejs", "marko", "anjali-taneja"],
-  all: ["kitchen-display", "menu-management", "merchant-onboarding", "roadmap", "postgresql", "anjali-taneja"],
+// Menu sections per tab, first to last. GoTab Work is covered by `signature`.
+export const categoryOrder: Record<Lens, CategoryId[]> = {
+  pm: ["product", "leadership", "projects", "backend", "frontend", "tools"],
+  eng: ["frontend", "backend", "tools", "projects", "product", "leadership"],
+  all: ["projects", "product", "leadership", "frontend", "backend", "tools"],
 };
 
 export const items: Item[] = [
@@ -71,10 +75,10 @@ export const items: Item[] = [
     name: "Kitchen Display System",
     category: "case-studies",
     blurb:
-      "I wrote the first production version of GoTab's Kitchen Display System. Much of the original system remains in production.",
-    price: { text: "In production" },
+      "I wrote the first production version of GoTab's Kitchen Display System.",
+    status: "In production",
+    results: { points: ["Much of the original system remains in production."] },
     gotab: true,
-    badge: "GoTab",
     ingredients: ["javascript", "nodejs", "marko", "postgresql"],
     keywords: "kds restaurant engineering",
   },
@@ -83,10 +87,10 @@ export const items: Item[] = [
     name: "Menu Management",
     category: "case-studies",
     blurb:
-      "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard. It was a deciding factor for prospective clients at launch and remains core infrastructure.",
-    price: { text: "Core infrastructure" },
+      "Led development of Menus, the shared menu-management system for QR ordering, POS, Kiosk and Manager Dashboard.",
+    status: "In production",
+    results: { points: ["A deciding factor for prospective clients at launch.", "Still core infrastructure."] },
     gotab: true,
-    badge: "GoTab",
     keywords: "menus platform qr ordering pos kiosk",
   },
   {
@@ -94,10 +98,18 @@ export const items: Item[] = [
     name: "Merchant Onboarding",
     category: "case-studies",
     blurb:
-      "Built and scaled merchant onboarding. The assisted flow activates about 50 venues a month at a 65-75% application-to-activation rate, and roughly 97% of those locations remain live. I then extended it into self-serve signup with automated identity and fraud screening, removing manual setup by Customer Success.",
-    price: { text: "~50 venues a month" },
+      "Built and scaled merchant onboarding, then extended it into self-serve signup with automated identity and fraud screening, removing manual setup by Customer Success.",
+    status: "In production",
+    results: {
+      scope: "Assisted flow",
+      points: [
+        "Activates about 50 venues a month.",
+        "65–75% of applications reach activation.",
+        "Roughly 97% of those locations remain live.",
+      ],
+      note: "These numbers are for the assisted flow only. They don't measure self-serve signup.",
+    },
     gotab: true,
-    badge: "GoTab",
     keywords: "activation self-serve signup fraud identity growth",
   },
   {
@@ -105,9 +117,8 @@ export const items: Item[] = [
     name: "Gift Card Rebuild",
     category: "case-studies",
     blurb: "Directing the gift card rebuild across issuance, purchase, claiming and redemption in QR ordering and POS.",
-    price: { text: "In progress" },
+    status: "In progress",
     gotab: true,
-    badge: "GoTab",
     keywords: "payments redemption qr ordering pos",
   },
   {
@@ -116,7 +127,7 @@ export const items: Item[] = [
     category: "case-studies",
     blurb:
       "Longer write-ups of this work: the problem, my role, what shipped and what changed. Still in the kitchen. Ask for the story at checkout and I'll walk you through it.",
-    price: { text: "Coming soon" },
+    status: "Coming soon",
     soon: true,
     keywords: "case study gotab restaurant",
   },
@@ -128,9 +139,8 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "Eight years on a hospitality commerce platform: QR ordering, point of sale, kiosks, kitchen operations, payments and the manager tools behind them.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
-    badge: "GoTab",
     keywords: "domain hospitality pos kitchen ordering payments",
   },
   {
@@ -139,7 +149,7 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "I own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues, and set priorities for the engineers building them.",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "product strategy planning product management",
   },
@@ -149,16 +159,17 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "Turning a fuzzy ask into a write-up anyone can read, an estimate, and slices that can each merge on their own. Most recently, scoping seven platform requirements for an enterprise launch.",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "estimation tickets epics requirements discovery planning",
   },
   {
     slug: "prds-specs",
+    groupedUnder: "scoping",
     name: "PRDs & Technical Specs",
     category: "product",
     blurb: "Writing requirements and technical specs that engineers can build from and stakeholders can read.",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "requirements documentation product management",
   },
@@ -167,7 +178,7 @@ export const items: Item[] = [
     name: "UI/UX & Design Review",
     category: "product",
     blurb: "Defining UI and UX standards for guest, staff and manager products through design and code review.",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "user experience interface standards",
   },
@@ -177,7 +188,7 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "Leading ADA and WCAG remediation for guest ordering, based on prospective enterprise client requirements, and holding UI work to AA: keyboard paths, focus, labels and contrast.",
-    price: { text: "Every UI PR" },
+    use: "Every UI PR",
     gotab: true,
     keywords: "wcag ada a11y aria inclusive",
   },
@@ -186,7 +197,7 @@ export const items: Item[] = [
     name: "Release Management",
     category: "product",
     blurb: "Ran POS, KDS, TDS and Kiosk releases, handling branching, versioning, cutover and release conflicts.",
-    price: { since: 2021 },
+    since: 2021,
     gotab: true,
     keywords: "versioning deploy cutover delivery",
   },
@@ -195,8 +206,9 @@ export const items: Item[] = [
     name: "Bug Triage",
     category: "product",
     blurb:
-      "Reproduce it, size the impact, set a severity and find the owner. I eliminated more than 15 recurring sources of support requests in two months by fixing the underlying product and engineering issues.",
-    price: { text: "Daily" },
+      "Reproduce it, size the impact, set a severity and find the owner.",
+    use: "Daily",
+    results: { points: ["Eliminated more than 15 recurring sources of support requests in two months."] },
     gotab: true,
     keywords: "support incidents severity root cause",
   },
@@ -206,7 +218,7 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "Checking rules, schema and assumptions against real production data before designing around them, and putting the query and the numbers in the PR.",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "analytics sql data-driven metrics",
   },
@@ -216,7 +228,7 @@ export const items: Item[] = [
     category: "product",
     blurb:
       "Running scoping, PR review, triage, QA and retros through my own Claude Code skills, with a context-free second reviewer and production evidence as the bar.",
-    price: { text: "Daily" },
+    use: "Daily",
     badge: "New",
     keywords: "claude code agents llm automation workflow",
   },
@@ -228,9 +240,8 @@ export const items: Item[] = [
     category: "leadership",
     blurb:
       "Grew and managed a team of junior and mid-level engineers from 2021. Today I set priorities for 3 to 4 engineers and directly manage a team of 2.",
-    price: { since: 2021 },
+    since: 2021,
     gotab: true,
-    badge: "GoTab",
     keywords: "manager team people director",
   },
   {
@@ -239,16 +250,17 @@ export const items: Item[] = [
     category: "leadership",
     blurb:
       "Reviewing and testing PRs against the actual ask: does it do what was requested, what else does it touch, and how do we know it works?",
-    price: { text: "Daily" },
+    use: "Daily",
     gotab: true,
     keywords: "pull requests testing quality",
   },
   {
     slug: "hiring-mentoring",
+    groupedUnder: "engineering-management",
     name: "Hiring & Onboarding",
     category: "leadership",
     blurb: "Technical hiring and onboarding as the team grew, and bringing junior engineers along through code review.",
-    price: { since: 2021 },
+    since: 2021,
     gotab: true,
     keywords: "interviews coaching mentoring junior developers",
   },
@@ -259,16 +271,17 @@ export const items: Item[] = [
     name: "JavaScript",
     category: "frontend",
     blurb: "My first language and still my daily one, on both sides of the stack. ES6 and beyond.",
-    price: { since: 2017 },
+    since: 2017,
     gotab: true,
     keywords: "es6 js",
   },
   {
     slug: "typescript",
+    groupedUnder: "javascript",
     name: "TypeScript",
     category: "frontend",
     blurb: "My default for new projects, including this one.",
-    price: { since: 2022 },
+    since: 2022,
     keywords: "ts types",
   },
   {
@@ -276,9 +289,8 @@ export const items: Item[] = [
     name: "Marko",
     category: "frontend",
     blurb: "The UI framework behind production GoTab screens. Rarer than React, and I know its sharp edges.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
-    badge: "GoTab",
     keywords: "markojs mobx",
   },
   {
@@ -286,15 +298,16 @@ export const items: Item[] = [
     name: "React",
     category: "frontend",
     blurb: "Components, hooks and state. This site runs on it.",
-    price: { since: 2018 },
+    since: 2018,
     keywords: "reactjs redux hooks",
   },
   {
     slug: "nextjs",
+    groupedUnder: "react",
     name: "Next.js",
     category: "frontend",
     blurb: "My pick for React sites that need real URLs and prerendered pages.",
-    price: { since: 2022 },
+    since: 2022,
     keywords: "nextjs ssr static",
   },
   {
@@ -302,31 +315,34 @@ export const items: Item[] = [
     name: "HTML & CSS",
     category: "frontend",
     blurb: "Semantic markup and responsive layouts, mobile-first.",
-    price: { since: 2017 },
+    since: 2017,
     keywords: "responsive mobile layout",
   },
   {
     slug: "sass",
+    groupedUnder: "html-css",
     name: "Sass",
     category: "frontend",
     blurb: "SCSS for larger stylesheets, from client sites to production apps.",
-    price: { since: 2018 },
+    since: 2018,
     keywords: "scss css",
   },
   {
     slug: "tailwind",
+    groupedUnder: "html-css",
     name: "Tailwind CSS",
     category: "frontend",
     blurb: "Utility-first styling for quick, consistent UI. This site's stylesheet.",
-    price: { since: 2022 },
+    since: 2022,
     keywords: "css utility",
   },
   {
     slug: "bootstrap",
+    groupedUnder: "html-css",
     name: "Bootstrap",
     category: "frontend",
     blurb: "A long-time standard for me, in production at GoTab and on earlier projects.",
-    price: { since: 2017 },
+    since: 2017,
     gotab: true,
     keywords: "css jquery",
   },
@@ -337,16 +353,17 @@ export const items: Item[] = [
     name: "Node.js",
     category: "backend",
     blurb: "Services, queue handlers and scripts. The other half of my day-to-day JavaScript.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
     keywords: "node server javascript backend",
   },
   {
     slug: "express",
+    groupedUnder: "nodejs",
     name: "Express",
     category: "backend",
     blurb: "REST APIs and small servers.",
-    price: { since: 2018 },
+    since: 2018,
     keywords: "rest api server",
   },
   {
@@ -355,36 +372,38 @@ export const items: Item[] = [
     category: "backend",
     blurb:
       "Schema design, migrations, query tuning and reading production data to settle arguments. A product person who writes their own SQL saves everyone a ticket.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
-    badge: "GoTab",
     keywords: "sql database postgres migrations data",
   },
 
   {
     slug: "sql",
+    groupedUnder: "postgresql",
     name: "SQL",
     category: "backend",
     blurb: "Writing the queries behind features, and reading production data to answer product questions.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
     keywords: "queries data analytics database",
   },
   {
     slug: "schema-design",
+    groupedUnder: "postgresql",
     name: "Schema Design",
     category: "backend",
     blurb: "Modeling data so features hold up across products and venues.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
     keywords: "database modeling migrations",
   },
   {
     slug: "rest-apis",
+    groupedUnder: "nodejs",
     name: "REST APIs",
     category: "backend",
     blurb: "Designing and building the APIs between clients and services.",
-    price: { since: 2018 },
+    since: 2018,
     gotab: true,
     keywords: "api services backend",
   },
@@ -395,7 +414,7 @@ export const items: Item[] = [
     name: "Git & GitHub",
     category: "tools",
     blurb: "Branches, reviews, project boards and release branches. Where most of my day happens.",
-    price: { since: 2017 },
+    since: 2017,
     gotab: true,
     keywords: "version control pull requests",
   },
@@ -404,7 +423,7 @@ export const items: Item[] = [
     name: "Jest & Cypress",
     category: "tools",
     blurb: "Unit and component tests with Jest, browser tests with Cypress.",
-    price: { text: "Every PR" },
+    use: "Every PR",
     keywords: "unit integration e2e qa",
   },
   {
@@ -412,23 +431,25 @@ export const items: Item[] = [
     name: "Vercel",
     category: "tools",
     blurb: "Previews on every PR and quick deploys. This site lives here.",
-    price: { since: 2021 },
+    since: 2021,
     keywords: "hosting deploy",
   },
   {
     slug: "cloudflare",
+    groupedUnder: "vercel",
     name: "Cloudflare",
     category: "tools",
     blurb: "Workers for small edge services, plus static hosting for side projects.",
-    price: { since: 2025 },
+    since: 2025,
     keywords: "workers serverless wrangler hosting deploy edge",
   },
   {
     slug: "claude-code",
+    groupedUnder: "ai-delivery",
     name: "Claude Code",
     category: "tools",
     blurb: "My daily coding agent, set up with custom skills, hooks and review rules.",
-    price: { since: 2025 },
+    since: 2025,
     badge: "New",
     keywords: "ai agents llm",
   },
@@ -440,9 +461,8 @@ export const items: Item[] = [
     category: "projects",
     blurb:
       "Website for a DC music artist, built around a playable retro radio with drag-to-turn knobs and stations you can tune between.",
-    price: { free: true },
     image: { src: "/projects/anjali-taneja.jpg", alt: "A cream-colored retro radio with two speakers, under the Anjali Taneja site header" },
-    badge: "Live",
+    status: "Live project",
     ingredients: ["javascript", "html-css"],
     links: [
       { label: "Visit site", href: "https://www.anjalitaneja.com" },
@@ -455,9 +475,8 @@ export const items: Item[] = [
     name: "Chem Cleanup",
     category: "projects",
     blurb: "A minesweeper game with easy, medium and hard boards and a classic desktop look.",
-    price: { free: true },
     image: { src: "/projects/chem-cleanup.jpg", alt: "A minesweeper board with a mine counter, smiley button and timer" },
-    badge: "Live",
+    status: "Live project",
     ingredients: ["nextjs", "react", "typescript", "tailwind", "testing"],
     links: [
       { label: "Play it", href: "https://chemcleanup.vercel.app/" },
@@ -471,8 +490,7 @@ export const items: Item[] = [
     category: "projects",
     blurb:
       "You're ordering from it. A portfolio shaped like the kind of product I work on: static pages, a real cart, and no backend to keep alive.",
-    price: { free: true },
-    badge: "Live",
+    status: "Live project",
     ingredients: ["nextjs", "react", "typescript", "tailwind", "vercel", "claude-code"],
     links: [{ label: "View code", href: "https://github.com/ziggysauce/portfolio" }],
     keywords: "portfolio meta ordering",
@@ -481,8 +499,8 @@ export const items: Item[] = [
     slug: "favorite-fonts",
     name: "Favorite Fonts",
     category: "projects",
-    blurb: "A font browser built on the Google Fonts API, with live text previews. Code only for now.",
-    price: { free: true },
+    blurb: "A font browser built on the Google Fonts API, with live text previews.",
+    status: "Code only",
     ingredients: ["react", "nodejs", "express", "sass", "bootstrap"],
     links: [{ label: "View code", href: "https://github.com/ziggysauce/favorite-fonts" }],
     keywords: "google fonts api typography",
@@ -491,8 +509,8 @@ export const items: Item[] = [
     slug: "gecho",
     name: "Gecho",
     category: "projects",
-    blurb: "A video-music player built on YouTube's API with a small team. Code only.",
-    price: { free: true },
+    blurb: "A video-music player built on YouTube's API with a small team.",
+    status: "Code only",
     ingredients: ["javascript", "html-css", "nodejs"],
     links: [{ label: "View code", href: "https://github.com/chingu-voyage4/Geckos-Team-32" }],
     keywords: "youtube music video team chingu",
@@ -514,6 +532,16 @@ export function requireItem(slug: string): Item {
 
 export function itemsIn(category: CategoryId): Item[] {
   return items.filter((item) => item.category === category);
+}
+
+/** The cards a menu section shows: grouped items ride on their parent's card instead. */
+export function menuCardsIn(category: CategoryId): Item[] {
+  return itemsIn(category).filter((item) => !item.groupedUnder);
+}
+
+/** Items shown on this item's card, such as Next.js on React's. */
+export function groupedWith(slug: string): Item[] {
+  return items.filter((item) => item.groupedUnder === slug);
 }
 
 /** Projects that list this skill as an ingredient. */
@@ -544,6 +572,10 @@ const CONTENT_YEAR = 2026;
 export function yearsSince(since: number): number {
   return Math.max(1, CONTENT_YEAR - since);
 }
+
+// A typo in a cross-reference fails the build instead of shipping a hole.
+signature.forEach(requireItem);
+items.forEach((item) => item.groupedUnder && requireItem(item.groupedUnder));
 
 export function search(query: string): Item[] {
   const needle = query.trim().toLowerCase();

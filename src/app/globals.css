@@ -153,21 +153,8 @@ html:has(dialog[open]) {
     text-decoration: underline;
   }
 
-  /* Raised, underlined units, like the cents on a menu price. */
-  .price {
-    font-size: 15px;
-    font-weight: 500;
-  }
-  .price sup {
-    margin-left: 2px;
-    font-size: 0.68em;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    vertical-align: 0.42em;
-    line-height: 0;
-  }
-
-  /* Product / Engineering / Everything, like Delivery / Pickup. */
+  /* Product / Engineering / Everything, like Delivery / Pickup. Each option is a
+     <label> around a visually hidden radio, so the checked state is real. */
   .segmented {
     display: inline-flex;
     gap: 2px;
@@ -175,7 +162,10 @@ html:has(dialog[open]) {
     background: var(--color-tile);
     padding: 4px;
   }
-  .segmented button {
+  .segmented label {
+    position: relative; /* Anchors the hidden radio, so focusing it can't scroll the page elsewhere. */
+    display: grid;
+    place-items: center;
     min-height: 40px;
     padding: 6px 16px;
     border-radius: 999px;
@@ -192,18 +182,27 @@ html:has(dialog[open]) {
       display: flex;
       width: 100%;
     }
-    .segmented button {
+    .segmented label {
       flex: 1 1 0;
       padding-inline: 6px;
     }
   }
-  .segmented button[aria-pressed="true"] {
+  /* Selected: white fill, shadow and darker text, plus a check mark, so it doesn't rest on color. */
+  .segmented label:has(:checked) {
     background: #fff;
     color: var(--color-ink);
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
   }
+  .segmented label:has(:checked) span::before {
+    content: "✓" / ""; /* Empty alt text: the radio already says it's checked. */
+    margin-right: 6px;
+  }
+  .segmented label:has(:focus-visible) {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
+  }
   @media (hover: hover) {
-    .segmented button[aria-pressed="false"]:hover {
+    .segmented label:not(:has(:checked)):hover {
       color: var(--color-ink);
     }
   }
@@ -275,7 +274,7 @@ html:has(dialog[open]) {
     padding: 16px 18px;
   }
 
-  /* Order status on /orders. Text colors hold 4.5:1 on their fills. */
+  /* Status pills on cards and /orders. Text colors hold 4.5:1 on their fills. */
   .status {
     flex-shrink: 0;
     border-radius: 999px;
@@ -288,6 +287,14 @@ html:has(dialog[open]) {
   .status-live {
     background: #e3f4e8;
     color: var(--color-open);
+  }
+
+  /* The fixed bar at the bottom. On phones it steps aside while the keyboard is up,
+     so it can't cover the field being typed in. */
+  @media (max-width: 767px) {
+    body:has(input:not([type="radio"], [type="checkbox"]):focus, textarea:focus) .order-bar {
+      display: none;
+    }
   }
 
   /* The <summary> that opens a role's receipt, styled as a small pill. */

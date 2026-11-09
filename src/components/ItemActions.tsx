@@ -7,7 +7,6 @@ import type { Item } from "@/content/catalog";
 import { canGoBack } from "@/lib/nav";
 import { addToOrder, removeFromOrder, useOrderSlugs } from "@/lib/order";
 import { Icon } from "./Icon";
-import { Price } from "./Price";
 
 export function BackLink() {
   const router = useRouter();
@@ -82,7 +81,7 @@ export function AddToOrder({ item }: { item: Item }) {
           className={`btn w-full justify-between ${inOrder ? "btn-outline" : "btn-primary"}`}
         >
           {inOrder ? "Remove from order" : "Add to order"}
-          {inOrder ? <Icon name="check" size={20} /> : <Price price={item.price} className="text-[16px]" />}
+          <Icon name={inOrder ? "check" : "plus"} size={20} />
         </button>
       )}
     </div>

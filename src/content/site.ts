@@ -18,29 +18,40 @@ export const site = {
     "Daniel Nguyen is a technical product leader and hands-on engineer with eight years at GoTab, a hospitality commerce platform.",
 };
 
+// The opening on the homepage. Every fact here is on the résumé.
+export const intro = {
+  role: "Technical product leader and hands-on engineer.",
+  current: "I'm Director of Technical Product Management at GoTab, and I still write production code.",
+  facts: [
+    { value: "8 years", label: "at GoTab, from software developer to director" },
+    { value: "~2,000", label: "venues use the products on my roadmap" },
+  ],
+  // Followed on the page by "Or skip the line and write to me directly."
+  howItWorks: "Add anything you'd like to talk about to your order. It goes into the email when you check out.",
+};
+
+// The Profile page summary.
+export const pitch =
+  "Technical product leader and hands-on engineer with eight years at GoTab, from software developer through engineering management to Director of Technical Product Management.";
+
 export type Lens = "pm" | "eng" | "all";
 
-export const lenses: { id: Lens; label: string; picks: string; pitch: string }[] = [
+// "Explore my work" options. `note` sits right under the switch and says what changed.
+export const lenses: { id: Lens; label: string; note: string }[] = [
   {
     id: "pm",
     label: "Product",
-    picks: "from the product side",
-    pitch:
-      "Director of Technical Product Management at GoTab. I own the roadmap for QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by roughly 2,000 venues, and I still write production code.",
+    note: "Roadmaps, scoping, triage and the team come first. Code is further down.",
   },
   {
     id: "eng",
     label: "Engineering",
-    picks: "from the engineering side",
-    pitch:
-      "Hands-on engineer with eight years at GoTab. I wrote the first production version of its Kitchen Display System and still ship fixes, UI improvements and small features.",
+    note: "Starts with what I build with, at GoTab and on my own projects.",
   },
   {
     id: "all",
     label: "Everything",
-    picks: "from the whole menu",
-    pitch:
-      "Technical product leader and hands-on engineer with eight years at GoTab, from software developer through engineering management to Director of Technical Product Management.",
+    note: "The whole menu, side projects first.",
   },
 ];
 
@@ -50,7 +61,7 @@ export const company = {
   about: "Hospitality commerce platform for ordering, point of sale, kitchen operations and payments.",
 };
 
-// Work history, newest first. Each role is an order on /orders and a line on the Profile page.
+// Work history, newest first. Each role is a card on /orders and a line on the Profile page.
 // `items` are menu slugs this role's notes back up; an unknown slug fails the build.
 export const roles = [
   {

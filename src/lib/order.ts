@@ -41,17 +41,17 @@ export function clearOrder() {
 }
 
 export type OrderDetails = {
-  number: string;
   name: string;
   company: string;
-  tip: string;
+  /** "What brings you here?" */
+  reason: string;
   note: string;
   items: Item[];
 };
 
 export function orderText(order: OrderDetails): string {
   const lines = [`Hi ${site.firstName},`, ""];
-  if (order.tip) lines.push(`What I'm bringing: ${order.tip}`, "");
+  if (order.reason) lines.push(`What brings me here: ${order.reason}`, "");
   if (order.items.length) {
     lines.push("I'd like to hear more about:");
     order.items.forEach((item) => lines.push(`- ${item.name}`));
@@ -62,7 +62,10 @@ export function orderText(order: OrderDetails): string {
   return lines.join("\n");
 }
 
+export function orderSubject(order: OrderDetails): string {
+  return `From your portfolio: ${order.name}${order.company ? ` at ${order.company}` : ""}`;
+}
+
 export function orderMailto(order: OrderDetails): string {
-  const subject = `Order ${order.number} from ${order.name}${order.company ? ` at ${order.company}` : ""}`;
-  return `mailto:${site.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(orderText(order))}`;
+  return `mailto:${site.email}?subject=${encodeURIComponent(orderSubject(order))}&body=${encodeURIComponent(orderText(order))}`;
 }

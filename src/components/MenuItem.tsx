@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { Item } from "@/content/catalog";
+import { groupedWith, type Item } from "@/content/catalog";
 import { addToOrder, removeFromOrder, useOrderSlugs } from "@/lib/order";
 import { Icon } from "./Icon";
-import { Price } from "./Price";
+import { ItemMeta, ResultLine } from "./ItemMeta";
 
 /** `className` must position it (relative or absolute) so it sits above the card's link. */
-function QuickAdd({ item, className }: { item: Item; className: string }) {
+export function QuickAdd({ item, className }: { item: Item; className: string }) {
   const inOrder = useOrderSlugs().includes(item.slug);
   return (
     <button
@@ -24,8 +24,10 @@ function QuickAdd({ item, className }: { item: Item; className: string }) {
   );
 }
 
-/** One dish on the menu: name, two lines of description, price, and a quick add. */
+/** One dish on the menu: name, two lines of description, a result if there is one, the meta row, and a quick add. */
 export function MenuItem({ item }: { item: Item }) {
+  const grouped = groupedWith(item.slug);
+  const result = item.results?.points[0];
   return (
     <article className="group relative flex gap-4 rounded-xl border border-line bg-white p-4 transition-colors hover:border-control">
       <div className="flex min-w-0 flex-1 flex-col">
@@ -38,17 +40,18 @@ export function MenuItem({ item }: { item: Item }) {
             {item.name}
           </Link>
         </h3>
+        {grouped.length ? (
+          <p className="mt-0.5 text-[14px] text-muted">Also: {grouped.map((other) => other.name).join(", ")}</p>
+        ) : null}
         <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-muted">{item.blurb}</p>
-        <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-3">
-          <Price price={item.price} />
-          {item.badge ? <span className="tag">{item.badge}</span> : null}
-        </div>
+        {result ? <ResultLine text={result} className="mt-2" /> : null}
+        <ItemMeta item={item} className="mt-auto pt-3" />
       </div>
 
       {item.image ? (
-        <div className="relative size-24 shrink-0 self-start md:size-28">
+        <div className="relative size-24 shrink-0 self-start sm:size-32">
           <div className="relative size-full overflow-hidden rounded-lg bg-tile">
-            <Image src={item.image.src} alt="" fill sizes="112px" className="object-cover object-top" />
+            <Image src={item.image.src} alt={item.image.alt} fill sizes="128px" className="object-cover object-top" />
           </div>
           {item.soon ? null : <QuickAdd item={item} className="absolute bottom-1.5 right-1.5 shadow-sm" />}
         </div>

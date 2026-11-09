@@ -4,8 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddToOrder, BackLink, ShareButton } from "@/components/ItemActions";
 import { Icon } from "@/components/Icon";
+import { ResultLine, StatusPill } from "@/components/ItemMeta";
 import { MenuGrid } from "@/components/MenuItem";
-import { foundIn, getItem, items, related, requireItem, yearsSince, type Item } from "@/content/catalog";
+import { foundIn, getItem, groupedWith, items, related, requireItem, yearsSince, type Item } from "@/content/catalog";
 import { site } from "@/content/site";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -31,21 +32,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-function detailFor(item: Item): { label: string; value: string } {
-  if ("since" in item.price) {
-    const years = yearsSince(item.price.since);
-    return { label: "Experience", value: `${years} ${years === 1 ? "year" : "years"}, since ${item.price.since}` };
+/** Experience and how often, when known. Status and results get their own cards. */
+function detailsFor(item: Item): { label: string; value: string }[] {
+  const details = [];
+  if (item.since) {
+    const years = yearsSince(item.since);
+    details.push({ label: "Experience", value: `${years} ${years === 1 ? "year" : "years"}, since ${item.since}` });
   }
-  if ("free" in item.price) return { label: "Source", value: "Public on GitHub" };
-  if (item.soon) return { label: "Status", value: item.price.text };
-  return { label: item.category === "case-studies" ? "At a glance" : "How often", value: item.price.text };
+  if (item.use) details.push({ label: "How often", value: item.use });
+  return details;
 }
 
 export default async function ItemPage({ params }: Props) {
   const item = getItem((await params).slug);
   if (!item) notFound();
 
-  const detail = detailFor(item);
+  const details = detailsFor(item);
+  const grouped = groupedWith(item.slug);
   const usedIn = foundIn(item.slug);
   const ingredients = item.ingredients?.map(requireItem) ?? [];
   const also = related(item);
@@ -75,10 +78,48 @@ export default async function ItemPage({ params }: Props) {
           <p className="mt-3 text-[17px] leading-relaxed">{item.blurb}</p>
 
           <div className="mt-8 space-y-3">
-            <div className="option-card">
-              <p className="font-medium">{detail.label}</p>
-              <p className="mt-0.5 text-[15px] text-muted">{detail.value}</p>
-            </div>
+            {item.status ? (
+              <div className="option-card flex items-center justify-between gap-4">
+                <p className="font-medium">Status</p>
+                <StatusPill status={item.status} />
+              </div>
+            ) : null}
+
+            {item.results ? (
+              <div className="option-card">
+                <p className="font-medium">{item.results.scope ? `${item.results.scope} results` : "Results"}</p>
+                <ul className="mt-2 space-y-1.5">
+                  {item.results.points.map((point) => (
+                    <li key={point}>
+                      <ResultLine text={point} className="text-[15px] font-normal" />
+                    </li>
+                  ))}
+                </ul>
+                {item.results.note ? <p className="mt-2 text-[14px] text-muted">{item.results.note}</p> : null}
+              </div>
+            ) : null}
+
+            {details.map((detail) => (
+              <div key={detail.label} className="option-card">
+                <p className="font-medium">{detail.label}</p>
+                <p className="mt-0.5 text-[15px] text-muted">{detail.value}</p>
+              </div>
+            ))}
+
+            {grouped.length ? (
+              <div className="option-card">
+                <p className="font-medium">Goes with</p>
+                <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
+                  {grouped.map((other) => (
+                    <li key={other.slug}>
+                      <Link href={`/item/${other.slug}`} className="underline underline-offset-4 hover:text-ink">
+                        {other.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {item.gotab || usedIn.length ? (
               <div className="option-card">
