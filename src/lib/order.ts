@@ -4,9 +4,6 @@ import { getItem, type Item } from "@/content/catalog";
 import { lenses, site, type Lens } from "@/content/site";
 import { createStore } from "./store";
 
-export const REWARD_AT = 3;
-export const REWARD_TEXT = "First coffee\u2019s on me";
-
 const EMPTY: string[] = [];
 
 const orderStore = createStore<string[]>("dtn-order", EMPTY, (raw) =>
@@ -61,7 +58,6 @@ export function orderText(order: OrderDetails): string {
     lines.push("");
   }
   if (order.note) lines.push(order.note, "");
-  if (order.items.length >= REWARD_AT) lines.push(`Reward unlocked: ${REWARD_TEXT}.`, "");
   lines.push(`From ${order.name}${order.company ? `, ${order.company}` : ""}`);
   return lines.join("\n");
 }

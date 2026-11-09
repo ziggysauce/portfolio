@@ -4,44 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { categories, categoryOrder, featured, itemsIn, requireItem, search } from "@/content/catalog";
 import { lenses, site } from "@/content/site";
-import { lensStore, REWARD_AT, REWARD_TEXT, useOrderSlugs } from "@/lib/order";
+import { lensStore } from "@/lib/order";
 import { Icon } from "./Icon";
 import { MenuGrid } from "./MenuItem";
-
-function rewardMessage(count: number) {
-  if (count >= REWARD_AT) return `Unlocked: ${REWARD_TEXT.toLowerCase()}. Check out to claim it.`;
-  const left = REWARD_AT - count;
-  return `Add ${left} ${count ? "more " : ""}${left === 1 ? "item" : "items"} and the first coffee’s on me.`;
-}
-
-function Rewards() {
-  const count = Math.min(useOrderSlugs().length, REWARD_AT);
-  return (
-    <section aria-label="Rewards" className="flex items-center gap-4 rounded-xl bg-tile px-4 py-3.5 md:px-5">
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px]" aria-live="polite">
-          <span className="font-medium">Rewards.</span>{" "}
-          {count >= REWARD_AT ? (
-            <Link href="/checkout" className="underline underline-offset-4">
-              {rewardMessage(count)}
-            </Link>
-          ) : (
-            rewardMessage(count)
-          )}
-        </p>
-        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#e4dfd5]">
-          <div
-            className="h-full rounded-full bg-ink transition-[width] duration-300 motion-reduce:transition-none"
-            style={{ width: `${(count / REWARD_AT) * 100}%` }}
-          />
-        </div>
-      </div>
-      <p className="shrink-0 text-[15px] font-medium">
-        {count}/{REWARD_AT}
-      </p>
-    </section>
-  );
-}
 
 /** The section whose heading has scrolled up under the sticky tabs. */
 function useActiveSection(idList: string) {
@@ -155,10 +120,6 @@ export function Storefront() {
         </section>
       ) : (
         <>
-          <div className="page mt-5">
-            <Rewards />
-          </div>
-
           <nav aria-label="Menu sections" className="menu-tabs mt-6">
             <ul ref={tabs} className="page no-scrollbar relative flex gap-6 overflow-x-auto">
               {[{ id: "popular", title: "Popular" }, ...sections].map((section) => (

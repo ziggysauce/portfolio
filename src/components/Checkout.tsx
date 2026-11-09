@@ -10,8 +10,6 @@ import {
   orderMailto,
   orderText,
   removeFromOrder,
-  REWARD_AT,
-  REWARD_TEXT,
   useOrderItems,
   type OrderDetails,
 } from "@/lib/order";
@@ -141,7 +139,6 @@ function Receipt({ order, onReset }: { order: OrderDetails; onReset: () => void 
           <span>Total</span>
           <span>Market price</span>
         </p>
-        {order.items.length >= REWARD_AT ? <p className="mt-4 text-sm text-muted">Reward unlocked: {REWARD_TEXT.toLowerCase()}.</p> : null}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">

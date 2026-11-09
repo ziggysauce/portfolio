@@ -24,7 +24,7 @@ npm run typecheck
 | Colors, button and component styles | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
 | How a menu row looks | `src/components/MenuItem.tsx` |
-| Order email wording, rewards threshold | `src/lib/order.ts` |
+| Order email wording | `src/lib/order.ts` |
 
 ## Adding to the menu
 
@@ -54,7 +54,6 @@ sections: [
 |---|---|
 | Delivery / Pickup tabs | Product / Engineering / Everything |
 | Product price | Years of experience, how often I do it, or $0.00 for public projects |
-| Rewards | Add 3 items and the first coffee's on me |
 | Ingredients | The skills in a project |
 | Orders and receipts | Work history at `/orders`: each role, its highlights and what came out of it |
 | Tip | What brings you here: a project, a question, a coffee |
