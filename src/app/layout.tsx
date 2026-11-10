@@ -1,15 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Onest } from "next/font/google";
+import { BottomNav } from "@/components/BottomNav";
+import { AddedToast, CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { AddedToast, OrderBar } from "@/components/OrderBar";
 import { site } from "@/content/site";
 import "./globals.css";
 
-// Swap a font here and the whole site follows. Fraunces for headings, like a
-// restaurant's menu; Inter for everything you read and tap.
-const heading = Fraunces({ subsets: ["latin"], variable: "--font-heading", weight: ["400", "500"] });
-const body = Inter({ subsets: ["latin"], variable: "--font-body", weight: ["400", "500"] });
+// One variable font for the whole site. Weight carries the hierarchy, from
+// 400 for reading to 800 for the hero.
+const onest = Onest({ subsets: ["latin"], variable: "--font-onest" });
 
 const title = `${site.name}: ${site.tagline}`;
 
@@ -28,14 +28,14 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
-export const viewport: Viewport = { themeColor: "#ffffff" };
+export const viewport: Viewport = { themeColor: "#ffffff", viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       data-scroll-behavior="smooth" // Smooth for #anchors, instant between pages.
-      className={`${heading.variable} ${body.variable}`}
+      className={onest.variable}
     >
       <body>
         <a href="#main" className="skip-link">
@@ -45,7 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <Footer />
         <AddedToast />
-        <OrderBar />
+        <BottomNav />
+        <CartDrawer />
       </body>
     </html>
   );

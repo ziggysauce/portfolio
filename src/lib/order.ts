@@ -10,8 +10,21 @@ const orderStore = createStore<string[]>("dtn-order", EMPTY, (raw) =>
   Array.isArray(raw) ? raw.filter((slug) => typeof slug === "string" && getItem(slug) && !getItem(slug)?.soon) : EMPTY,
 );
 
-// Most recent add, for the "Added to order" toast. Not saved.
+// Most recent add, for the "Added to your order" toast. Not saved.
 export const toastStore = createStore<{ slug: string; id: number } | null>(null, null);
+
+// Whether the cart drawer is open. Not saved.
+export const cartOpenStore = createStore<boolean>(null, false);
+
+/** Opening the cart also clears the "Added to your order" toast: it has done its job. */
+export function openCart() {
+  toastStore.set(null);
+  cartOpenStore.set(true);
+}
+
+export function closeCart() {
+  cartOpenStore.set(false);
+}
 
 export const lensStore = createStore<Lens>("dtn-lens", "pm", (raw) =>
   lenses.some((lens) => lens.id === raw) ? (raw as Lens) : "pm",

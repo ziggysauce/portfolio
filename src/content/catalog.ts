@@ -465,7 +465,7 @@ export const items: Item[] = [
     status: "Live project",
     ingredients: ["javascript", "html-css"],
     links: [
-      { label: "Visit site", href: "https://www.anjalitaneja.com" },
+      { label: "View project", href: "https://www.anjalitaneja.com" },
       { label: "View code", href: "https://github.com/ziggysauce/anjali_taneja" },
     ],
     keywords: "music artist client website radio",
@@ -479,7 +479,7 @@ export const items: Item[] = [
     status: "Live project",
     ingredients: ["nextjs", "react", "typescript", "tailwind", "testing"],
     links: [
-      { label: "Play it", href: "https://chemcleanup.vercel.app/" },
+      { label: "View project", href: "https://chemcleanup.vercel.app/" },
       { label: "View code", href: "https://github.com/ziggysauce/minesweeper" },
     ],
     keywords: "game minesweeper",

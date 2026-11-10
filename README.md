@@ -21,10 +21,12 @@ npm run typecheck
 | Work history on `/orders`, which menu items each role links to (`items`), and the role line on signature cards | `roles` in `src/content/site.ts` |
 | Résumé PDF (replace the file, keep the name) | `public/Daniel_Nguyen_Resume.pdf` |
 | Menu items, sections, the three signature projects, section order per tab | `src/content/catalog.ts` |
-| Colors, button and component styles | `src/app/globals.css` |
+| Colors, type, radii and component styles (color roles are listed at the top) | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
-| How a menu row looks | `src/components/MenuItem.tsx` |
+| How menu cards look: projects lead with a screenshot, skills are compact | `src/components/MenuItem.tsx` |
 | How a signature project card looks | `src/components/SignatureCard.tsx` |
+| Header, phone bottom navigation and the four destinations | `src/components/Header.tsx`, `src/components/BottomNav.tsx`, `src/lib/nav.ts` |
+| Cart drawer and the "Added to your order" toast | `src/components/CartDrawer.tsx` |
 | Email subject and body | `src/lib/order.ts` |
 
 ## Adding to the menu
@@ -62,7 +64,7 @@ sections: [
 | Delivery / Pickup tabs | "Explore my work": Product / Engineering / Everything |
 | Menu | Skills and side projects, below the signature work |
 | Ingredients | The skills in a project |
-| Your order | Topics you'd like to talk about. Optional |
+| Your order | Topics you'd like to talk about, in a cart drawer. Optional |
 | Order history | Work history at `/orders`: each role and its details |
 | Checkout | "What brings you here?", then Draft email (opens your mail app) or Copy message |
 | Skip the line | `/contact`, no order needed |

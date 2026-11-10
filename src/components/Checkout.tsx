@@ -73,14 +73,14 @@ function OrderLines({ items }: { items: Item[] }) {
 
   if (!items.length) {
     return (
-      <div className="py-8">
-        <p ref={emptyHeading} tabIndex={-1} className="font-display text-[26px] outline-none">
+      <div className="py-6">
+        <p ref={emptyHeading} tabIndex={-1} className="text-[18px] font-bold outline-none">
           Nothing in your order yet
         </p>
         <p className="mt-2 max-w-sm text-[15px] text-muted">
           That&rsquo;s fine. Pick a few topics from the menu, or just write me a note.
         </p>
-        <Link href="/#menu" className="btn btn-outline mt-5">
+        <Link href="/#menu" className="btn btn-soft btn-sm mt-4">
           Browse the menu
         </Link>
       </div>
@@ -89,9 +89,9 @@ function OrderLines({ items }: { items: Item[] }) {
   return (
     <ul ref={list} aria-label="Topics in your order" className="divide-y divide-line">
       {items.map((item, index) => (
-        <li key={item.slug} className="flex items-start justify-between gap-4 py-4">
+        <li key={item.slug} className="flex items-center justify-between gap-4 py-3.5">
           <div className="min-w-0">
-            <Link href={`/item/${item.slug}`} className="text-[16px] font-medium leading-snug underline-offset-4 hover:underline">
+            <Link href={`/item/${item.slug}`} className="text-[16px] font-semibold leading-snug underline-offset-4 hover:underline">
               {item.name}
             </Link>
             <p className="mt-0.5 text-[14px] text-muted">{categoryTitle(item)}</p>
@@ -100,7 +100,7 @@ function OrderLines({ items }: { items: Item[] }) {
             type="button"
             onClick={() => remove(item.slug, index)}
             aria-label={`Remove ${item.name} from your order`}
-            className="shrink-0 rounded-sm py-1 text-[14px] font-medium underline underline-offset-4"
+            className="btn btn-soft btn-sm shrink-0"
           >
             Remove
           </button>
@@ -122,8 +122,8 @@ function Drafted({ order, onReset }: { order: OrderDetails; onReset: () => void 
   }, []);
 
   return (
-    <div className="page max-w-xl py-10">
-      <h1 ref={heading} tabIndex={-1} className="font-display text-[40px] font-normal leading-tight outline-none">
+    <div className="page max-w-xl pt-6 md:pt-10">
+      <h1 ref={heading} tabIndex={-1} className="page-title outline-none">
         One more step, {order.name.split(" ")[0]}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed">
@@ -131,8 +131,8 @@ function Drafted({ order, onReset }: { order: OrderDetails; onReset: () => void 
         copy the message and email it to <EmailLink />.
       </p>
 
-      <div className="mt-6 rounded-2xl border border-line bg-tile p-5">
-        <p className="text-[13px] font-medium text-muted">Your message</p>
+      <div className="card mt-6 p-5">
+        <p className="text-[13px] font-semibold text-muted">Your message</p>
         <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-relaxed">{text}</p>
       </div>
 
@@ -217,24 +217,26 @@ export function Checkout() {
 
   return (
     <div className="sheet-up">
-      <div className="page border-b border-line pb-6 pt-6 md:pt-12">
-        <h1 className="font-display text-[40px] font-normal leading-tight md:text-[52px]">Your order</h1>
-        <p className="mt-1 text-[15px] text-muted">
+      <div className="page pt-4 md:pt-8">
+        <h1 className="page-title">Your order</h1>
+        <p className="mt-2 max-w-2xl text-[16px] text-muted">
           Topics you&rsquo;d like to talk about. They go into the email, so I know where to start.
         </p>
       </div>
 
-      <div className="page grid grid-cols-[minmax(0,1fr)] gap-x-14 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <OrderLines items={items} />
+      <div className="page mt-6 grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start lg:gap-8">
+        <div className="card px-5 py-1 lg:sticky lg:top-24">
+          <OrderLines items={items} />
+        </div>
 
-        <form onSubmit={draftEmail} noValidate className="mt-6 self-start lg:sticky lg:top-20 lg:mt-5">
+        <form onSubmit={draftEmail} noValidate className="card p-5 md:p-7">
           <fieldset>
-            <legend className="section-title">What brings you here?</legend>
+            <legend className="text-[20px] font-bold tracking-tight">What brings you here?</legend>
             <p className="mt-1 text-[15px] text-muted">Optional, but it helps.</p>
-            {/* The 1px gaps show the border color through, drawing the dividers at any column count. */}
-            <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-control bg-control sm:grid-cols-4">
+            {/* Chips over real radios: selected is mint, bold and outlined in green. */}
+            <div className="mt-4 flex flex-wrap gap-2">
               {REASONS.map((option) => (
-                <label key={option} className="relative cursor-pointer bg-white">
+                <label key={option} className="relative">
                   <input
                     type="radio"
                     name="reason"
@@ -243,9 +245,7 @@ export function Checkout() {
                     onChange={() => setReason(option)}
                     className="peer absolute inset-0 size-full cursor-pointer opacity-0"
                   />
-                  <span className="grid h-12 place-items-center px-1 text-center text-sm transition-colors peer-checked:bg-ink peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-link">
-                    {option}
-                  </span>
+                  <span className="chip">{option}</span>
                 </label>
               ))}
             </div>
@@ -259,7 +259,7 @@ export function Checkout() {
             ) : null}
           </fieldset>
 
-          <div className="mt-8 space-y-4">
+          <div className="mt-7 space-y-4 border-t border-line pt-6">
             <div>
               <label htmlFor="order-name" className="field-label">
                 Your name <span className="text-muted">(required)</span>
@@ -335,7 +335,7 @@ export function Checkout() {
       </div>
 
       {suggestions.length ? (
-        <section aria-labelledby="also-like" className="page mt-14 border-t border-line pt-8">
+        <section aria-labelledby="also-like" className="page mt-12">
           <h2 id="also-like" className="section-title">
             You might also like
           </h2>

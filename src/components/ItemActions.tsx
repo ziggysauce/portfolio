@@ -14,7 +14,7 @@ export function BackLink() {
     <Link
       href="/"
       aria-label="Back"
-      className="-ml-2 grid size-11 place-items-center"
+      className="-ml-2 grid size-11 place-items-center rounded-full transition-colors hover:bg-white"
       onClick={(event) => {
         if (canGoBack()) {
           event.preventDefault();
@@ -48,14 +48,14 @@ export function ShareButton({ name }: { name: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span aria-live="polite" className={copied ? "rounded-full bg-tile px-3 py-1 text-[13px]" : "sr-only"}>
+      <span aria-live="polite" className={copied ? "rounded-full bg-mint px-3 py-1 text-[13px] font-semibold text-brand-strong" : "sr-only"}>
         {copied ? "Link copied" : ""}
       </span>
       <button
         type="button"
         onClick={share}
         aria-label={`Share ${name}`}
-        className="-mr-2 grid size-11 place-items-center rounded-full transition-colors hover:bg-tile"
+        className="-mr-2 grid size-11 place-items-center rounded-full transition-colors hover:bg-white"
       >
         <Icon name="share" size={22} />
       </button>
@@ -67,21 +67,21 @@ export function AddToOrder({ item }: { item: Item }) {
   const inOrder = useOrderSlugs().includes(item.slug);
 
   return (
-    // The white band keeps page text from showing between the button and the order bar.
-    <div className="sticky bottom-[calc(var(--bar-h)+env(safe-area-inset-bottom)-16px)] z-10 -mx-4 mt-5 bg-white px-4 pb-7 pt-3 md:static md:mx-0 md:mt-8 md:px-0 md:pb-0 md:pt-0">
+    // Full width on phones; inline with the project links from tablet up.
+    <div className="md:inline-block md:align-middle">
       {item.soon ? (
-        <Link href="/checkout" className="btn btn-primary w-full justify-between">
+        <Link href="/checkout" className="btn btn-primary w-full md:w-auto">
           Ask about it at checkout
-          <Icon name="arrowRight" size={20} />
+          <Icon name="arrowRight" size={18} />
         </Link>
       ) : (
         <button
           type="button"
           onClick={() => (inOrder ? removeFromOrder(item.slug) : addToOrder(item.slug))}
-          className={`btn w-full justify-between ${inOrder ? "btn-outline" : "btn-primary"}`}
+          className={`btn w-full md:w-auto ${inOrder ? "btn-outline" : "btn-primary"}`}
         >
+          <Icon name={inOrder ? "check" : "plus"} size={18} />
           {inOrder ? "Remove from order" : "Add to order"}
-          <Icon name={inOrder ? "check" : "plus"} size={20} />
         </button>
       )}
     </div>

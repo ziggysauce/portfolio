@@ -6,7 +6,7 @@ import { AddToOrder, BackLink, ShareButton } from "@/components/ItemActions";
 import { Icon } from "@/components/Icon";
 import { ResultLine, StatusPill } from "@/components/ItemMeta";
 import { MenuGrid } from "@/components/MenuItem";
-import { foundIn, getItem, groupedWith, items, related, requireItem, yearsSince, type Item } from "@/content/catalog";
+import { categories, foundIn, getItem, groupedWith, items, related, requireItem, yearsSince, type Item } from "@/content/catalog";
 import { site } from "@/content/site";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -43,6 +43,27 @@ function detailsFor(item: Item): { label: string; value: string }[] {
   return details;
 }
 
+/** A labeled list of links to other items, such as "Built with". */
+function LinkTile({ label, items: linked, extra, wide = false }: { label: string; items: Item[]; extra?: string; wide?: boolean }) {
+  return (
+    <div className={`rounded-xl bg-canvas p-4 ${wide ? "sm:col-span-2" : ""}`}>
+      <dt className="text-[14px] font-semibold text-muted">{label}</dt>
+      <dd className="mt-1">
+        <ul className="flex flex-wrap gap-x-3 gap-y-1">
+          {extra ? <li>{extra}</li> : null}
+          {linked.map((other) => (
+            <li key={other.slug}>
+              <Link href={`/item/${other.slug}`} className="font-medium underline underline-offset-4 hover:text-brand">
+                {other.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </dd>
+    </div>
+  );
+}
+
 export default async function ItemPage({ params }: Props) {
   const item = getItem((await params).slug);
   if (!item) notFound();
@@ -52,141 +73,93 @@ export default async function ItemPage({ params }: Props) {
   const usedIn = foundIn(item.slug);
   const ingredients = item.ingredients?.map(requireItem) ?? [];
   const also = related(item);
+  const section = categories.find((category) => category.id === item.category)?.title;
 
   return (
-    <>
-      <div className="page flex max-w-3xl items-center justify-between">
+    <div className="page max-w-4xl pt-3 md:pt-6">
+      <div className="flex items-center justify-between">
         <BackLink />
         <ShareButton name={item.name} />
       </div>
-      <article className="page mt-1 max-w-3xl">
+
+      <article className="card mt-1 overflow-hidden">
         {item.image ? (
-          <div className="relative mb-6 aspect-[16/9] overflow-hidden rounded-xl bg-tile">
-            <Image
-              src={item.image.src}
-              alt={item.image.alt}
-              fill
-              sizes="(min-width: 768px) 704px, 100vw"
-              className="object-cover object-top"
-            />
+          <div className="relative aspect-[16/9] border-b border-line bg-canvas">
+            <Image src={item.image.src} alt={item.image.alt} fill sizes="(min-width: 896px) 832px, 100vw" className="object-cover object-top" priority />
           </div>
         ) : null}
 
-        <div>
-          {item.badge ? <span className="tag">{item.badge}</span> : null}
-          <h1 className="mt-2 font-display text-[36px] font-normal leading-[1.12] md:text-[48px]">{item.name}</h1>
-          <p className="mt-3 text-[17px] leading-relaxed">{item.blurb}</p>
+        <div className="p-5 md:p-8">
+          <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium text-muted">
+            {item.status ? <StatusPill status={item.status} /> : null}
+            {item.badge ? <span className="tag">{item.badge}</span> : null}
+            {section}
+          </p>
+          <h1 className="page-title mt-3">{item.name}</h1>
+          <p className="mt-4 max-w-2xl text-[17px] leading-relaxed">{item.blurb}</p>
 
-          <div className="mt-8 space-y-3">
-            {item.status ? (
-              <div className="option-card flex items-center justify-between gap-4">
-                <p className="font-medium">Status</p>
-                <StatusPill status={item.status} />
+          {item.results ? (
+            <div className="mt-6 max-w-2xl rounded-xl bg-mint-soft p-4 md:p-5">
+              <p className="text-[14px] font-bold text-brand-strong">{item.results.scope ? `${item.results.scope} results` : "Results"}</p>
+              <ul className="mt-2 space-y-1.5">
+                {item.results.points.map((point) => (
+                  <li key={point}>
+                    <ResultLine text={point} className="text-[15px]" />
+                  </li>
+                ))}
+              </ul>
+              {item.results.note ? <p className="mt-2 text-[14px] text-muted">{item.results.note}</p> : null}
+            </div>
+          ) : null}
+
+          <div className="mt-6">
+            {item.links?.length ? (
+              <div className="mb-3 flex flex-wrap gap-3 md:mb-0 md:mr-3 md:inline-flex md:align-middle">
+                {item.links.map((link) => (
+                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className="btn btn-outline">
+                    {link.label}
+                    <Icon name="external" size={16} />
+                    <span className="sr-only">(opens in a new tab)</span>
+                  </a>
+                ))}
               </div>
             ) : null}
-
-            {item.results ? (
-              <div className="option-card">
-                <p className="font-medium">{item.results.scope ? `${item.results.scope} results` : "Results"}</p>
-                <ul className="mt-2 space-y-1.5">
-                  {item.results.points.map((point) => (
-                    <li key={point}>
-                      <ResultLine text={point} className="text-[15px] font-normal" />
-                    </li>
-                  ))}
-                </ul>
-                {item.results.note ? <p className="mt-2 text-[14px] text-muted">{item.results.note}</p> : null}
-              </div>
-            ) : null}
-
-            {details.map((detail) => (
-              <div key={detail.label} className="option-card">
-                <p className="font-medium">{detail.label}</p>
-                <p className="mt-0.5 text-[15px] text-muted">{detail.value}</p>
-              </div>
-            ))}
-
-            {grouped.length ? (
-              <div className="option-card">
-                <p className="font-medium">Goes with</p>
-                <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
-                  {grouped.map((other) => (
-                    <li key={other.slug}>
-                      <Link href={`/item/${other.slug}`} className="underline underline-offset-4 hover:text-ink">
-                        {other.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {item.gotab || usedIn.length ? (
-              <div className="option-card">
-                <p className="font-medium">Where I&rsquo;ve used it</p>
-                <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
-                  {item.gotab ? <li>GoTab</li> : null}
-                  {usedIn.map((project) => (
-                    <li key={project.slug}>
-                      <Link href={`/item/${project.slug}`} className="underline underline-offset-4 hover:text-ink">
-                        {project.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {ingredients.length ? (
-              <div className="option-card">
-                <p className="font-medium">Ingredients</p>
-                <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[15px] text-muted">
-                  {ingredients.map((ingredient) => (
-                    <li key={ingredient.slug}>
-                      <Link href={`/item/${ingredient.slug}`} className="underline underline-offset-4 hover:text-ink">
-                        {ingredient.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {item.links?.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                target="_blank"
-                rel="noreferrer"
-                className="option-card flex items-center justify-between font-medium transition-colors hover:border-ink"
-              >
-                {link.label}
-                <Icon name="arrowRight" size={24} />
-              </a>
-            ))}
+            <AddToOrder item={item} />
           </div>
 
-          {item.sections?.map((section) => (
-            <section key={section.heading} className="mt-8">
-              <h2 className="section-title">{section.heading}</h2>
-              <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed">{section.body}</p>
+          {details.length || grouped.length || item.gotab || usedIn.length || ingredients.length ? (
+            <dl className="mt-8 grid gap-3 sm:grid-cols-2">
+              {details.map((detail) => (
+                <div key={detail.label} className="rounded-xl bg-canvas p-4">
+                  <dt className="text-[14px] font-semibold text-muted">{detail.label}</dt>
+                  <dd className="mt-1">{detail.value}</dd>
+                </div>
+              ))}
+              {grouped.length ? <LinkTile label="Goes with" items={grouped} /> : null}
+              {item.gotab || usedIn.length ? <LinkTile label="Where I’ve used it" items={usedIn} extra={item.gotab ? "GoTab" : undefined} /> : null}
+              {ingredients.length ? <LinkTile label="Built with" items={ingredients} wide /> : null}
+            </dl>
+          ) : null}
+
+          {item.sections?.map((part) => (
+            <section key={part.heading} className="mt-8">
+              <h2 className="section-title">{part.heading}</h2>
+              <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed">{part.body}</p>
             </section>
           ))}
-
-          <AddToOrder item={item} />
         </div>
       </article>
 
       {also.length ? (
-        <section aria-labelledby="also-like" className="page mt-14 max-w-3xl">
+        <section aria-labelledby="also-like" className="mt-12">
           <h2 id="also-like" className="section-title">
             You might also like
           </h2>
           <div className="mt-5">
-            <MenuGrid items={also} />
+            <MenuGrid items={also} className="lg:grid-cols-2" />
           </div>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

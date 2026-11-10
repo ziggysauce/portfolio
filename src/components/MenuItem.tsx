@@ -15,58 +15,93 @@ export function QuickAdd({ item, className }: { item: Item; className: string })
       type="button"
       onClick={() => (inOrder ? removeFromOrder(item.slug) : addToOrder(item.slug))}
       aria-label={`${inOrder ? "Remove" : "Add"} ${item.name} ${inOrder ? "from" : "to"} your order`}
-      className={`z-10 grid size-10 place-items-center rounded-full border transition-colors ${
-        inOrder ? "border-ink bg-ink text-white" : "border-control bg-white text-ink hover:border-ink"
-      } ${className}`}
+      data-selected={inOrder}
+      className={`quick-add z-10 ${className}`}
     >
-      <Icon name={inOrder ? "check" : "plus"} size={18} />
+      <Icon name={inOrder ? "check" : "plus"} size={20} />
     </button>
   );
 }
 
-/** One dish on the menu: name, two lines of description, a result if there is one, the meta row, and a quick add. */
-export function MenuItem({ item }: { item: Item }) {
+/** The name links to the item, and its ::after covers the card so the whole card opens it. */
+export function NameLink({ item }: { item: Item }) {
+  return (
+    <Link
+      href={`/item/${item.slug}`}
+      className="underline-offset-4 after:absolute after:inset-0 after:z-[1] after:rounded-card group-hover:underline focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-brand"
+    >
+      {item.name}
+    </Link>
+  );
+}
+
+function Grouped({ item }: { item: Item }) {
   const grouped = groupedWith(item.slug);
+  return grouped.length ? <p className="mt-0.5 text-[14px] text-muted">Also: {grouped.map((other) => other.name).join(", ")}</p> : null;
+}
+
+/** Projects: led by a real screenshot when there is one, then the description, a result and the meta row. */
+function ProjectCard({ item }: { item: Item }) {
   const result = item.results?.points[0];
   return (
-    <article className="group relative flex gap-4 rounded-xl border border-line bg-white p-4 transition-colors hover:border-control">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <h3 className="text-[16px] font-medium leading-snug">
-          {/* The link's ::after covers the card, photo included, so the whole row opens the item. */}
-          <Link
-            href={`/item/${item.slug}`}
-            className="underline-offset-4 after:absolute after:inset-0 after:z-[1] after:rounded-xl group-hover:underline focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-link"
-          >
-            {item.name}
-          </Link>
-        </h3>
-        {grouped.length ? (
-          <p className="mt-0.5 text-[14px] text-muted">Also: {grouped.map((other) => other.name).join(", ")}</p>
-        ) : null}
-        <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-muted">{item.blurb}</p>
-        {result ? <ResultLine text={result} className="mt-2" /> : null}
-        <ItemMeta item={item} className="mt-auto pt-3" />
-      </div>
-
+    <article className="card card-link group flex flex-col overflow-hidden">
       {item.image ? (
-        <div className="relative size-24 shrink-0 self-start sm:size-32">
-          <div className="relative size-full overflow-hidden rounded-lg bg-tile">
-            <Image src={item.image.src} alt={item.image.alt} fill sizes="128px" className="object-cover object-top" />
-          </div>
-          {item.soon ? null : <QuickAdd item={item} className="absolute bottom-1.5 right-1.5 shadow-sm" />}
+        <div className="relative aspect-[2/1] border-b border-line bg-canvas">
+          <Image src={item.image.src} alt={item.image.alt} fill sizes="(min-width: 768px) 560px, 100vw" className="object-cover object-top" />
         </div>
-      ) : item.soon ? null : (
-        <QuickAdd item={item} className="relative shrink-0 self-end" />
-      )}
+      ) : null}
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 pt-1.5">
+            <h3 className="text-[18px] font-bold leading-snug">
+              <NameLink item={item} />
+            </h3>
+            <Grouped item={item} />
+          </div>
+          {item.soon ? null : <QuickAdd item={item} className="relative shrink-0" />}
+        </div>
+        <p className="mt-1.5 line-clamp-2 text-[15px] leading-relaxed text-muted">{item.blurb}</p>
+        {result ? <ResultLine text={result} className="mt-2" /> : null}
+        <ItemMeta item={item} className="mt-auto pt-4" />
+      </div>
     </article>
   );
 }
 
-export function MenuGrid({ items, className = "" }: { items: Item[]; className?: string }) {
+/** Skills, "Also at GoTab", search results and suggestions: the name, what rides with it, and the meta row. */
+function CompactCard({ item }: { item: Item }) {
   return (
-    <div className={`grid gap-3 md:grid-cols-2 md:gap-4 ${className}`}>
+    <article className="card card-link group flex items-center gap-3 p-4">
+      {item.image ? (
+        <span className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-line bg-canvas">
+          <Image src={item.image.src} alt="" fill sizes="48px" className="object-cover object-top" />
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[16px] font-semibold leading-snug">
+          <NameLink item={item} />
+        </h3>
+        <Grouped item={item} />
+        <ItemMeta item={item} className="mt-1.5" />
+      </div>
+      {item.soon ? null : <QuickAdd item={item} className="relative shrink-0" />}
+    </article>
+  );
+}
+
+const layouts = {
+  project: { Card: ProjectCard, grid: "grid gap-4 md:grid-cols-2" },
+  compact: { Card: CompactCard, grid: "grid gap-3 sm:grid-cols-2 lg:grid-cols-3" },
+};
+
+export type MenuVariant = keyof typeof layouts;
+
+export function MenuGrid({ items, variant = "compact", className = "" }: { items: Item[]; variant?: MenuVariant; className?: string }) {
+  const { Card, grid } = layouts[variant];
+  return (
+    <div className={`${grid} ${className}`}>
       {items.map((item) => (
-        <MenuItem key={item.slug} item={item} />
+        <Card key={item.slug} item={item} />
       ))}
     </div>
   );

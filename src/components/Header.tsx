@@ -2,125 +2,77 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { site } from "@/content/site";
-import { noteView } from "@/lib/nav";
-import { useOrderSlugs } from "@/lib/order";
+import { currentFor, destinations, noteView } from "@/lib/nav";
+import { cartOpenStore, openCart, useOrderSlugs } from "@/lib/order";
 import { Icon } from "./Icon";
 
-const nav = [
-  { label: "Menu", href: "/" },
-  { label: "Profile", href: "/about" },
-  { label: "Work history", href: "/orders" },
-  { label: "Contact", href: "/contact" },
-];
+export function BrandMark({ large = false }: { large?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid shrink-0 place-items-center rounded-full bg-brand font-bold text-white ${large ? "size-16 text-[22px] md:size-20 md:text-[26px]" : "size-8 text-[13px]"}`}
+    >
+      {site.initials}
+    </span>
+  );
+}
+
+function CartButton() {
+  const count = useOrderSlugs().length;
+  const open = cartOpenStore.use();
+  return (
+    <button
+      type="button"
+      id="cart-button"
+      onClick={openCart}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls="cart-drawer"
+      className="inline-flex h-10 items-center gap-2 rounded-full bg-ink py-1 pl-4 pr-1.5 text-[15px] font-semibold text-white transition-colors hover:bg-[#2b302d]"
+    >
+      <Icon name="bag" size={18} />
+      Cart
+      <span className={`grid h-7 min-w-7 place-items-center rounded-full px-1.5 text-[13px] font-bold ${count ? "bg-white text-ink" : "bg-[#3a403c] text-white"}`}>
+        {count}
+      </span>
+      <span className="sr-only">{count === 1 ? "item" : "items"}</span>
+    </button>
+  );
+}
 
 export function Header() {
-  const count = useOrderSlugs().length;
   const pathname = usePathname();
-  const menu = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     noteView();
-    menu.current?.close();
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-30 bg-white">
-      <div className="page flex h-16 items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="-ml-2 grid size-11 place-items-center md:hidden"
-            aria-label="Open menu"
-            aria-haspopup="dialog"
-            onClick={() => menu.current?.showModal()}
-          >
-            <Icon name="menu" size={28} />
-          </button>
-          <Link href="/" aria-label={`${site.wordmark} ${site.name}, home`} className="font-display text-[26px] font-medium tracking-tight">
-            {site.wordmark}
-          </Link>
-        </div>
+    <header className="sticky top-0 z-30 border-b border-line bg-white">
+      <div className="page flex h-[var(--header-h)] items-center justify-between gap-4">
+        <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-full">
+          <BrandMark />
+          {/* Tablets need the room for the nav, so the name is visually hidden there but still names the link. */}
+          <span className="truncate text-[16px] font-bold tracking-tight md:sr-only lg:not-sr-only">{site.name}</span>
+        </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-8 md:flex">
-          {nav.map((link) => (
-            <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className="nav-link">
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          {destinations.map((link) => (
+            <Link key={link.href} href={link.href} aria-current={currentFor(link.href, pathname)} className="nav-link">
               {link.label}
             </Link>
           ))}
           <a href={site.resume} target="_blank" rel="noreferrer" className="nav-link">
             Résumé
+            <Icon name="external" size={15} />
+            <span className="sr-only">(PDF, opens in a new tab)</span>
           </a>
         </nav>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/checkout"
-            aria-label={`Your order, ${count} ${count === 1 ? "item" : "items"}`}
-            className="relative -mr-2 grid size-11 place-items-center"
-          >
-            <Icon name="bag" size={28} />
-            {count > 0 ? (
-              <span
-                aria-hidden="true"
-                className="absolute right-0.5 top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-[11px] font-medium text-white"
-              >
-                {count}
-              </span>
-            ) : null}
-          </Link>
-        </div>
+        <CartButton />
       </div>
-
-      <dialog ref={menu} aria-label="Site menu" className="site-menu">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-display text-5xl">{site.firstName}</p>
-            <p className="mt-2 text-sm text-muted">{site.location}</p>
-          </div>
-          <button
-            type="button"
-            className="-mr-2 grid size-11 place-items-center"
-            aria-label="Close menu"
-            onClick={() => menu.current?.close()}
-          >
-            <Icon name="close" size={28} />
-          </button>
-        </div>
-        <ul className="mt-14 space-y-5 font-display text-[40px] leading-tight">
-          <li>
-            <Link href="/" onClick={() => menu.current?.close()}>
-              Menu
-            </Link>
-          </li>
-          <li>
-            <Link href="/about" onClick={() => menu.current?.close()}>
-              Profile
-            </Link>
-          </li>
-          <li>
-            <Link href="/orders" onClick={() => menu.current?.close()}>
-              Work history
-            </Link>
-          </li>
-          <li>
-            <a href={site.resume} target="_blank" rel="noreferrer">
-              Résumé
-            </a>
-          </li>
-          <li>
-            <Link href="/contact" onClick={() => menu.current?.close()}>
-              Contact
-            </Link>
-          </li>
-          <li>
-            <a href={site.linkedin} target="_blank" rel="noreferrer" className="text-link">
-              LinkedIn
-            </a>
-          </li>
-        </ul>
-      </dialog>
     </header>
   );
 }

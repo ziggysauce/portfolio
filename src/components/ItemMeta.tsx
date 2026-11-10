@@ -27,8 +27,8 @@ export function ItemMeta({ item, className = "" }: { item: Item; className?: str
 /** One outcome, set apart from the description so results read first. */
 export function ResultLine({ text, className = "" }: { text: string; className?: string }) {
   return (
-    <p className={`flex gap-2 text-[14px] font-medium leading-snug ${className}`}>
-      <Icon name="check" size={16} className="mt-0.5 shrink-0 text-open" />
+    <p className={`flex gap-2 text-[14px] font-semibold leading-snug ${className}`}>
+      <Icon name="check" size={16} className="mt-0.5 shrink-0 text-brand" />
       <span>
         <span className="sr-only">Result: </span>
         {text}

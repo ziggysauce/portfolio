@@ -3,7 +3,7 @@
 export const site = {
   name: "Daniel Nguyen",
   firstName: "Daniel",
-  wordmark: "dtn.",
+  initials: "DN",
   location: "Washington, DC",
   replyTime: "Replies within a day",
   tagline: "Technical Product Management and Software Engineering",
