@@ -1,0 +1,563 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design tokens. Tune the look here: color, type, radii and elevation.
+   The font is chosen in src/app/layout.tsx.
+
+   Color roles
+     brand        saturated green: the hero, primary actions, brand marks
+     brand-strong darker green: hover, green text on mint, the hero's inner panel
+     mint         selected states and the live status pills ("In production", "Current role")
+     mint-soft    the band behind GoTab work, the one featured area on the menu
+     ink          primary text
+     canvas       page background and supporting surfaces
+     white        cards, header, drawer and form fields
+   ========================================================================== */
+
+@theme {
+  --color-brand: #00723b; /* White text on it: 6:1. */
+  --color-brand-strong: #005a2e; /* On mint: 6.9:1. */
+  --color-mint: #cff2da;
+  --color-mint-soft: #e9f5ed; /* The GoTab work band. Muted text on it: 5.3:1. */
+  --color-ink: #101412;
+  --color-muted: #5f655f; /* 6:1 on white, 5.4:1 on canvas. */
+  --color-canvas: #f2f3f1;
+  --color-line: #e3e5e1; /* Decorative dividers and card edges. */
+  --color-control: #7c827c; /* Input borders: 3.9:1 on white, 3.5:1 on canvas. */
+  --color-error: #c4210f;
+
+  --radius-card: 16px;
+  --radius-panel: 24px;
+
+  --shadow-card: 0 1px 2px rgb(16 20 18 / 0.05);
+  --shadow-raised: 0 8px 24px rgb(16 20 18 / 0.1);
+  --shadow-overlay: 0 16px 48px rgb(16 20 18 / 0.22);
+}
+
+@theme inline {
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light; /* Light-only by design: stops OS dark mode half-theming form controls. */
+  --header-h: 64px;
+  --bar-h: 64px; /* The bottom navigation on phones. */
+  --sticky-top: 80px;
+  --focus: var(--color-brand);
+}
+@media (min-width: 768px) {
+  :root {
+    --bar-h: 0px;
+  }
+}
+
+/* The menu's category tabs stick under the header, so anchors land lower there. */
+html:has(.menu-tabs) {
+  --sticky-top: 132px;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Keeps anchors and keyboard focus clear of the sticky header and the bottom navigation. */
+  scroll-padding-top: var(--sticky-top);
+  scroll-padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 16px);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: 16px;
+  }
+  @media (min-width: 768px) {
+    .page {
+      padding-inline: 32px;
+    }
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 16px;
+    top: -60px;
+    z-index: 60;
+    background: var(--color-ink);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 10px;
+  }
+  .skip-link:focus {
+    top: 12px;
+  }
+
+  /* Type. One family; weight and size carry the hierarchy. */
+  .display {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+  }
+  .page-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+  }
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  @media (min-width: 768px) {
+    .page-title {
+      font-size: 48px;
+    }
+    .section-title {
+      font-size: 28px;
+    }
+  }
+
+  /* Buttons: pill-shaped, 48px tall. Primary is green, soft is canvas, outline is for light surfaces. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color 150ms,
+      color 150ms,
+      border-color 150ms;
+  }
+  .btn-primary {
+    background: var(--color-brand);
+    color: #fff;
+  }
+  .btn-soft {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+  .btn-outline {
+    border: 1px solid var(--color-control);
+    background: #fff;
+    color: var(--color-ink);
+  }
+  /* On the green hero. */
+  .btn-on-brand {
+    background: #fff;
+    color: var(--color-brand-strong);
+  }
+  .btn-ghost-on-brand {
+    border: 1px solid rgb(255 255 255 / 0.7);
+    color: #fff;
+  }
+  .btn-sm {
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  /* Hover only where hover exists, or a tapped button stays dark on phones. */
+  @media (hover: hover) {
+    .btn-primary:hover {
+      background: var(--color-brand-strong);
+    }
+    .btn-soft:hover {
+      background: var(--color-line);
+    }
+    .btn-outline:hover {
+      border-color: var(--color-ink);
+    }
+    .btn-on-brand:hover {
+      background: var(--color-mint);
+    }
+    .btn-ghost-on-brand:hover {
+      background: rgb(255 255 255 / 0.12);
+    }
+  }
+
+  /* Small labels on menu items, such as "New". */
+  .tag {
+    display: inline-block;
+    border-radius: 999px;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+
+  /* A card on the canvas. Menu cards, order lines, roles and contact rows all start here. */
+  .card {
+    position: relative;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: #fff;
+    box-shadow: var(--shadow-card);
+  }
+  .card-link {
+    transition:
+      border-color 150ms,
+      box-shadow 150ms;
+  }
+  @media (hover: hover) {
+    .card-link:hover {
+      border-color: var(--color-control);
+      box-shadow: var(--shadow-raised);
+    }
+  }
+
+  /* Header links and the phone's bottom navigation. The current page is mint. */
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--color-ink);
+    transition: background-color 150ms;
+  }
+  .nav-link[aria-current] {
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+    font-weight: 600;
+  }
+  @media (hover: hover) {
+    .nav-link:not([aria-current]):hover {
+      background: var(--color-canvas);
+    }
+  }
+  /* On phones the bottom bar steps aside while the keyboard is up, so it can't cover the field being typed in. */
+  @media (max-width: 767px) {
+    body:has(input:not([type="radio"], [type="checkbox"]):focus, textarea:focus) .bottom-nav {
+      display: none;
+    }
+  }
+  .tab-link {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 2px 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--color-muted);
+  }
+  @media (max-width: 359px) {
+    .tab-link {
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+  }
+  .tab-link .tab-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 30px;
+    border-radius: 999px;
+    color: var(--color-ink);
+    transition: background-color 150ms;
+  }
+  .tab-link[aria-current] {
+    color: var(--color-brand-strong);
+    font-weight: 700;
+  }
+  .tab-link[aria-current] .tab-icon {
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+  }
+
+  /* Product / Engineering / Everything, like Delivery / Pickup. Each option is a
+     <label> around a visually hidden radio, so the checked state is real. Selected
+     is mint with a check mark, so it doesn't rest on color alone. */
+  .segmented {
+    display: inline-flex;
+    gap: 4px;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: #fff;
+    padding: 4px;
+  }
+  .segmented label {
+    position: relative; /* Anchors the hidden radio, so focusing it can't scroll the page elsewhere. */
+    display: grid;
+    place-items: center;
+    min-height: 40px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    color: var(--color-muted);
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 150ms,
+      color 150ms;
+  }
+  .segmented label:has(:checked) {
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+    font-weight: 700;
+  }
+  .segmented label:has(:checked) span::before {
+    content: "✓" / ""; /* Empty alt text: the radio already says it's checked. */
+    margin-right: 6px;
+  }
+  .segmented label:has(:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  @media (hover: hover) {
+    .segmented label:not(:has(:checked)):hover {
+      background: var(--color-canvas);
+      color: var(--color-ink);
+    }
+  }
+  /* Full width on phones, three equal options, so it fits at 320px. */
+  @media (max-width: 767px) {
+    .segmented {
+      display: flex;
+      width: 100%;
+    }
+    .segmented label {
+      flex: 1 1 0;
+      padding-inline: 6px;
+    }
+  }
+
+  /* Category tabs that stick under the header. The section you're reading is underlined in green. */
+  .menu-tabs {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 20;
+    background: #fff;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .menu-tab {
+    display: block;
+    padding: 14px 2px 11px;
+    border-bottom: 3px solid transparent;
+    color: var(--color-muted);
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .menu-tab[aria-current="true"] {
+    border-color: var(--color-brand);
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+  @media (hover: hover) {
+    .menu-tab:hover {
+      color: var(--color-ink);
+    }
+  }
+
+  /* The round add button on menu cards. In the order, it turns mint with a check. */
+  .quick-add {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--color-control);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-brand);
+    transition:
+      background-color 150ms,
+      border-color 150ms;
+  }
+  .quick-add[data-selected="true"] {
+    border-color: var(--color-brand);
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+  }
+  @media (hover: hover) {
+    .quick-add:not([data-selected="true"]):hover {
+      border-color: var(--color-brand);
+    }
+  }
+
+  /* Selectable chips, like "What brings you here?" at checkout. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 1px solid var(--color-control);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background-color 150ms,
+      border-color 150ms;
+  }
+  input:checked + .chip {
+    border-color: var(--color-brand);
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+    font-weight: 700;
+  }
+  input:focus-visible + .chip {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .field {
+    display: block;
+    width: 100%;
+    height: 48px;
+    padding-inline: 14px;
+    border: 1px solid var(--color-control);
+    border-radius: 12px;
+    background: #fff;
+    font-size: 16px;
+  }
+  .field:focus-visible {
+    outline-offset: 0;
+  }
+
+  /* Status chips on roles. */
+  .status {
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--color-canvas);
+    color: var(--color-muted);
+    padding: 2px 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status-live {
+    background: var(--color-mint);
+    color: var(--color-brand-strong);
+  }
+
+  /* The <summary> that opens a role's highlights. */
+  .receipt-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--color-canvas);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  .receipt-toggle::-webkit-details-marker {
+    display: none;
+  }
+  @media (hover: hover) {
+    .receipt-toggle:hover {
+      background: var(--color-line);
+    }
+  }
+
+  /* The cart slides in from the right. On phones it takes the full width. */
+  .drawer {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(420px, 100%);
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: var(--color-ink);
+    box-shadow: var(--shadow-overlay);
+  }
+  .drawer[open] {
+    display: flex;
+    flex-direction: column;
+    animation: drawer-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .drawer::backdrop {
+    background: rgb(16 20 18 / 0.45);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Motion: short, and only to show where something came from. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+}
+.sheet-up {
+  animation: sheet-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.toast-in {
+  animation: toast-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .sheet-up,
+  .toast-in,
+  .drawer[open] {
+    animation: none;
+  }
+}
