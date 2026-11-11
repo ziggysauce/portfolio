@@ -6,3 +6,6 @@ next-env.d.ts
 .DS_Store
 .env*
 .vercel
+
+# Blender autosave backups
+*.blend1
