@@ -84,7 +84,7 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
     const saved = { padTop: root.style.scrollPaddingTop, padBottom: root.style.scrollPaddingBottom, bg: root.style.background };
     root.style.scrollPaddingTop = "0px";
     root.style.scrollPaddingBottom = "0px";
-    root.style.background = "#241a12"; // So overscroll shows the hall, not the v3 canvas color.
+    root.style.background = "#222a29"; // So overscroll shows the hall, not the v3 canvas color.
     return () => {
       root.style.scrollPaddingTop = saved.padTop;
       root.style.scrollPaddingBottom = saved.padBottom;
@@ -205,6 +205,9 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
       pressing.current = false;
       arm();
     }
+    // The room's ambient motion pauses once the hall scrolls out of view.
+    const watcher = new IntersectionObserver(([entry]) => scene.current?.setVisible(entry.isIntersecting));
+    if (stage.current) watcher.observe(stage.current);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
@@ -213,6 +216,7 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
     window.addEventListener("pointercancel", onRelease, { passive: true });
     const timer = idle;
     return () => {
+      watcher.disconnect();
       window.clearTimeout(timer.current);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
