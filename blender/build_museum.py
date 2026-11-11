@@ -6,8 +6,8 @@ Builds the museum's 3D assets from scratch: no downloaded models or textures.
 
 Writes:
     blender/museum.blend           editable source (open it in Blender to tweak)
-    blender/textures/*.png         generated textures: oak planks and grain, painted plaster, evening sky
-    public/museum/museum.glb       web asset: nodes "Bay", "Case", "Skull", "Fern"
+    blender/textures/*.png         generated textures: oak, plaster, evening sky, rug, the curator's note
+    public/museum/museum.glb       web asset: nodes "Bay", "Case" (with its "Drawer"), "Skull", "Fern", "Props"
     public/museum/hall.jpg         still render, used as the no-WebGL fallback (with --render)
 
 Units are meters. Blender is Z-up with the exhibits facing -Y; the glTF export turns
@@ -29,11 +29,15 @@ TEX_DIR = os.path.join(BLEND_DIR, "textures")
 WEB_DIR = os.path.join(ROOT, "public", "museum")
 RENDER = "--render" in sys.argv
 
-BAY_WIDTH = 3.2  # One exhibit per bay; the web app spaces exhibits by this much.
+BAY_WIDTH = 2.6  # One exhibit per bay; the web app spaces exhibits by this much. Close enough that the next case peeks in.
 WALL_Y = 1.0  # Front face of the back wall.
 CASE_Y = 0.2  # Center of the display case, in front of the niche.
-PLINTH_H = 0.92
+PLINTH_H = 0.78  # A squat cabinet: about as tall as it is wide.
 DECK_Z = PLINTH_H + 0.045
+# The cabinet runs wider on the right than the glass case, leaving a shelf for the curator's things.
+CAB_X0, CAB_X1, CAB_D = -0.30, 0.52, 0.25  # left side, right side, half depth
+# The drawer under the top, which holds the curator's note. The web scene slides the "Drawer" node.
+DRAWER_X0, DRAWER_X1, DRAWER_Z0, DRAWER_Z1, DRAWER_DEPTH = CAB_X0 + 0.055, CAB_X1 - 0.055, 0.555, 0.695, 0.3
 
 
 # ---------------------------------------------------------------- helpers
@@ -346,24 +350,84 @@ def plaster_image(size=512, seed=3):
     return save_image("plaster", np.repeat(value[..., None], 3, axis=2))
 
 
-def sky_image(width=256, height=512, seed=8):
-    """The view through the window: a calm evening sky over a soft tree line. Original, painted in code."""
+def sky_image(width=384, height=768, seed=8):
+    """The view through the window: deep blue evening over a far hill with a few lit windows, and a
+    soft tree line in front. Original, painted in code."""
     rng = np.random.default_rng(seed)
     v, u = np.mgrid[0:height, 0:width].astype(np.float64)
     t = v / height  # 0 at the bottom row (Blender images start at the bottom), 1 at the top.
-    top, mid, low = np.array([0.20, 0.33, 0.42]), np.array([0.42, 0.60, 0.66]), np.array([0.86, 0.72, 0.58])
-    k = np.clip((t - 0.22) / 0.78, 0, 1)[..., None]
-    sky = np.where(k > 0.45, mid + (top - mid) * ((k - 0.45) / 0.55), low + (mid - low) * (k / 0.45))
+    top, mid, low = np.array([0.06, 0.09, 0.21]), np.array([0.12, 0.19, 0.36]), np.array([0.34, 0.36, 0.50])
+    k = np.clip((t - 0.2) / 0.8, 0, 1)[..., None]
+    sky = np.where(k > 0.35, mid + (top - mid) * ((k - 0.35) / 0.65), low + (mid - low) * (k / 0.35))
+    sky = sky + np.exp(-((t - 0.24) ** 2) / 0.003)[..., None] * np.array([0.10, 0.06, 0.04])  # the last warmth on the horizon
     cloud = periodic_noise(rng, max(width, height), 4, 0.5)[:height, :width]
-    band = np.exp(-((t - 0.62) ** 2) / 0.004)[..., None]
-    sky = sky + band * np.clip(cloud, 0, None)[..., None] * np.array([0.10, 0.08, 0.07])
-    # A soft tree line: rounded crowns, dusky teal.
-    ridge = 0.19 + 0.03 * np.sin(u / width * 2 * np.pi * 2 + 0.4) + 0.012 * np.sin(u / width * 2 * np.pi * 5 + 1.3)
-    cell = (u / width * 7) % 1.0  # Rounded crowns, one soft dome per tree.
-    crowns = 0.04 * np.sqrt(np.clip(1 - ((cell - 0.5) / 0.5) ** 2, 0, 1))
+    band = np.exp(-((t - 0.6) ** 2) / 0.004)[..., None]
+    sky = sky + band * np.clip(cloud, 0, None)[..., None] * np.array([0.03, 0.04, 0.06])
+    # A few faint stars, high up.
+    for _ in range(9):
+        sx, sy = rng.uniform(0.08, 0.92) * width, rng.uniform(0.6, 0.97) * height
+        sky += (np.exp(-((u - sx) ** 2 + (v - sy) ** 2) / 1.2) * rng.uniform(0.25, 0.5))[..., None] * np.array([0.8, 0.85, 1.0])
+    # A far hill, a shade lighter than the trees, with a handful of distant lit windows on it.
+    hill = 0.27 + 0.025 * np.sin(u / width * 2 * np.pi * 1.2 + 2.0)
+    on_hill = (t < hill)[..., None]
+    sky = np.where(on_hill, np.array([0.08, 0.11, 0.19]) + 0.02 * t[..., None], sky)
+    for _ in range(11):
+        lx = rng.uniform(0.06, 0.94) * width
+        ly = rng.uniform(0.2, 0.25) * height
+        glow = np.exp(-((u - lx) ** 2 + (v - ly) ** 2) / rng.uniform(2.5, 5.0))
+        sky += (glow * rng.uniform(0.6, 1.0))[..., None] * np.array([1.0, 0.72, 0.38])
+    # A soft tree line in front: rounded crowns, nearly black blue-green.
+    ridge = 0.17 + 0.025 * np.sin(u / width * 2 * np.pi * 2 + 0.4) + 0.01 * np.sin(u / width * 2 * np.pi * 5 + 1.3)
+    cell = (u / width * 7) % 1.0  # One soft dome per tree.
+    crowns = 0.035 * np.sqrt(np.clip(1 - ((cell - 0.5) / 0.5) ** 2, 0, 1))
     trees = (t < ridge + crowns)[..., None]
-    sky = np.where(trees, np.array([0.13, 0.22, 0.24]) + 0.03 * t[..., None], sky)
+    sky = np.where(trees, np.array([0.04, 0.07, 0.09]) + 0.02 * t[..., None], sky)
     return save_image("evening-sky", sky)
+
+
+def rug_image(width=1024, height=512, seed=13):
+    """A faded runner: dusty terracotta field, teal and cream border stripes, a quiet row of diamonds,
+    a little fibre and some wear down the middle. Tiles along its length (u)."""
+    rng = np.random.default_rng(seed)
+    v, u = np.mgrid[0:height, 0:width].astype(np.float64)
+    v, u = v / height, u / width
+    rgb = np.ones((height, width, 3)) * np.array([0.55, 0.38, 0.31])
+    edge = np.minimum(v, 1 - v)
+    teal, cream, rust = np.array([0.29, 0.39, 0.37]), np.array([0.80, 0.71, 0.57]), np.array([0.45, 0.28, 0.23])
+    rgb = np.where((edge < 0.085)[..., None], teal, rgb)
+    rgb = np.where(((edge > 0.105) & (edge < 0.122))[..., None], cream, rgb)
+    rgb = np.where(((edge > 0.14) & (edge < 0.15))[..., None], rust, rgb)
+    # Diamonds down the middle, three per tile: a cream outline around a rust centre.
+    cell = (u * 3) % 1.0
+    d = np.abs(cell - 0.5) / 0.16 + np.abs(v - 0.5) / 0.22
+    rgb = np.where(((d > 0.78) & (d < 1.0))[..., None], cream, rgb)
+    rgb = np.where((d < 0.45)[..., None], rust, rgb)
+    # Fibre: fine streaks along the weave, plus speckle.
+    streak = np.sin(2 * np.pi * (v * 180 + 0.4 * np.sin(2 * np.pi * u * 3))) * 0.018
+    speckle = (rng.random((height, width)) - 0.5) * 0.05
+    # Wear: a gently lighter path down the middle, where people walk.
+    wear = np.exp(-((v - 0.5) ** 2) / 0.05) * (0.04 + periodic_noise(rng, width, 3, 0.02)[:height, :width])
+    rgb = rgb * (1 + streak + speckle)[..., None] + wear[..., None] * np.array([0.9, 0.85, 0.75])
+    return save_image("rug", rgb)
+
+
+def note_image(width=256, height=320, seed=17):
+    """The curator's note card: cream paper with a few lines of quick, illegible handwriting."""
+    rng = np.random.default_rng(seed)
+    v, u = np.mgrid[0:height, 0:width].astype(np.float64)
+    rgb = np.ones((height, width, 3)) * np.array([0.93, 0.89, 0.80])
+    ink = np.zeros((height, width))
+    for row in range(5):
+        y = height * (0.78 - row * 0.13)
+        x0, x1 = width * 0.12, width * rng.uniform(0.62, 0.9)
+        # A wavering stroke with loops: handwriting at a glance, nothing readable up close.
+        path = y + 5 * np.sin(u * 0.32 + row) + 3 * np.sin(u * 0.11 + row * 2)
+        stroke = np.exp(-((v - path) ** 2) / 2.2) * ((u > x0) & (u < x1))
+        ink = np.maximum(ink, stroke * (0.55 + 0.45 * (np.sin(u * 0.9 + row) > -0.6)))
+    sig = np.exp(-((v - height * 0.12 - 6 * np.sin(u * 0.2)) ** 2) / 2.5) * ((u > width * 0.5) & (u < width * 0.86))
+    ink = np.maximum(ink, sig)
+    rgb = rgb * (1 - ink[..., None] * 0.7) + ink[..., None] * np.array([0.12, 0.16, 0.26]) * 0.7
+    return save_image("curator-note", rgb)
 
 
 # ---------------------------------------------------------------- the skull
@@ -509,35 +573,92 @@ def build_skull(material):
 # ---------------------------------------------------------------- the case
 
 
+def build_drawer(mats, front):
+    """The curator's drawer: an oak box behind a rounded front, a brass card holder and knob, and a
+    folded note lying inside. The web scene slides the "Drawer" node out and stands the note up on
+    its hinge ("DrawerNote", origin at its front edge)."""
+    x0, x1, z0, z1 = DRAWER_X0, DRAWER_X1, DRAWER_Z0, DRAWER_Z1
+    mid = (x0 + x1) / 2
+    oak = [box("DrawerFront", x0, x1, front - 0.024, front - 0.002, z0, z1, bevel=0.01, segments=4)]
+    bx0, bx1, bz0, bz1 = x0 + 0.012, x1 - 0.012, z0 + 0.008, z1 - 0.022
+    by0, by1 = front - 0.002, front + DRAWER_DEPTH
+    oak.append(box("DrawerBottom", bx0, bx1, by0, by1, bz0, bz0 + 0.008))
+    oak.append(box("DrawerSide", bx0, bx0 + 0.012, by0, by1, bz0, bz1))
+    oak.append(box("DrawerSide", bx1 - 0.012, bx1, by0, by1, bz0, bz1))
+    oak.append(box("DrawerBack", bx0, bx1, by1 - 0.012, by1, bz0, bz1))
+    for i, part in enumerate(oak):
+        grain_uv(part, seed=60 + i)
+    drawer_oak = join(oak, "DrawerOak")
+    drawer_oak.data.materials.append(mats["grain"])
+    shade_smooth(drawer_oak)
+
+    # A brass card holder (with a blank card) above a small knob, like a specimen-cabinet drawer.
+    brass = [box("CardHolder", mid - 0.042, mid + 0.042, front - 0.03, front - 0.023, 0.638, 0.678, bevel=0.003, segments=2)]
+    brass.append(ellipsoid((mid, front - 0.036, 0.593), (0.015, 0.013, 0.015), 20, 12, "Knob"))
+    drawer_brass = join(brass, "DrawerBrass")
+    drawer_brass.data.materials.append(mats["bronze"])
+    shade_smooth(drawer_brass)
+    card = box("DrawerCard", mid - 0.035, mid + 0.035, front - 0.0325, front - 0.029, 0.643, 0.673)
+    card.data.materials.append(mats["paper"])
+
+    # The note: a card lying flat, hinged at its front edge so the web scene can stand it up.
+    hinge_y, floor_z = front + 0.03, bz0 + 0.0085
+    w, l = 0.13, 0.16
+    bm = bmesh.new()
+    corners = [(mid - w / 2, 0), (mid + w / 2, 0), (mid + w / 2, l), (mid - w / 2, l)]
+    verts = [bm.verts.new((x, hinge_y + y, floor_z)) for x, y in corners]
+    face = bm.faces.new(verts)
+    uv = bm.loops.layers.uv.new("UVMap")
+    for loop in face.loops:
+        x, y, _ = loop.vert.co
+        loop[uv].uv = ((x - (mid - w / 2)) / w, (y - hinge_y) / l)  # The far edge becomes the top once it stands.
+    if face.normal.z < 0:
+        face.normal_flip()
+    mesh = bpy.data.meshes.new("DrawerNote")
+    bm.to_mesh(mesh)
+    bm.free()
+    note = bpy.data.objects.new("DrawerNote", mesh)
+    bpy.context.scene.collection.objects.link(note)
+    solid = note.modifiers.new("Card", "SOLIDIFY")
+    solid.thickness = 0.0012
+    apply_modifiers(note)
+    note.data.materials.append(mats["note"])
+    activate(note)
+    bpy.context.scene.cursor.location = (mid, hinge_y, floor_z)
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")  # The hinge.
+    bpy.context.scene.cursor.location = (0, 0, 0)
+
+    return parent([drawer_oak, drawer_brass, card, note], "Drawer")
+
+
 def build_case(mats):
-    """An oak specimen cabinet: bun feet, a base moulding, a raised front panel, a bronze escutcheon,
-    then the glass case on top. Edges are softened as if handled for decades."""
+    """A squat oak specimen cabinet with softly rounded edges: bun feet, a base moulding, two raised
+    panels and the curator's drawer, then the glass case on top. The cabinet runs wider than the
+    case on the right, leaving a shelf. Edges are softened as if handled for decades."""
     cx, cy = 0.0, CASE_Y
+    x0, x1, d = CAB_X0, CAB_X1, CAB_D
+    front = cy - d
     parts_oak = []
-    for sx in (-1, 1):
+    for fx in (x0 + 0.07, x1 - 0.07):
         for sy in (-1, 1):
-            foot = ellipsoid((cx + sx * 0.2, cy + sy * 0.2, 0.034), (0.036, 0.036, 0.034), 24, 14, "Foot")
-            parts_oak.append(foot)
-    parts_oak.append(box("Base", cx - 0.255, cx + 0.255, cy - 0.255, cy + 0.255, 0.058, 0.122, bevel=0.014, segments=4))
-    body = box("Body", cx - 0.235, cx + 0.235, cy - 0.235, cy + 0.235, 0.12, 0.884, bevel=0.022, segments=5)
-    parts_oak.append(body)
-    parts_oak.append(box("Cornice", cx - 0.252, cx + 0.252, cy - 0.252, cy + 0.252, 0.872, PLINTH_H, bevel=0.012, segments=4))
-    # A raised panel on the front, with a slim bead around it: the joint lines that make it read as built.
-    front = cy - 0.235
-    parts_oak.append(box("Panel", cx - 0.168, cx + 0.168, front - 0.012, front + 0.004, 0.2, 0.79, bevel=0.009, segments=3))
-    parts_oak.append(box("Bead", cx - 0.19, cx + 0.19, front - 0.004, front + 0.004, 0.178, 0.812, bevel=0.004, segments=2))
+            parts_oak.append(ellipsoid((fx, cy + sy * (d - 0.07), 0.03), (0.046, 0.046, 0.032), 24, 14, "Foot"))
+    parts_oak.append(box("Base", x0 - 0.014, x1 + 0.014, cy - d - 0.014, cy + d + 0.014, 0.05, 0.115, bevel=0.03, segments=6))
+    parts_oak.append(box("Body", x0, x1, cy - d, cy + d, 0.1, PLINTH_H - 0.03, bevel=0.045, segments=7))
+    parts_oak.append(box("Top", x0 - 0.02, x1 + 0.02, cy - d - 0.02, cy + d + 0.02, PLINTH_H - 0.042, PLINTH_H, bevel=0.021, segments=6))
+    # Two raised panels under the drawer: the joint lines that make it read as built.
+    mid = (x0 + x1) / 2
+    for px0, px1 in ((x0 + 0.065, mid - 0.016), (mid + 0.016, x1 - 0.065)):
+        parts_oak.append(box("Panel", px0, px1, front - 0.012, front + 0.004, 0.175, 0.495, bevel=0.012, segments=4))
     for i, part in enumerate(parts_oak):
         grain_uv(part, seed=i)
     cabinet = join(parts_oak, "Cabinet")
     cabinet.data.materials.append(mats["grain"])
     shade_smooth(cabinet)
 
-    plate = box("Escutcheon", cx - 0.021, cx + 0.021, front - 0.019, front - 0.011, 0.64, 0.69, bevel=0.006, segments=3)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.004, depth=0.006, location=(cx, front - 0.019, 0.668), rotation=(math.radians(90), 0, 0))
-    keyhole = bpy.context.active_object
-    keyhole.data.materials.append(mats["shadow"])
-    plate.data.materials.append(mats["bronze"])
-    shade_smooth(plate)
+    # The dark opening behind the drawer front, seen once the drawer slides out.
+    opening = box("DrawerOpening", DRAWER_X0 + 0.004, DRAWER_X1 - 0.004, front - 0.003, front + 0.001, DRAWER_Z0 + 0.004, DRAWER_Z1 - 0.004)
+    opening.data.materials.append(mats["shadow"])
+    drawer = build_drawer(mats, front)
 
     trim = box("Trim", cx - 0.258, cx + 0.258, cy - 0.258, cy + 0.258, PLINTH_H, PLINTH_H + 0.028, bevel=0.008)
     trim.data.materials.append(mats["bronze"])
@@ -550,7 +671,7 @@ def build_case(mats):
     riser.data.materials.append(mats["grain"])
 
     # Glass: four sides and a lid, single-sided, no thickness. Cheap to draw and to sort.
-    top = DECK_Z + 0.36
+    top = DECK_Z + 0.34
     half = 0.232
     bm = bmesh.new()
     corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
@@ -586,7 +707,7 @@ def build_case(mats):
 
     for obj in (trim, deck, frame, riser):
         shade_smooth(obj)
-    case = parent([cabinet, plate, keyhole, trim, deck, riser, glass, frame], "Case")
+    case = parent([cabinet, opening, drawer, trim, deck, riser, glass, frame], "Case")
     case.rotation_euler.z = math.radians(0.6)  # Not quite square to the wall: someone moved it once.
     return case
 
@@ -595,25 +716,34 @@ def build_case(mats):
 
 
 # Window and sconce positions, shared with src/components/museum/scene.ts (which converts to Y-up).
-WINDOW_X, WINDOW_W, WINDOW_SILL, WINDOW_SPRING = -1.03, 0.42, 1.0, 1.86
-SCONCE_X, SCONCE_Z = 0.98, 1.58  # Low enough that the glowing shade clears the page header's shade.
+WINDOW_X, WINDOW_W, WINDOW_SILL, WINDOW_SPRING = -0.94, 0.36, 1.0, 1.86
+SCONCE_X, SCONCE_Z = 1.0, 1.58  # Low enough that the glowing shade clears the page header's shade.
 
 
 def build_bay(mats):
     half = BAY_WIDTH / 2
     floor_depth = 3.6
-    niche_w, niche_spring, niche_depth = 1.5, 1.85, 0.16
+    niche_w, niche_spring, niche_depth = 1.3, 1.85, 0.16
 
     bpy.ops.mesh.primitive_plane_add(size=1, location=(0, WALL_Y - floor_depth / 2, 0))
     floor = bpy.context.active_object
     floor.name = "Floor"
     floor.scale = (BAY_WIDTH, floor_depth, 1)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    # One texture tile per 1.6 m, so a bay holds exactly two and bays tile seamlessly.
+    # One texture tile per half bay, so a bay holds exactly two and bays tile seamlessly.
+    tile = BAY_WIDTH / 2
     for loop in floor.data.loops:
         co = floor.data.vertices[loop.vertex_index].co
-        floor.data.uv_layers.active.data[loop.index].uv = ((co.x + half) / 1.6, (co.y - WALL_Y) / 1.6)
+        floor.data.uv_layers.active.data[loop.index].uv = ((co.x + half) / tile, (co.y - WALL_Y) / tile)
     floor.data.materials.append(mats["floor"])
+
+    # A runner rug along the hall in front of the cases, continuous from bay to bay.
+    rug_y0, rug_y1 = -0.74, -0.12
+    rug = box("Rug", -half, half, rug_y0, rug_y1, 0.0, 0.006)
+    for loop in rug.data.loops:
+        co = rug.data.vertices[loop.vertex_index].co
+        rug.data.uv_layers.active.data[loop.index].uv = ((co.x + half) / tile, (co.y - rug_y0) / (rug_y1 - rug_y0))
+    rug.data.materials.append(mats["rug"])
 
     # Back wall: painted plaster with an arched niche for the exhibit and an arched window recess.
     wall = box("Wall", -half, half, WALL_Y, WALL_Y + 0.3, 0.0, 3.4)
@@ -669,7 +799,7 @@ def build_bay(mats):
     for x0, x1, y in ((-half, -niche_w / 2 - 0.03, WALL_Y), (niche_w / 2 + 0.03, half, WALL_Y), (-niche_w / 2 + 0.035, niche_w / 2 - 0.035, WALL_Y + niche_depth)):
         oak_parts.append(box("Skirting", x0, x1, y - 0.03, y + 0.002, 0.0, 0.15, bevel=0.012, segments=3))
     # The window sill, deep enough for a pot, and a slim frame with one mullion and one transom.
-    oak_parts.append(box("Sill", WINDOW_X - WINDOW_W / 2 - 0.05, WINDOW_X + WINDOW_W / 2 + 0.05, WALL_Y - 0.09, WALL_Y + 0.17, WINDOW_SILL - 0.035, WINDOW_SILL, bevel=0.012, segments=3))
+    oak_parts.append(box("Sill", WINDOW_X - WINDOW_W / 2 - 0.04, WINDOW_X + WINDOW_W / 2 + 0.04, WALL_Y - 0.09, WALL_Y + 0.17, WINDOW_SILL - 0.035, WINDOW_SILL, bevel=0.012, segments=3))
     for i, part in enumerate(oak_parts):
         grain_uv(part, seed=100 + i)
     wainscot = join(oak_parts, "Wainscot")
@@ -747,7 +877,88 @@ def build_bay(mats):
     block = join(blocks, "PilasterBase")
     block.data.materials.append(mats["grain"])
 
-    return parent([floor, wall, wainscot, window_frame, window_glass, sconce, shade, pilaster, block], "Bay")
+    return parent([floor, rug, wall, wainscot, window_frame, window_glass, sconce, shade, pilaster, block], "Bay")
+
+
+def build_notebook(mats, cover, name):
+    """A pocket field notebook (9 x 14 cm): cloth covers, a cream page block, a dark elastic band."""
+    w, l, t = 0.09, 0.14, 0.009
+    pages = box(name + "Pages", -w / 2 + 0.002, w / 2 - 0.003, -l / 2 + 0.002, l / 2 - 0.002, 0.0014, t - 0.0014)
+    pages.data.materials.append(mats["paper"])
+    covers = [
+        box(name + "Back", -w / 2, w / 2, -l / 2, l / 2, 0.0, 0.0016, bevel=0.0007, segments=2),
+        box(name + "Front", -w / 2, w / 2, -l / 2, l / 2, t - 0.0016, t, bevel=0.0007, segments=2),
+        box(name + "Spine", -w / 2, -w / 2 + 0.0016, -l / 2, l / 2, 0.0, t, bevel=0.0007, segments=2),
+    ]
+    cover_obj = join(covers, name + "Cover")
+    cover_obj.data.materials.append(mats[cover])
+    band = box(name + "Band", -w / 2 - 0.0006, w / 2 + 0.0006, l * 0.3, l * 0.3 + 0.004, -0.0006, t + 0.0006)
+    band.data.materials.append(mats["shadow"])
+    return parent([pages, cover_obj, band], name)
+
+
+def build_props(mats):
+    """The curator's things, left on the cabinet's shelf beside the case: two field notebooks with a
+    pencil on top, and a mug of coffee gone cold. Only the first gallery gets them."""
+    shelf_z = PLINTH_H
+
+    lower = build_notebook(mats, "kraft", "NotebookKraft")
+    lower.location = (0.4, CASE_Y - 0.075, shelf_z)
+    lower.rotation_euler.z = math.radians(8)
+    upper = build_notebook(mats, "sage", "NotebookSage")
+    upper.location = (0.407, CASE_Y - 0.068, shelf_z + 0.0092)
+    upper.rotation_euler.z = math.radians(-5)
+
+    # A pencil across the top notebook: hexagonal, painted, with a sharpened cedar tip.
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0036, depth=0.1, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    body = bpy.context.active_object
+    body.data.materials.append(mats["pencil"])
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0034, radius2=0.0009, depth=0.017, location=(0.0585, 0, 0), rotation=(0, math.radians(90), 0))
+    tip = bpy.context.active_object
+    tip.data.materials.append(mats["cedar"])
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.001, radius2=0.0001, depth=0.003, location=(0.0682, 0, 0), rotation=(0, math.radians(90), 0))
+    lead = bpy.context.active_object
+    lead.data.materials.append(mats["shadow"])
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0038, depth=0.008, location=(-0.054, 0, 0), rotation=(0, math.radians(90), 0))
+    ferrule = bpy.context.active_object
+    ferrule.data.materials.append(mats["bronze"])
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0035, depth=0.006, location=(-0.061, 0, 0), rotation=(0, math.radians(90), 0))
+    eraser = bpy.context.active_object
+    eraser.data.materials.append(mats["clay"])
+    pencil = parent([body, tip, lead, ferrule, eraser], "Pencil")
+    pencil.location = (0.405, CASE_Y - 0.07, shelf_z + 0.0184 + 0.0034)
+    pencil.rotation_euler.z = math.radians(28)
+
+    # The mug: a glazed cylinder with a rolled lip and a loop handle, a little cold coffee inside.
+    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=0.037, depth=0.086, location=(0, 0, 0.043))
+    cup = bpy.context.active_object
+    bm = bmesh.new()
+    bm.from_mesh(cup.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
+    bm.to_mesh(cup.data)
+    bm.free()
+    wall = cup.modifiers.new("Wall", "SOLIDIFY")
+    wall.thickness = 0.004
+    wall.offset = -1
+    soft = cup.modifiers.new("Soft", "BEVEL")
+    soft.width = 0.0016
+    soft.segments = 2
+    soft.limit_method = "ANGLE"
+    apply_modifiers(cup)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0055, major_segments=28, minor_segments=10, location=(0.053, 0, 0.044), rotation=(math.radians(90), 0, 0))
+    handle = bpy.context.active_object  # Its inner arc ends inside the cup wall, not in the coffee.
+    mug = join([cup, handle], "Mug")
+    shade_smooth(mug)
+    mug.data.materials.append(mats["glaze"])
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.033, depth=0.002, location=(0, 0, 0.062))
+    coffee = bpy.context.active_object
+    coffee.name = "Coffee"
+    coffee.data.materials.append(mats["coffee"])
+    cup_group = parent([mug, coffee], "MugGroup")
+    cup_group.location = (0.455, CASE_Y + 0.12, shelf_z)
+    cup_group.rotation_euler.z = math.radians(-35)  # Handle turned toward the back corner.
+
+    return parent([lower, upper, pencil, cup_group], "Props")
 
 
 def build_fern(mats):
@@ -826,11 +1037,11 @@ def setup_render(skull, case, bay):
     """A still matching the web scene's resting view: amber on the exhibit, cool evening light from the window."""
     scene = bpy.context.scene
     cam_data = bpy.data.cameras.new("Camera")
-    cam_data.lens = 46
+    cam_data.lens = 62  # Only one bay exists in Blender, so the still frames the vignette inside it.
     cam = bpy.data.objects.new("Camera", cam_data)
     scene.collection.objects.link(cam)
-    cam.location = (0.1, CASE_Y - 2.75, 1.42)
-    cam.rotation_euler = (Vector((0.1, CASE_Y, 1.04)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    cam.location = (0.05, CASE_Y - 3.2, 1.42)
+    cam.rotation_euler = (Vector((0.05, CASE_Y, 0.86)) - cam.location).to_track_quat("-Z", "Y").to_euler()
     scene.camera = cam
 
     def light(name, kind, location, target, energy, color, size=0.3, spot=None):
@@ -850,7 +1061,7 @@ def setup_render(skull, case, bay):
         obj.rotation_euler = (Vector(target) - Vector(location)).to_track_quat("-Z", "Y").to_euler()
         return obj
 
-    light("Key", "SPOT", (0.4, CASE_Y - 1.1, 2.8), (0, CASE_Y, 1.0), 300, (1.0, 0.74, 0.45), 0.18, math.radians(26))
+    light("Key", "SPOT", (0.4, CASE_Y - 1.1, 2.8), (0, CASE_Y, DECK_Z + 0.06), 300, (1.0, 0.74, 0.45), 0.18, math.radians(26))
     light("Window", "AREA", (WINDOW_X, WALL_Y + 0.05, 1.55), (WINDOW_X + 0.3, WALL_Y - 1.5, 0.6), 60, (0.62, 0.8, 0.9), 0.5)
     light("Sconce", "POINT", (SCONCE_X, WALL_Y - 0.12, SCONCE_Z + 0.03), (SCONCE_X, WALL_Y - 1, SCONCE_Z), 8, (1.0, 0.75, 0.48), 0.05)
     light("Fill", "AREA", (0.0, CASE_Y - 2.6, 2.2), (0, WALL_Y, 1.2), 40, (0.7, 0.82, 0.86), 3.0)
@@ -886,6 +1097,8 @@ def main():
     grain = oak_image("oak-grain", size=512, seed=5, seams=False)
     plaster = plaster_image()
     sky = sky_image()
+    rug = rug_image()
+    note = note_image()
     mats = {
         # Base colors here are for the Blender still. The web scene sets its own tones by material name.
         "paint": principled("PaintTeal", srgb("#8fa59c"), 0.93, image=plaster),
@@ -903,6 +1116,15 @@ def main():
         "leaf_light": principled("LeafLight", srgb("#86a066"), 0.62),
         "clay": principled("Clay", srgb("#a8735a"), 0.88),
         "shadow": principled("Shadow", srgb("#1d1712"), 1.0),
+        "rug": principled("Rug", srgb("#ffffff"), 1.0, image=rug),
+        "paper": principled("Paper", srgb("#efe6d2"), 0.9),
+        "note": principled("NotePaper", srgb("#ffffff"), 0.9, image=note),
+        "kraft": principled("NotebookKraft", srgb("#a5835a"), 0.85),
+        "sage": principled("NotebookSage", srgb("#6f8578"), 0.85),
+        "pencil": principled("Pencil", srgb("#c9a04a"), 0.5),
+        "cedar": principled("Cedar", srgb("#d7b08a"), 0.8),
+        "glaze": principled("MugGlaze", srgb("#6f8798"), 0.3),
+        "coffee": principled("Coffee", srgb("#2a1a10"), 0.15),
     }
 
     bay = build_bay(mats)
@@ -910,6 +1132,7 @@ def main():
     skull = build_skull(mats["skull"])
     fern = build_fern(mats)
     fern.location = (WINDOW_X, WALL_Y + 0.05, WINDOW_SILL)  # On the window sill, for the still.
+    build_props(mats)
 
     # Bake contact occlusion with everything in place. Glass and the sky pane don't occlude.
     see_through = [bpy.data.objects[name] for name in ("Glass", "WindowGlass") if name in bpy.data.objects]

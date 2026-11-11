@@ -19,6 +19,8 @@ export type Exhibit = {
   specimen?: string;
   /** What still needs confirming before this exhibit can go on view. */
   unverified?: string[];
+  /** An optional, clearly playful note in the cabinet's drawer. Never the only place a fact appears. */
+  note?: string[];
 };
 
 export const hall = {
@@ -35,6 +37,11 @@ export const exhibits: Exhibit[] = [
     quote: "Explains the existence of this museum.",
     status: "on-view",
     specimen: "Skull",
+    note: [
+      "To the night staff:",
+      "Specimen 001 is only a plaster cast, so after-hours guests are welcome.",
+      "It does prefer its full title. Please don't call it “the skull.”",
+    ],
   },
   {
     id: "pipette",

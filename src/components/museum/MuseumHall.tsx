@@ -11,6 +11,8 @@ type Status = "loading" | "ready" | "fallback";
 type Props = {
   hall: { name: string; subtitle: string };
   exhibits: Exhibit[];
+  /** Every exhibit, planned ones included, for the gallery directory. */
+  directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
   links: { about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
   summary: string;
 };
@@ -36,10 +38,21 @@ function supportsWebGL() {
   }
 }
 
-export function MuseumHall({ hall, exhibits, links, summary }: Props) {
+export function MuseumHall({ hall, exhibits, directory, links, summary }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLElement | null)[]>([]);
+  const notes = useRef<(HTMLElement | null)[]>([]);
+  const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
+  const [openNote, setOpenNote] = useState<number | null>(null);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const directoryToggle = useRef<HTMLButtonElement>(null);
+  /** Folds the directory away. Where it folds (smaller screens), focus moves to its toggle instead of vanishing. */
+  const closeDirectory = useCallback(() => {
+    setDirectoryOpen(false);
+    const toggle = directoryToggle.current;
+    if (toggle && toggle.offsetParent !== null && toggle.parentElement?.contains(document.activeElement)) toggle.focus();
+  }, []);
   const scene = useRef<MuseumScene | null>(null);
   const reduced = useRef(false);
   const [status, setStatus] = useState<Status>("loading");
@@ -117,6 +130,10 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
         // and tabbing to one walks the camera to its case.
         label.style.visibility = "visible";
         label.style.pointerEvents = opacity > 0.05 ? "auto" : "none";
+        // The note comes out beside its drawer; on a portrait screen it lies over the label, from its top.
+        const note = notes.current[i];
+        const portrait = window.innerWidth / window.innerHeight < 0.8;
+        if (note) note.style.transform = `translate3d(${(portrait ? window.innerWidth / 2 : anchor.drawer.x).toFixed(1)}px, ${(portrait ? anchor.y : anchor.drawer.y).toFixed(1)}px, 0)`;
       });
     }
 
@@ -191,6 +208,9 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
         }
         shown = nearest;
         setIndex(nearest);
+        setOpenNote((open) => (open === nearest ? open : null)); // The drawer shuts behind you.
+        // If focus was in a note that just closed, it lands on the label of the case you walked to.
+        if (notes.current.some((note, i) => i !== nearest && note?.contains(document.activeElement))) labels.current[nearest]?.focus();
       }
     }
     function onResize() {
@@ -226,10 +246,28 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
     };
   }, [status, count, offsetFor, caseHeight, go]);
 
-  // Left and right arrows walk the hall, unless you're typing somewhere.
+  // The curator's drawer follows the open note. (Walking on to another case closes the note: see onScroll.)
+  useEffect(() => {
+    exhibits.forEach((_, i) => scene.current?.setDrawer(i, openNote === i));
+  }, [openNote, exhibits, status]);
+  const closeNote = useCallback((i: number) => {
+    setOpenNote(null);
+    // Focus goes back to the control that opened it, if it was inside the note.
+    if (notes.current[i]?.contains(document.activeElement)) noteToggles.current[i]?.focus();
+  }, []);
+
+  // Left and right arrows walk the hall, unless you're typing somewhere. Escape closes the note.
   useEffect(() => {
     if (status !== "ready") return;
     function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && directoryOpen) {
+        closeDirectory();
+        return;
+      }
+      if (event.key === "Escape" && openNote !== null) {
+        closeNote(openNote);
+        return;
+      }
       const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
       if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
       if (event.key === "ArrowRight") go(index + 1);
@@ -239,7 +277,7 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [status, index, go]);
+  }, [status, index, go, openNote, closeNote, directoryOpen, closeDirectory]);
 
   // A sideways swipe or trackpad gesture moves one case; vertical scrolling stays the browser's.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -258,14 +296,27 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.2) window.scrollBy({ top: event.deltaX, behavior: "instant" });
   }
 
+  /** A drawer under this point that holds a note, on the case you're standing at. */
+  function noteDrawerAt(clientX: number, clientY: number) {
+    const drawer = scene.current?.pickDrawer(clientX, clientY);
+    return drawer === index && exhibits[index]?.note ? drawer : null;
+  }
+
   // Hovering a case brightens its light and lifts the specimen a little.
   function onPointerMove(event: React.PointerEvent) {
     if (event.pointerType !== "mouse" || !scene.current) return;
     const hit = scene.current.pick(event.clientX, event.clientY);
     scene.current.setHighlight(hit);
-    if (canvas.current) canvas.current.style.cursor = hit !== null && hit !== index ? "pointer" : "";
+    const drawer = noteDrawerAt(event.clientX, event.clientY);
+    if (canvas.current) canvas.current.style.cursor = drawer !== null || (hit !== null && hit !== index) ? "pointer" : "";
   }
   function onClick(event: React.MouseEvent) {
+    // The drawer itself opens too; the labelled button in the label does the same for keyboard and touch.
+    const drawer = noteDrawerAt(event.clientX, event.clientY);
+    if (drawer !== null) {
+      setOpenNote((open) => (open === drawer ? null : drawer));
+      return;
+    }
     const hit = scene.current?.pick(event.clientX, event.clientY);
     if (hit !== null && hit !== undefined && hit !== index) go(hit);
   }
@@ -291,6 +342,11 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
                 <div className={styles.sign}>
                   <p className={styles.hallName}>{hall.name}</p>
                   <h1 className={styles.subtitle}>{hall.subtitle}</h1>
+                  {/* The premise, in one small ticket stub: the museum has closed, and you're a guest. */}
+                  <p className={styles.ticket}>
+                    <span className={styles.admission}>After-hours admission</span>
+                    <span className={styles.guest}>Guest of Dan</span>
+                  </p>
                 </div>
                 <nav aria-label="Main" className={styles.nav}>
                   <Link href={links.about}>About</Link>
@@ -305,14 +361,14 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
               <img
                 className={styles.still}
                 src="/museum/hall.jpg"
-                alt="A plaster skull cast in a bronze-framed glass case on an oak plinth, lit warmly in an arched plaster niche."
+                alt="A plaster skull cast in a bronze-framed glass case on a squat oak cabinet with a drawer, a mug and field notebooks beside it, lit warmly in an arched plaster niche at dusk."
               />
             ) : (
               <canvas
                 ref={canvas}
                 className={styles.canvas}
                 role="img"
-                aria-label="The gallery: lit glass cases on oak plinths, each in an arched plaster niche."
+                aria-label="The gallery after hours: lit glass cases on oak cabinets in arched plaster niches, a runner rug, and deep blue evening in the windows."
                 onPointerMove={onPointerMove}
                 onPointerLeave={() => scene.current?.setHighlight(null)}
                 onClick={onClick}
@@ -347,10 +403,95 @@ export function MuseumHall({ hall, exhibits, links, summary }: Props) {
                       </p>
                     ))}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
+                    {exhibit.note && !fallback ? (
+                      <button
+                        ref={(node) => {
+                          noteToggles.current[i] = node;
+                        }}
+                        type="button"
+                        className={styles.noteToggle}
+                        aria-expanded={openNote === i}
+                        aria-controls={`${exhibit.id}-note`}
+                        onClick={() => (openNote === i ? closeNote(i) : setOpenNote(i))}
+                      >
+                        <span aria-hidden="true" className={styles.drawerIcon} />
+                        Curator&rsquo;s note
+                      </button>
+                    ) : null}
                   </article>
+                  {exhibit.note && !fallback ? (
+                    <aside
+                      id={`${exhibit.id}-note`}
+                      hidden={openNote !== i}
+                      ref={(node) => {
+                        notes.current[i] = node;
+                      }}
+                      className={styles.note}
+                      aria-label="Curator’s note"
+                    >
+                      {exhibit.note.map((line) => (
+                        <p key={line}>{line}</p>
+                      ))}
+                      <p className={styles.signature}>The Curator</p>
+                      <button type="button" className={styles.noteClose} onClick={() => closeNote(i)}>
+                        Close the drawer
+                      </button>
+                    </aside>
+                  ) : null}
                 </li>
               ))}
             </ol>
+
+            {fallback ? null : (
+              <nav className={styles.directory} aria-label="Gallery directory" data-open={directoryOpen || undefined}>
+                <button
+                  ref={directoryToggle}
+                  type="button"
+                  className={styles.directoryToggle}
+                  aria-expanded={directoryOpen}
+                  aria-controls="gallery-directory"
+                  onClick={() => setDirectoryOpen((open) => !open)}
+                >
+                  Directory
+                </button>
+                <div id="gallery-directory" className={styles.directoryList}>
+                  <p className={styles.directoryTitle} aria-hidden="true">
+                    Gallery directory
+                  </p>
+                  <ol>
+                    {directory.map((item) => {
+                      const at = exhibits.findIndex((exhibit) => exhibit.id === item.id);
+                      const here = at === index;
+                      return (
+                        <li key={item.id}>
+                          {at === -1 ? (
+                            // Not built yet: listed honestly, not a control.
+                            <span className={styles.closed}>
+                              <span className={styles.dirNumber}>{item.number}</span>
+                              <span className={styles.dirTitle}>{item.title}</span>
+                              <span className={styles.soon}>Opening later</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-current={here ? "location" : undefined}
+                              onClick={() => {
+                                go(at);
+                                closeDirectory();
+                              }}
+                            >
+                              <span className={styles.dirNumber}>{item.number}</span>
+                              <span className={styles.dirTitle}>{item.title}</span>
+                              {here ? <span className={styles.here}>You are here</span> : null}
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              </nav>
+            )}
 
             {fallback ? null : (
               <div className={styles.controls}>

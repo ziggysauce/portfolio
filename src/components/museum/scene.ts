@@ -4,13 +4,16 @@ import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLigh
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 // Dimensions from blender/build_museum.py, converted to three.js (Y up, exhibits facing +Z).
-export const BAY_WIDTH = 3.2;
+export const BAY_WIDTH = 2.6;
 const CASE_Z = -0.2;
-const DECK_Y = 0.965;
-const SPECIMEN_Y = 1.1; // Where the eye should rest: the middle of a specimen on its riser.
+const DECK_Y = 0.825;
+const SPECIMEN_Y = 0.96; // Where the eye should rest: the middle of a specimen on its riser.
 const WALL_Z = -1.0;
-const WINDOW = { x: -1.03, width: 0.42, sill: 1.0, top: 2.07 };
-const SCONCE = { x: 0.98, y: 1.63, z: -0.885 };
+const WINDOW = { x: -0.94, width: 0.36, sill: 1.0, top: 2.04 };
+const SCONCE = { x: 1.0, y: 1.63, z: -0.885 };
+// The squat cabinet runs wider on the right (a shelf for the curator's things); its drawer slides out.
+const CABINET = { x0: -0.32, x1: 0.54 };
+const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, travel: 0.17 };
 
 // The light: a broad warm key on the exhibit, a warm sconce, a cool evening window, a blue-green room.
 // The key is warm white rather than orange, so cream stays cream and the room keeps its own colors.
@@ -33,10 +36,19 @@ const TONES: Record<string, Tone> = {
   // color, so the factor sits well above 1: the result lands at about 0.9 to 1, matte, grain-led.
   OakGrain: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
   Oak: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
-  FloorOak: { color: "#968069", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  FloorOak: { color: "#a48d75", roughness: 2.4, grainRoughness: true, env: 0.55 },
   Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
   Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
   SkullPlaster: { color: "#ece5d7", roughness: 0.92, env: 0.5 },
+  Rug: { color: "#f4ece0", roughness: 1, env: 0.45 },
+  Paper: { color: "#efe6d2", roughness: 0.9, env: 0.5 },
+  NotePaper: { color: "#ffffff", roughness: 0.9, env: 0.5 },
+  NotebookKraft: { color: "#a5835a", roughness: 0.85, env: 0.5 },
+  NotebookSage: { color: "#6f8578", roughness: 0.85, env: 0.5 },
+  Pencil: { color: "#c9a04a", roughness: 0.5, env: 0.8 },
+  Cedar: { color: "#d7b08a", roughness: 0.8, env: 0.5 },
+  MugGlaze: { color: "#6f8798", roughness: 0.28, env: 1.4 }, // Glazed stoneware: a soft highlight, no mirror.
+  Coffee: { color: "#2a1a10", roughness: 0.12, env: 1.2 },
   Clay: { color: "#b27c60", roughness: 0.88 },
   Leaf: { color: "#6e8a56", roughness: 0.6 },
   LeafLight: { color: "#88a46a", roughness: 0.6 },
@@ -44,7 +56,8 @@ const TONES: Record<string, Tone> = {
 
 export type SceneExhibit = { specimen?: string; status: string };
 
-export type LabelAnchor = { x: number; y: number; visible: boolean };
+/** Where a case's label goes and where its drawer front is, in CSS pixels. */
+export type LabelAnchor = { x: number; y: number; visible: boolean; drawer: { x: number; y: number } };
 
 export type MuseumScene = {
   /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. */
@@ -55,6 +68,10 @@ export type MuseumScene = {
   setVisible(visible: boolean): void;
   /** Which case is under this point of the canvas, if any. */
   pick(clientX: number, clientY: number): number | null;
+  /** Which case's drawer front is under this point, if any. */
+  pickDrawer(clientX: number, clientY: number): number | null;
+  /** Slides a case's drawer open or shut. The specimen reacts once when a visitor opens it. */
+  setDrawer(index: number, open: boolean): void;
   resize(): void;
   dispose(): void;
 };
@@ -87,6 +104,14 @@ function radialTexture(inner: string, outer: string) {
   return texture;
 }
 
+/** Keeps waxed oak from going glossy where its grain map is darkest. */
+function floorRoughness(shader: { fragmentShader: string }) {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <roughnessmap_fragment>",
+    "#include <roughnessmap_fragment>\n\troughnessFactor = max(roughnessFactor, 0.74);",
+  );
+}
+
 // The area-light lookup tables are global; build them once, not on every mount.
 let areaLightsReady = false;
 
@@ -103,7 +128,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // AgX keeps amber light warm without pushing every lit surface toward orange.
   renderer.toneMapping = THREE.AgXToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.22; // Lifted a touch with the floor in view: welcoming, not dim.
   renderer.shadowMap.enabled = true;
   // Variance shadows: soft edges like a diffused museum spot. PCF (with depth-compare samplers) logged
   // GL_INVALID_OPERATION sampler mismatches on Chrome's Metal backend with three r186, and PCFSoft is gone.
@@ -130,7 +155,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     material.envMapIntensity = ENV_INTENSITY * strength;
   };
   // Blue-green room light from above, a warmer bounce from the floor. Lower than before, for depth.
-  scene.add(new THREE.HemisphereLight("#9db9b7", "#5c4a39", 0.46));
+  scene.add(new THREE.HemisphereLight("#9db9b7", "#5c4a39", 0.52));
 
   const camera = new THREE.PerspectiveCamera(31, 1, 0.05, 30);
 
@@ -152,6 +177,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const bayTemplate = source.getObjectByName("Bay")!;
   const caseTemplate = source.getObjectByName("Case")!;
   const fernTemplate = source.getObjectByName("Fern");
+  const propsTemplate = source.getObjectByName("Props");
 
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
   const glass = new THREE.MeshStandardMaterial({
@@ -202,7 +228,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     // A mesh with two materials loads as a group of meshes named after its data (the Wall is "Cube" and
     // "Cube_1"), so check the parent's name too.
     const names = [node.name, node.parent?.name ?? ""];
-    const quiet = ["Floor", "Wall", "Pilaster", "Frame", "Wainscot", "Soil"];
+    const quiet = ["Floor", "Rug", "Wall", "Pilaster", "Frame", "Wainscot", "Soil", "Coffee"];
     node.castShadow = !names.some((name) => name.startsWith("Frond") || quiet.includes(name));
     node.receiveShadow = true;
     if (material.map) material.map.anisotropy = maxAnisotropy; // Keeps grain crisp at a glance.
@@ -213,7 +239,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       if (tone.metalness !== undefined) material.metalness = tone.metalness;
       if (tone.env !== undefined) reflect(material, tone.env);
       // The grain texture doubles as a roughness map: denser grain reads a touch rougher than the flats.
-      if (tone.grainRoughness && material.map) material.roughnessMap = material.map;
+      // Floored, so the darkest grain lines don't turn glossy and catch the window lights at a glance.
+      if (tone.grainRoughness && material.map) {
+        material.roughnessMap = material.map;
+        material.onBeforeCompile = floorRoughness;
+      }
     }
   });
 
@@ -225,10 +255,10 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const deckContactMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.55, depthWrite: false, fog: false });
   const seatMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.85, depthWrite: false, fog: false });
   owned.push(deckContactMaterial, seatMaterial);
-  function contact(x: number, z: number, size: number, y = 0.002) {
+  function contact(x: number, z: number, size: number, y = 0.002, depth = size) {
     const shadow = new THREE.Mesh(contactGeometry, contactMaterial);
     shadow.position.set(x, y, z);
-    shadow.scale.set(size, 1, size);
+    shadow.scale.set(size, 1, depth);
     shadow.renderOrder = 1;
     scene.add(shadow);
   }
@@ -288,6 +318,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   // One bay per exhibit, plus one at each end so the hall doesn't stop at the frame.
   const keys: THREE.SpotLight[] = [];
   const specimens: (THREE.Object3D | null)[] = [];
+  type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
+  const drawers: Drawer[] = [];
   for (let i = -1; i <= exhibits.length; i++) {
     const x = i * BAY_WIDTH;
     const bay = bayTemplate.clone(true);
@@ -295,11 +327,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     scene.add(bay);
     if (fernTemplate) {
       placeFern(x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, 1, i + 2);
-      if (i < exhibits.length) placeFern(x + BAY_WIDTH / 2, 0, 0.55, 2.5, i + 7); // Foreground, between this bay and the next.
+      if (i < exhibits.length) placeFern(x + BAY_WIDTH / 2, 0, -0.78, 1.45, i + 7); // Between this bay and the next, by the pilaster.
     }
 
     // Cool evening light through the window, washing the sill, the wall beside it and the floor.
-    const windowLight = new THREE.RectAreaLight("#a3c5d2", 2.3, WINDOW.width, WINDOW.top - WINDOW.sill);
+    const windowLight = new THREE.RectAreaLight("#9db7dd", 2.3, WINDOW.width, WINDOW.top - WINDOW.sill); // Deep blue evening.
     windowLight.position.set(x + WINDOW.x, (WINDOW.sill + WINDOW.top) / 2, WALL_Z + 0.04);
     windowLight.lookAt(x + WINDOW.x + 0.5, 0.2, 1.6);
     scene.add(windowLight);
@@ -324,7 +356,16 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const display = caseTemplate.clone(true);
     display.position.x = x;
     scene.add(display);
-    contact(x, CASE_Z, 0.95);
+    contact(x + (CABINET.x0 + CABINET.x1) / 2, CASE_Z, CABINET.x1 - CABINET.x0 + 0.2, 0.002, 0.74);
+    const drawer = display.getObjectByName("Drawer") ?? null;
+    const note = drawer?.getObjectByName("DrawerNote") ?? null;
+    drawers.push({ node: drawer, baseZ: drawer?.position.z ?? 0, note, noteBase: note?.rotation.x ?? 0 });
+    // The curator's things live in the first gallery only.
+    if (i === 0 && propsTemplate) {
+      const props = propsTemplate.clone(true);
+      props.position.x += x;
+      scene.add(props);
+    }
     // Contact where the riser meets the linen deck: small, soft, inside the case.
     const riserContact = new THREE.Mesh(contactGeometry, deckContactMaterial);
     riserContact.position.set(x, DECK_Y + 0.0008, CASE_Z - 0.005);
@@ -336,6 +377,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     if (specimen) {
       specimen.position.x += x;
       specimen.userData.baseY = specimen.position.y;
+      specimen.userData.baseRotation = specimen.rotation.clone();
       scene.add(specimen);
       // And where the skull rests on the riser. It fades a little as the skull lifts on hover.
       const seat = new THREE.Mesh(contactGeometry, seatMaterial.clone());
@@ -393,7 +435,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const points = new THREE.Points(geometry, material);
     points.frustumCulled = false;
     scene.add(points);
-    dust.push({ points, seeds, origin: new THREE.Vector3(x + 0.22, 1.25, CASE_Z + 0.35) });
+    dust.push({ points, seeds, origin: new THREE.Vector3(x + 0.22, 1.11, CASE_Z + 0.35) });
   });
 
   /** Moves each mote along the beam from the lamp down toward the case, drifting slowly sideways. */
@@ -420,11 +462,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
   updateDust(0); // Place the motes before the first frame, even if they never move (reduced motion).
 
-  // Hit boxes for hover: the glass case and its cabinet.
+  // Hit boxes for hover: the glass case and its cabinet, and each drawer front (which moves with it).
   const boxes = exhibits.map((_, i) => {
     const x = i * BAY_WIDTH;
-    return new THREE.Box3(new THREE.Vector3(x - 0.27, 0, CASE_Z - 0.27), new THREE.Vector3(x + 0.27, DECK_Y + 0.38, CASE_Z + 0.27));
+    return new THREE.Box3(new THREE.Vector3(x + CABINET.x0, 0, CASE_Z - 0.27), new THREE.Vector3(x + CABINET.x1, DECK_Y + 0.36, CASE_Z + 0.29));
   });
+  const drawerBox = new THREE.Box3();
 
   // ---------------------------------------------------------------- camera rig
 
@@ -436,9 +479,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   let time = 0;
   let highlightIndex: number | null = null;
   const glow = exhibits.map(() => 0); // 0 to 1 per case, eased toward the highlight.
+  // Each drawer runs on a critically damped spring, so it eases out and in, never overshoots, and
+  // can be reversed mid-slide without a jolt.
+  const drawerGoal = exhibits.map(() => 0);
+  const drawerOpen = exhibits.map(() => 0);
+  const drawerSpeed = exhibits.map(() => 0);
+  const nod = exhibits.map(() => -1); // Seconds since the specimen's reaction began; -1 when at rest.
   let width = 1;
   let height = 1;
-  const framing = { distance: 2.75, panX: 0, lookY: SPECIMEN_Y, height: 1.4 };
+  const framing = { distance: 3.5, camX: 0, lookX: 0, lookY: SPECIMEN_Y, height: 1.4 };
 
   function frame() {
     const aspect = width / height;
@@ -447,42 +496,47 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     camera.updateProjectionMatrix();
     const halfV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const halfH = halfV * aspect;
-    // Far enough back to see the cabinet, the window beside it and the sconce above the label.
-    framing.distance = Math.max(2.75, 0.62 / halfH);
-    const visibleHalfH = framing.distance * halfH;
-    const visibleHalfV = framing.distance * halfV;
     if (aspect >= 0.8) {
-      framing.panX = 0.1 * visibleHalfH; // Case a little left of center: window at left, label at right.
-      framing.lookY = 1.06;
+      // Back far enough for the floor and the rug, and turned a little down the hall, so the cabinet,
+      // its shelf and label make one vignette left of center and the next case peeks in at the right.
+      framing.distance = Math.max(3.5, 1.45 / halfH);
+      const wide = THREE.MathUtils.clamp((aspect - 1.2) / 0.4, 0, 1); // 0 on squarer screens, 1 from 16:10.
+      framing.camX = -0.05;
+      framing.lookX = 0.2 + 0.42 * wide;
+      framing.lookY = 0.74;
+      framing.height = 1.5;
     } else {
-      framing.panX = 0;
-      framing.lookY = SPECIMEN_Y - 0.34 * visibleHalfV; // Case in the upper half, label below.
+      // Phones: the case in the upper half, the label below it.
+      framing.distance = Math.max(2.75, 0.55 / halfH);
+      framing.camX = framing.lookX = (CABINET.x0 + CABINET.x1) / 2;
+      framing.lookY = SPECIMEN_Y - 0.34 * framing.distance * halfV;
+      framing.height = framing.lookY + 0.3;
     }
-    framing.height = framing.lookY + 0.3;
   }
 
   const lookAt = new THREE.Vector3();
   function place() {
-    const x = current * BAY_WIDTH + framing.panX;
+    const x = current * BAY_WIDTH;
     // A touch of lead in the direction of travel, no zoom and no roll: the eye arrives slightly first.
     const lead = THREE.MathUtils.clamp(velocity * BAY_WIDTH * 0.03, -0.18, 0.18);
-    camera.position.set(x, framing.height, CASE_Z + framing.distance);
-    lookAt.set(x + lead, framing.lookY, CASE_Z);
+    camera.position.set(x + framing.camX, framing.height, CASE_Z + framing.distance);
+    lookAt.set(x + framing.lookX + lead, framing.lookY, CASE_Z);
     camera.lookAt(lookAt);
   }
 
   const anchorPoint = new THREE.Vector3();
+  function toScreen(point: THREE.Vector3) {
+    point.project(camera);
+    return { x: (point.x * 0.5 + 0.5) * width, y: (-point.y * 0.5 + 0.5) * height, ndc: point.x };
+  }
   function anchors(): LabelAnchor[] {
     const portrait = width / height < 0.8;
     return exhibits.map((_, i) => {
       const x = i * BAY_WIDTH;
-      anchorPoint.set(portrait ? x : x + 0.38, portrait ? DECK_Y - 0.05 : SPECIMEN_Y + 0.14, CASE_Z);
-      anchorPoint.project(camera);
-      return {
-        x: (anchorPoint.x * 0.5 + 0.5) * width,
-        y: (-anchorPoint.y * 0.5 + 0.5) * height,
-        visible: anchorPoint.x > -1.6 && anchorPoint.x < 1.6,
-      };
+      // Wide screens: pinned to the wall above the shelf. Phones: under the case, clear of the drawer.
+      const label = toScreen(anchorPoint.set(portrait ? x + framing.lookX : x + 0.27, portrait ? 0.5 : 1.2, portrait ? CASE_Z + 0.3 : CASE_Z));
+      const front = toScreen(anchorPoint.set(x + DRAWER.x1, (DRAWER.y0 + DRAWER.y1) / 2, DRAWER.front + DRAWER.travel * drawerOpen[i]));
+      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y } };
     });
   }
 
@@ -515,7 +569,50 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         if (seat) (seat.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - (reduced ? 0 : glow[i]) * 0.5);
       }
     });
-    if (lifting && !reduced) renderer.shadowMap.needsUpdate = true; // The specimen's shadow follows it up.
+    // Drawers: a spring toward open or shut, stepped finely so it stays stable at any frame rate.
+    drawerOpen.forEach((value, i) => {
+      const goal = drawerGoal[i];
+      if (value === goal && drawerSpeed[i] === 0) return;
+      if (reduced) {
+        drawerOpen[i] = goal;
+        drawerSpeed[i] = 0;
+      } else {
+        const stiffness = 8;
+        for (let left = dt; left > 0; left -= 1 / 240) {
+          const step = Math.min(left, 1 / 240);
+          drawerSpeed[i] += (stiffness * stiffness * (goal - drawerOpen[i]) - 2 * stiffness * drawerSpeed[i]) * step;
+          drawerOpen[i] += drawerSpeed[i] * step;
+        }
+        if (Math.abs(goal - drawerOpen[i]) < 0.0005 && Math.abs(drawerSpeed[i]) < 0.01) {
+          drawerOpen[i] = goal;
+          drawerSpeed[i] = 0;
+        }
+      }
+      moving = lifting = true;
+      const { node, baseZ, note, noteBase } = drawers[i];
+      if (node) node.position.z = baseZ + DRAWER.travel * drawerOpen[i];
+      // The folded note stands up on its hinge once the drawer is mostly out, like a pop-up card.
+      const stand = THREE.MathUtils.smoothstep(drawerOpen[i], 0.45, 1);
+      if (note) note.rotation.x = noteBase + stand * 1.25;
+    });
+
+    // The specimen's one reaction when its drawer is opened: it leans in to look, then settles back.
+    nod.forEach((elapsed, i) => {
+      if (elapsed < 0) return;
+      const specimen = specimens[i];
+      const t = elapsed + dt;
+      const settled = t > 2.4 || reduced;
+      nod[i] = settled ? -1 : t;
+      const envelope = settled ? 0 : (t / 0.38) * Math.exp(1 - t / 0.38); // Rises to 1 at 0.38 s, gone by about 2 s.
+      if (specimen) {
+        specimen.rotation.x = specimen.userData.baseRotation.x + 0.075 * envelope;
+        specimen.rotation.z = specimen.userData.baseRotation.z - 0.045 * envelope;
+        specimen.position.y += 0.006 * envelope; // Rock on the front edge instead of sinking into the riser.
+      }
+      moving = lifting = true;
+    });
+
+    if (lifting && !reduced) renderer.shadowMap.needsUpdate = true; // Shadows follow the specimen and the drawer.
 
     if (!reduced) {
       time += dt;
@@ -576,6 +673,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const hit = new THREE.Vector3();
+  function aim(clientX: number, clientY: number) {
+    const rect = canvas.getBoundingClientRect();
+    pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+  }
 
   return {
     setTarget(progress) {
@@ -597,11 +699,28 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       kick();
     },
     pick(clientX, clientY) {
-      const rect = canvas.getBoundingClientRect();
-      pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-      raycaster.setFromCamera(pointer, camera);
+      aim(clientX, clientY);
       const index = boxes.findIndex((box) => raycaster.ray.intersectBox(box, hit));
       return index === -1 ? null : index;
+    },
+    pickDrawer(clientX, clientY) {
+      aim(clientX, clientY);
+      const index = exhibits.findIndex((_, i) => {
+        const x = i * BAY_WIDTH;
+        const z = DRAWER.front + DRAWER.travel * drawerOpen[i];
+        drawerBox.min.set(x + DRAWER.x0, DRAWER.y0, z - 0.05);
+        drawerBox.max.set(x + DRAWER.x1, DRAWER.y1, z + 0.02);
+        return raycaster.ray.intersectBox(drawerBox, hit) !== null;
+      });
+      return index === -1 ? null : index;
+    },
+    setDrawer(index, open) {
+      if (index < 0 || index >= exhibits.length) return;
+      const goal = open ? 1 : 0;
+      if (drawerGoal[index] === goal) return;
+      drawerGoal[index] = goal;
+      if (open && !reduced) nod[index] = 0;
+      kick();
     },
     resize,
     dispose() {
