@@ -97,12 +97,128 @@ def shade_smooth(obj):
     bpy.ops.object.shade_smooth()
 
 
-def smart_uv(obj, angle=66):
+def tube(points, radius, name, caps=True):
+    """A smooth swept tube through points (NURBS), converted to a closed mesh."""
+    curve = bpy.data.curves.new(name, "CURVE")
+    curve.dimensions = "3D"
+    spline = curve.splines.new("NURBS")
+    spline.points.add(len(points) - 1)
+    for point, (x, y, z) in zip(spline.points, points):
+        point.co = (x, y, z, 1.0)
+    spline.order_u = 4
+    spline.use_endpoint_u = True
+    curve.resolution_u = 24
+    curve.bevel_depth = radius
+    curve.bevel_resolution = 5
+    curve.use_fill_caps = caps
+    obj = bpy.data.objects.new(name, curve)
+    bpy.context.scene.collection.objects.link(obj)
+    activate(obj)
+    bpy.ops.object.convert(target="MESH")
+    return bpy.context.active_object
+
+
+def grain_uv(obj, scale=0.6, seed=0):
+    """Box-projected UVs where the grain runs along each board's longest side, like real joinery.
+    The oak texture's grain lines run along U, so U follows the board."""
+    rng = np.random.default_rng(seed)
+    mesh = obj.data
+    if not mesh.uv_layers:
+        mesh.uv_layers.new(name="UVMap")
+    uv = mesh.uv_layers[0].data
+    dims = obj.dimensions
+    offset = rng.uniform(0, 1, 2)
+    for poly in mesh.polygons:
+        axis = max(range(3), key=lambda i: abs(poly.normal[i]))
+        a, b = [i for i in range(3) if i != axis]
+        if dims[b] > dims[a]:
+            a, b = b, a
+        for li in poly.loop_indices:
+            co = mesh.vertices[mesh.loops[li].vertex_index].co
+            uv[li].uv = (co[a] / scale + offset[0], co[b] / scale + offset[1])
+
+
+def bake_setup(distance, samples=256):
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = samples  # Enough that the small bakes come out clean, without grain.
+    if scene.world is None:
+        scene.world = bpy.data.worlds.new("BakeWorld")
+    scene.world.light_settings.distance = distance  # How far occlusion reaches: local contact only.
+
+
+def gltf_output_group():
+    """The node group the glTF exporter reads an occlusion texture from."""
+    group = bpy.data.node_groups.get("glTF Material Output")
+    if group is None:
+        group = bpy.data.node_groups.new("glTF Material Output", "ShaderNodeTree")
+        group.interface.new_socket(name="Occlusion", in_out="INPUT", socket_type="NodeSocketFloat")
+    return group
+
+
+def bake_ao_texture(obj, label, size, distance, strength):
+    """Bakes soft ambient occlusion into a texture on a second UV map and wires it as the glTF
+    occlusion map. In three.js it darkens only the ambient light, so contact stays subtle."""
+    bake_setup(distance)
+    mesh = obj.data
+    grain = mesh.uv_layers[0]
+    ao_uv = mesh.uv_layers.new(name="AOMap")
+    mesh.uv_layers.active = ao_uv
     activate(obj)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(angle), island_margin=0.02)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.02)
     bpy.ops.object.mode_set(mode="OBJECT")
+    image = bpy.data.images.new(f"ao-{label}", size, size, alpha=False)
+    textures = []
+    for slot in obj.material_slots:
+        material = slot.material.copy()  # Each baked object gets its own copy, carrying its own AO map.
+        material.name = f"{slot.material.name}.{label}"
+        slot.material = material
+        nodes, links = material.node_tree.nodes, material.node_tree.links
+        uv_node = nodes.new("ShaderNodeUVMap")
+        uv_node.uv_map = "AOMap"
+        tex = nodes.new("ShaderNodeTexImage")
+        tex.image = image
+        tex.image.colorspace_settings.name = "Non-Color"
+        links.new(uv_node.outputs["UV"], tex.inputs["Vector"])
+        nodes.active = tex
+        textures.append((material, tex))
+    bpy.ops.object.bake(type="AO", margin=8, use_clear=True)
+    # Soften and lift the result: occlusion only where things actually meet.
+    pixels = np.empty(size * size * 4, np.float32)
+    image.pixels.foreach_get(pixels)
+    pixels[0::4] = pixels[1::4] = pixels[2::4] = 1.0 - (1.0 - pixels[0::4]) * strength
+    image.pixels.foreach_set(pixels)
+    image.filepath_raw = os.path.join(TEX_DIR, f"ao-{label}.png")
+    image.file_format = "PNG"
+    image.save()
+    group = gltf_output_group()
+    for material, tex in textures:
+        nodes, links = material.node_tree.nodes, material.node_tree.links
+        separate = nodes.new("ShaderNodeSeparateColor")
+        output = nodes.new("ShaderNodeGroup")
+        output.node_tree = group
+        links.new(tex.outputs["Color"], separate.inputs["Color"])
+        links.new(separate.outputs["Red"], output.inputs["Occlusion"])
+    mesh.uv_layers.active = grain
+
+
+def bake_ao_vertices(obj, distance, strength, floor):
+    """Bakes ambient occlusion into vertex colors, for the specimen: no UVs to manage, and it
+    reads as the faint grey a plaster cast collects in its hollows."""
+    bake_setup(distance)
+    attr = obj.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    obj.data.color_attributes.active_color = attr
+    activate(obj)
+    bpy.ops.object.bake(type="AO", target="VERTEX_COLORS")
+    colors = np.empty(len(obj.data.vertices) * 4, np.float32)
+    attr.data.foreach_get("color", colors)
+    ao = colors[0::4]
+    ao = np.clip(1.0 - (1.0 - ao) * strength, floor, 1.0)
+    colors[0::4] = colors[1::4] = colors[2::4] = ao
+    colors[3::4] = 1.0
+    attr.data.foreach_set("color", colors)
 
 
 def parent(children, name):
@@ -267,24 +383,63 @@ def build_skull(material):
         c = (center[0], center[1], center[2] + lift)
         parts.append(ellipsoid(c, radii, segments, rings))
 
+    def lifted(points):
+        return [(x, y, z + lift) for x, y, z in points]
+
+    def dental(s, z, back=0.0):
+        """A point on the dental arch: a parabola, widest at the back molars."""
+        return (0.034 * s, -0.087 + back + 0.05 * s * s, z)
+
     add((0, 0.004, 0.124), (0.068, 0.098, 0.077), 48, 32)  # vault, forehead included
     add((0, 0.06, 0.098), (0.05, 0.04, 0.046))  # occipital
-    add((0, -0.071, 0.097), (0.057, 0.016, 0.014))  # brow ridge
-    add((0, -0.061, 0.052), (0.040, 0.031, 0.040))  # maxilla
+    # Cranial base: the skull is widest low at the sides, so the arches and jaw joints have bone to
+    # meet instead of hanging in the air beside a narrow vault.
+    add((0, 0.012, 0.072), (0.058, 0.068, 0.036), 36, 22)
+    add((0, -0.071, 0.097), (0.051, 0.016, 0.013))  # brow ridge, ending inside the orbit rims
+    add((0, -0.063, 0.05), (0.043, 0.032, 0.037))  # maxilla
+    # The ridge that holds the upper teeth, so they sit in bone rather than hanging below it.
+    parts.append(tube(lifted([dental(s, 0.031, 0.005) for s in (-0.95, -0.5, 0.0, 0.5, 0.95)]), 0.0075, "Alveolus"))
     for s in (-1, 1):
-        add((s * 0.046, -0.058, 0.066), (0.016, 0.015, 0.018))  # cheekbone
-        add((s * 0.059, -0.02, 0.066), (0.0075, 0.038, 0.0095))  # zygomatic arch
+        # Cheekbone: a plate facing forward and out, not a ball. It is what makes the face wide.
+        cheek = ellipsoid((s * 0.047, -0.06, 0.064 + lift), (0.017, 0.008, 0.015), 28, 18, "Cheek")
+        cheek.rotation_euler = (0, 0, math.radians(s * 32))
+        activate(cheek)
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+        parts.append(cheek)
+        # Outer orbit rim: the brow's end runs down into the cheekbone in one stroke.
+        parts.append(tube(lifted([(s * 0.047, -0.07, 0.097), (s * 0.054, -0.066, 0.083), (s * 0.051, -0.062, 0.068)]), 0.0055, "Rim"))
+        add((s * 0.044, -0.06, 0.083), (0.012, 0.011, 0.016))  # the orbit's side wall, behind the rim
+        # The bone behind the upper jaw and behind the last molars, so the gaps under the arch and
+        # at the back of the bite read as recesses, not holes through the head.
+        add((s * 0.03, -0.026, 0.038), (0.014, 0.022, 0.022))
+        add((s * 0.037, -0.03, 0.018), (0.009, 0.015, 0.012))
+        add((s * 0.047, -0.013, 0.044), (0.006, 0.009, 0.013))  # coronoid, rising under the arch
         add((s * 0.05, 0.03, 0.06), (0.014, 0.016, 0.022))  # mastoid
-        for k in range(6):  # ramus, rising toward the temporal bone
-            f = k / 5
-            add((s * (0.046 + 0.004 * f), 0.002 + 0.006 * f, 0.004 + 0.044 * f), (0.0105, 0.013, 0.012), 20, 12)
-    # Mandible body: a U of overlapping volumes, chin forward.
-    for s in np.linspace(-1, 1, 19):
-        add((0.045 * s, -0.079 + 0.077 * s * s, -0.009 + 0.008 * s * s), (0.0105, 0.011, 0.0155), 20, 12)
+        # Zygomatic arch: a swept tube from the cheekbone back to the ear, close along the skull's side.
+        parts.append(tube(lifted([(s * 0.046, -0.056, 0.064), (s * 0.058, -0.034, 0.066), (s * 0.061, -0.008, 0.064), (s * 0.056, 0.014, 0.06)]), 0.006, "Arch"))
+        # Ramus: a flat blade rising from the jaw's angle to the joint under the arch, leaning back as
+        # it rises. A real ramus is a plate; the earlier tube read as a finger.
+        ramus = ellipsoid((s * 0.049, 0.002, 0.027 + lift), (0.0075, 0.018, 0.028), 28, 18, "Ramus")
+        ramus.rotation_euler = (math.radians(-10), 0, 0)
+        activate(ramus)
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+        parts.append(ramus)
+        add((s * 0.05, 0.012, 0.054), (0.009, 0.0065, 0.006))  # condyle, seated under the arch's root
+    # Mandible body: one U from angle to angle through the chin, then stretched upright so its
+    # section is a tall oval like real bone, not a round rope.
+    body = [(-0.047, 0.004, 0.0), (-0.043, -0.03, -0.004), (-0.03, -0.062, -0.007), (0.0, -0.078, -0.008), (0.03, -0.062, -0.007), (0.043, -0.03, -0.004), (0.047, 0.004, 0.0)]
+    jaw = tube(lifted(body), 0.0085, "Jaw")
+    activate(jaw)
+    bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
+    jaw.scale = (1, 1, 1.8)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    parts.append(jaw)
+    add((0, -0.08, -0.014), (0.016, 0.009, 0.011))  # chin
+    add((0, -0.058, 0.017), (0.027, 0.03, 0.011))  # palate and floor of the mouth, behind the teeth
     # Teeth, upper and lower, along the dental arch.
     for z, back in ((0.024, 0.0), (0.010, 0.002)):
         for s in np.linspace(-0.92, 0.92, 10):
-            add((0.034 * s, -0.087 + back + 0.05 * s * s, z), (0.0058, 0.0052, 0.0072), 16, 10)
+            add(dental(s, z, back), (0.0058, 0.0052, 0.0072), 16, 10)
 
     skull = join(parts, "Skull")
     activate(skull)
@@ -328,11 +483,11 @@ def build_skull(material):
 
     # Plaster tooth: a fraction of a millimeter of irregularity, enough to catch the light.
     tooth = bpy.data.textures.new("PlasterTooth", "CLOUDS")
-    tooth.noise_scale = 0.0045
-    tooth.noise_depth = 2
+    tooth.noise_scale = 0.005
+    tooth.noise_depth = 1
     displace = skull.modifiers.new("Tooth", "DISPLACE")
     displace.texture = tooth
-    displace.strength = 0.0009
+    displace.strength = 0.0006
     displace.mid_level = 0.5
     settle = skull.modifiers.new("Settle", "LAPLACIANSMOOTH")
     settle.iterations = 2
@@ -343,42 +498,12 @@ def build_skull(material):
     apply_modifiers(skull)
     print(f"[skull] finished: {len(skull.data.polygons)} faces, dims {tuple(round(d, 3) for d in skull.dimensions)}")
     shade_smooth(skull)
-    bake_cavity(skull)
     skull.data.materials.append(material)
 
     # Seated on its riser, turned a little toward the visitor's left for a three-quarter view.
     skull.location = (0, CASE_Y + 0.01, DECK_Z + 0.035)
     skull.rotation_euler = (0, 0, math.radians(-18))
     return skull
-
-
-def bake_cavity(obj, iterations=6, strength=95.0):
-    """Darkens hollows (orbits, under the brow, between teeth) into vertex colors, like dust in a cast."""
-    bm = bmesh.new()
-    bm.from_mesh(obj.data)
-    bm.verts.ensure_lookup_table()
-    bm.normal_update()
-    count = len(bm.verts)
-    concave = np.zeros(count)
-    for vert in bm.verts:
-        if not vert.link_edges:
-            continue
-        mean = Vector((0, 0, 0))
-        for edge in vert.link_edges:
-            mean += edge.other_vert(vert).co
-        mean /= len(vert.link_edges)
-        concave[vert.index] = vert.normal.dot(mean - vert.co)
-    neighbors = [[e.other_vert(v).index for e in v.link_edges] for v in bm.verts]
-    for _ in range(iterations):
-        concave = np.array([(concave[i] + concave[n].mean()) / 2 if n else concave[i] for i, n in enumerate(neighbors)])
-    shade = np.clip(1.0 - np.maximum(concave, 0) * strength * 1000, 0.62, 1.0)
-    bm.free()
-
-    attr = obj.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
-    colors = np.repeat(shade[:, None], 4, axis=1)
-    colors[:, 3] = 1.0
-    attr.data.foreach_set("color", colors.astype(np.float32).ravel())
-    obj.data.color_attributes.active_color = attr
 
 
 # ---------------------------------------------------------------- the case
@@ -401,8 +526,9 @@ def build_case(mats):
     front = cy - 0.235
     parts_oak.append(box("Panel", cx - 0.168, cx + 0.168, front - 0.012, front + 0.004, 0.2, 0.79, bevel=0.009, segments=3))
     parts_oak.append(box("Bead", cx - 0.19, cx + 0.19, front - 0.004, front + 0.004, 0.178, 0.812, bevel=0.004, segments=2))
+    for i, part in enumerate(parts_oak):
+        grain_uv(part, seed=i)
     cabinet = join(parts_oak, "Cabinet")
-    smart_uv(cabinet)
     cabinet.data.materials.append(mats["grain"])
     shade_smooth(cabinet)
 
@@ -420,7 +546,7 @@ def build_case(mats):
     deck.data.materials.append(mats["linen"])
 
     riser = box("Riser", cx - 0.085, cx + 0.085, cy - 0.07, cy + 0.08, DECK_Z, DECK_Z + 0.035, bevel=0.008)
-    smart_uv(riser)
+    grain_uv(riser, seed=40)
     riser.data.materials.append(mats["grain"])
 
     # Glass: four sides and a lid, single-sided, no thickness. Cheap to draw and to sort.
@@ -470,7 +596,7 @@ def build_case(mats):
 
 # Window and sconce positions, shared with src/components/museum/scene.ts (which converts to Y-up).
 WINDOW_X, WINDOW_W, WINDOW_SILL, WINDOW_SPRING = -1.03, 0.42, 1.0, 1.86
-SCONCE_X, SCONCE_Z = 0.98, 1.74
+SCONCE_X, SCONCE_Z = 0.98, 1.58  # Low enough that the glowing shade clears the page header's shade.
 
 
 def build_bay(mats):
@@ -516,7 +642,7 @@ def build_bay(mats):
         co = wall.data.vertices[loop.vertex_index].co
         wall.data.uv_layers.active.data[loop.index].uv = (co.x / 1.2 + co.y / 1.2, co.z / 1.2)
     shade_smooth(wall)
-    # The niche and window recess get warm cream paint; the rest of the wall the dusty teal.
+    # The niche gets warm cream paint; the rest of the wall, window recess included, the dusty teal.
     # Face centers are compared in world space, so apply the box's offset first, and drop the
     # empty material slot the boolean cuts leave behind.
     activate(wall)
@@ -527,8 +653,7 @@ def build_bay(mats):
     for poly in wall.data.polygons:
         c = poly.center
         in_niche = abs(c.x) < niche_w / 2 + 0.02 and c.y > WALL_Y + 0.005 and c.z < niche_spring + niche_w / 2 + 0.02
-        in_window = abs(c.x - WINDOW_X) < WINDOW_W / 2 + 0.02 and c.y > WALL_Y + 0.005 and WINDOW_SILL - 0.02 < c.z < WINDOW_SPRING + WINDOW_W / 2 + 0.02
-        poly.material_index = 1 if (in_niche or in_window) else 0
+        poly.material_index = 1 if in_niche else 0  # The window recess stays teal: cooler, and it sits back.
 
     # Oak wainscot either side of the niche: a flat back, proud stiles and rails, a rounded dado rail.
     oak_parts = []
@@ -545,8 +670,9 @@ def build_bay(mats):
         oak_parts.append(box("Skirting", x0, x1, y - 0.03, y + 0.002, 0.0, 0.15, bevel=0.012, segments=3))
     # The window sill, deep enough for a pot, and a slim frame with one mullion and one transom.
     oak_parts.append(box("Sill", WINDOW_X - WINDOW_W / 2 - 0.05, WINDOW_X + WINDOW_W / 2 + 0.05, WALL_Y - 0.09, WALL_Y + 0.17, WINDOW_SILL - 0.035, WINDOW_SILL, bevel=0.012, segments=3))
+    for i, part in enumerate(oak_parts):
+        grain_uv(part, seed=100 + i)
     wainscot = join(oak_parts, "Wainscot")
-    smart_uv(wainscot, angle=45)
     wainscot.data.materials.append(mats["grain"])
     shade_smooth(wainscot)
 
@@ -616,8 +742,9 @@ def build_bay(mats):
     for s in (-1, 1):
         x_out, x_in = s * half, s * (half - 0.16)
         blocks.append(box("PlinthBlock", min(x_out, x_in), max(x_out, x_in), WALL_Y - 0.12, WALL_Y + 0.01, 0.0, 0.3, bevel=0.012, segments=3))
+    for i, part in enumerate(blocks):
+        grain_uv(part, seed=200 + i)
     block = join(blocks, "PilasterBase")
-    smart_uv(block)
     block.data.materials.append(mats["grain"])
 
     return parent([floor, wall, wainscot, window_frame, window_glass, sconce, shade, pilaster, block], "Bay")
@@ -783,6 +910,18 @@ def main():
     skull = build_skull(mats["skull"])
     fern = build_fern(mats)
     fern.location = (WINDOW_X, WALL_Y + 0.05, WINDOW_SILL)  # On the window sill, for the still.
+
+    # Bake contact occlusion with everything in place. Glass and the sky pane don't occlude.
+    see_through = [bpy.data.objects[name] for name in ("Glass", "WindowGlass") if name in bpy.data.objects]
+    for obj in see_through:
+        obj.hide_render = True
+    bpy.context.view_layer.update()
+    bake_ao_vertices(skull, distance=0.035, strength=0.75, floor=0.55)
+    bake_ao_texture(bpy.data.objects["Cabinet"], "cabinet", 512, distance=0.1, strength=0.8)
+    bake_ao_texture(bpy.data.objects["Wainscot"], "wainscot", 512, distance=0.12, strength=0.75)
+    bake_ao_texture(bpy.data.objects["Wall"], "wall", 1024, distance=0.3, strength=0.7)
+    for obj in see_through:
+        obj.hide_render = False
 
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BLEND_DIR, "museum.blend"))
 

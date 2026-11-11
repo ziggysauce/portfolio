@@ -10,24 +10,33 @@ const DECK_Y = 0.965;
 const SPECIMEN_Y = 1.1; // Where the eye should rest: the middle of a specimen on its riser.
 const WALL_Z = -1.0;
 const WINDOW = { x: -1.03, width: 0.42, sill: 1.0, top: 2.07 };
-const SCONCE = { x: 0.98, y: 1.79, z: -0.885 };
+const SCONCE = { x: 0.98, y: 1.63, z: -0.885 };
 
-// The light: amber on the exhibit and the sconce, a cool evening window, and a blue-green room.
-const AMBER = new THREE.Color("#ffb86b");
-const AMBER_HOVER = new THREE.Color("#ffa04d");
-const KEY_INTENSITY = 26;
+// The light: a broad warm key on the exhibit, a warm sconce, a cool evening window, a blue-green room.
+// The key is warm white rather than orange, so cream stays cream and the room keeps its own colors.
+const AMBER = new THREE.Color("#ffd2a0");
+const AMBER_HOVER = new THREE.Color("#ffbf80");
+const KEY_INTENSITY = 30;
+const ENV_INTENSITY = 0.12; // Room reflections: just enough for brass and glass to catch a highlight.
 const LIFT = 0.012; // How far a specimen rises on hover, in meters: enough to notice, still grounded.
 
 // Each material's own tone, set here so the mood can be tuned without re-exporting from Blender.
-const TONES: Record<string, { color: string; roughness?: number; metalness?: number }> = {
-  PaintTeal: { color: "#8aa29a", roughness: 0.95 },
-  PaintCream: { color: "#e6d6bb", roughness: 0.93 },
-  OakGrain: { color: "#bc9a78", roughness: 0.58 }, // Waxed, not lacquered: no hot reflections of the window.
-  Oak: { color: "#c9a27a", roughness: 0.55 },
-  FloorOak: { color: "#9c8468", roughness: 0.62 },
-  Bronze: { color: "#8a6a44", roughness: 0.42, metalness: 1 },
-  Linen: { color: "#d8caae", roughness: 0.96 },
-  SkullPlaster: { color: "#eee6d6", roughness: 0.8 },
+// Each surface responds differently: chalky paint, waxed oak with grain-led roughness, warm brass,
+// matte plaster. Keys are base material names; baked copies (such as "OakGrain.cabinet") share them.
+// `env` scales the room's reflected and ambient light (ENV_INTENSITY): under 1 for matte surfaces, which
+// deepens the room around the lit exhibit; over 1 for brass and glass, which should catch it.
+type Tone = { color: string; roughness?: number; metalness?: number; env?: number; grainRoughness?: boolean };
+const TONES: Record<string, Tone> = {
+  PaintTeal: { color: "#86a097", roughness: 1, env: 0.5 },
+  PaintCream: { color: "#e2d2b6", roughness: 1, env: 0.5 },
+  // Waxed oak. Roughness comes from the grain texture, which samples at about 0.37 to 0.43 in linear
+  // color, so the factor sits well above 1: the result lands at about 0.9 to 1, matte, grain-led.
+  OakGrain: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  Oak: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  FloorOak: { color: "#968069", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
+  Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
+  SkullPlaster: { color: "#ece5d7", roughness: 0.92, env: 0.5 },
   Clay: { color: "#b27c60", roughness: 0.88 },
   Leaf: { color: "#6e8a56", roughness: 0.6 },
   LeafLight: { color: "#88a46a", roughness: 0.6 },
@@ -113,8 +122,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = environment;
-  scene.environmentIntensity = 0.12; // Just enough for bronze and glass to catch a highlight.
-  scene.add(new THREE.HemisphereLight("#a6c2c0", "#4d4034", 0.72)); // Blue-green room light from above.
+  scene.environmentIntensity = ENV_INTENSITY; // The base level; each tone scales it below.
+  // A material that borrows scene.environment always gets scene.environmentIntensity (three overrides
+  // envMapIntensity), so toned materials take the map directly to keep their own reflection strength.
+  const reflect = (material: THREE.MeshStandardMaterial, strength: number) => {
+    material.envMap = environment;
+    material.envMapIntensity = ENV_INTENSITY * strength;
+  };
+  // Blue-green room light from above, a warmer bounce from the floor. Lower than before, for depth.
+  scene.add(new THREE.HemisphereLight("#9db9b7", "#5c4a39", 0.46));
 
   const camera = new THREE.PerspectiveCamera(31, 1, 0.05, 30);
 
@@ -141,12 +157,23 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const glass = new THREE.MeshStandardMaterial({
     color: "#ffffff",
     transparent: true,
-    opacity: 0.06,
-    roughness: 0.04,
+    opacity: 0.03,
+    roughness: 0.03,
     metalness: 0,
-    envMapIntensity: 5,
     depthWrite: false,
+    side: THREE.DoubleSide, // The camera stands between the side panes, so they're seen from inside.
   });
+  reflect(glass, 3.5);
+  // Fresnel: almost invisible face-on, a soft sheen where a pane turns away from the eye. That's
+  // what makes glass read as glass without veiling the specimen.
+  glass.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      `float glassFacing = abs(dot(normalize(vViewPosition), normal));
+      diffuseColor.a = clamp(diffuseColor.a + pow(1.0 - glassFacing, 3.0) * 0.32, 0.0, 0.4);
+      #include <opaque_fragment>`,
+    );
+  };
   const owned: { dispose(): void }[] = [glass];
   source.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
@@ -165,7 +192,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     if (node.name === "SconceShade") {
       // A linen shade glowing from within: warmer and a step darker than the wall, so it reads as a lamp.
-      const shade = new THREE.MeshStandardMaterial({ color: "#d9b98a", emissive: "#ff9a3c", emissiveIntensity: 1.35, roughness: 0.9, side: THREE.DoubleSide });
+      // Parchment lit from inside. It's a light source, so it skips tone mapping: AgX desaturates bright
+      // orange toward tan, and a glowing shade should land exactly as warm as chosen here.
+      const shade = new THREE.MeshBasicMaterial({ color: "#f6cf98", toneMapped: false, fog: false, side: THREE.DoubleSide });
       owned.push(shade);
       node.material = shade;
       return;
@@ -177,11 +206,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     node.castShadow = !names.some((name) => name.startsWith("Frond") || quiet.includes(name));
     node.receiveShadow = true;
     if (material.map) material.map.anisotropy = maxAnisotropy; // Keeps grain crisp at a glance.
-    const tone = TONES[material.name];
+    const tone = TONES[material.name.split(".")[0]];
     if (tone) {
       material.color.set(tone.color);
       if (tone.roughness !== undefined) material.roughness = tone.roughness;
       if (tone.metalness !== undefined) material.metalness = tone.metalness;
+      if (tone.env !== undefined) reflect(material, tone.env);
+      // The grain texture doubles as a roughness map: denser grain reads a touch rougher than the flats.
+      if (tone.grainRoughness && material.map) material.roughnessMap = material.map;
     }
   });
 
@@ -190,6 +222,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const contactMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, depthWrite: false, fog: false });
   const contactGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   owned.push(contactTexture, contactMaterial, contactGeometry);
+  const deckContactMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.55, depthWrite: false, fog: false });
+  const seatMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.85, depthWrite: false, fog: false });
+  owned.push(deckContactMaterial, seatMaterial);
   function contact(x: number, z: number, size: number, y = 0.002) {
     const shadow = new THREE.Mesh(contactGeometry, contactMaterial);
     shadow.position.set(x, y, z);
@@ -197,6 +232,35 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     shadow.renderOrder = 1;
     scene.add(shadow);
   }
+
+  // The sconce's wall glow: two soft lobes, a tighter one up and a wider one down.
+  function spillTexture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 512;
+    const context = canvas.getContext("2d")!;
+    const lobe = (cy: number, radius: number, squeeze: number, alpha: number) => {
+      context.save();
+      context.translate(128, cy);
+      context.scale(squeeze, 1);
+      const gradient = context.createRadialGradient(0, 0, 0, 0, 0, radius);
+      gradient.addColorStop(0, `rgba(255,178,104,${alpha})`);
+      gradient.addColorStop(0.4, `rgba(255,160,88,${alpha * 0.42})`);
+      gradient.addColorStop(1, "rgba(255,150,80,0)");
+      context.fillStyle = gradient;
+      context.fillRect(-radius, -radius, radius * 2, radius * 2);
+      context.restore();
+    };
+    lobe(170, 150, 0.42, 0.55); // up, through the narrow top of the shade
+    lobe(330, 200, 0.62, 0.7); // down, through the wide bottom
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+  const spillMap = spillTexture();
+  const spillMaterial = new THREE.MeshBasicMaterial({ map: spillMap, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const spillGeometry = new THREE.PlaneGeometry(0.62, 1.24);
+  owned.push(spillMap, spillMaterial, spillGeometry);
 
   // Ferns: one on each window sill, and a big one between bays in the foreground for depth as you walk.
   type Swaying = { node: THREE.Object3D; base: THREE.Euler; phase: number; rate: number; amount: number };
@@ -235,15 +299,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
 
     // Cool evening light through the window, washing the sill, the wall beside it and the floor.
-    const windowLight = new THREE.RectAreaLight("#9fc2cf", 3.2, WINDOW.width, WINDOW.top - WINDOW.sill);
+    const windowLight = new THREE.RectAreaLight("#a3c5d2", 2.3, WINDOW.width, WINDOW.top - WINDOW.sill);
     windowLight.position.set(x + WINDOW.x, (WINDOW.sill + WINDOW.top) / 2, WALL_Z + 0.04);
     windowLight.lookAt(x + WINDOW.x + 0.5, 0.2, 1.6);
     scene.add(windowLight);
 
-    // The sconce: a small warm pool on the wall above the label.
-    const sconce = new THREE.PointLight("#ffc184", 0.9, 2.4, 2);
+    // The sconce: light escapes the shade's open top and bottom, so the wall gets an upward and a
+    // downward scallop (a painted light decal, nearly free), and a small real light warms the label area.
+    const sconce = new THREE.PointLight("#ffc184", 0.4, 2.2, 2);
     sconce.position.set(x + SCONCE.x, SCONCE.y, SCONCE.z + 0.05);
     scene.add(sconce);
+    const spill = new THREE.Mesh(spillGeometry, spillMaterial);
+    spill.position.set(x + SCONCE.x, SCONCE.y + 0.03, WALL_Z + 0.004);
+    spill.renderOrder = 1;
+    scene.add(spill);
   }
 
   const dustTexture = radialTexture("rgba(255,236,205,1)", "rgba(255,236,205,0)");
@@ -256,6 +325,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     display.position.x = x;
     scene.add(display);
     contact(x, CASE_Z, 0.95);
+    // Contact where the riser meets the linen deck: small, soft, inside the case.
+    const riserContact = new THREE.Mesh(contactGeometry, deckContactMaterial);
+    riserContact.position.set(x, DECK_Y + 0.0008, CASE_Z - 0.005);
+    riserContact.scale.set(0.27, 1, 0.24);
+    scene.add(riserContact);
 
     const template = exhibit.specimen ? source.getObjectByName(exhibit.specimen) : undefined;
     const specimen = exhibit.status === "on-view" && template ? template.clone(true) : null;
@@ -263,23 +337,37 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       specimen.position.x += x;
       specimen.userData.baseY = specimen.position.y;
       scene.add(specimen);
+      // And where the skull rests on the riser. It fades a little as the skull lifts on hover.
+      const seat = new THREE.Mesh(contactGeometry, seatMaterial.clone());
+      seat.position.set(x, DECK_Y + 0.035 + 0.0008, CASE_Z - 0.012);
+      seat.scale.set(0.13, 1, 0.16);
+      seat.rotation.y = specimen.rotation.y;
+      scene.add(seat);
+      owned.push(seat.material as THREE.Material);
+      specimen.userData.seat = seat;
     }
     specimens.push(specimen);
 
-    // The exhibit light: a tight amber spot from above and to the right, with soft shadows.
-    const key = new THREE.SpotLight(AMBER, KEY_INTENSITY, 0, THREE.MathUtils.degToRad(17), 0.7, 2);
-    key.position.set(x + 0.45, 2.85, 0.75);
+    // The exhibit light: broad, warm, from high above and a little to the right, so it models the
+    // skull's form and drops its shadows short and soft instead of raking them up the wall.
+    const key = new THREE.SpotLight(AMBER, KEY_INTENSITY, 0, THREE.MathUtils.degToRad(25), 0.9, 2);
+    key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
     key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.near = 0.8;
-    key.shadow.camera.far = 5;
-    key.shadow.bias = -0.0006;
-    key.shadow.normalBias = 0.015;
-    key.shadow.radius = 7;
-    key.shadow.blurSamples = 12;
+    key.shadow.mapSize.set(2048, 2048); // Fine enough for the skull's shadow at gallery distance.
+    key.shadow.camera.near = 1.2; // A tight depth range keeps the shadow precise.
+    key.shadow.camera.far = 3.8;
+    key.shadow.bias = -0.0002;
+    key.shadow.normalBias = 0.006; // Small, so shadows stay attached where things touch.
+    key.shadow.radius = 10;
+    key.shadow.blurSamples = 16;
     scene.add(key, key.target);
     keys.push(key);
+
+    // Warm light bounced up from the linen deck, so the underside of the jaw isn't a dead shadow.
+    const bounce = new THREE.PointLight("#ffd3a0", 0.03, 0.5, 2);
+    bounce.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16);
+    scene.add(bounce);
 
     // Sparse dust drifting in that beam: about forty motes, only visible where the light catches them.
     const count = 28;
@@ -421,7 +509,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       keys[i].intensity = KEY_INTENSITY * (1 + 0.32 * glow[i]);
       keys[i].color.copy(AMBER).lerp(AMBER_HOVER, glow[i] * 0.6);
       const specimen = specimens[i];
-      if (specimen) specimen.position.y = specimen.userData.baseY + (reduced ? 0 : LIFT * glow[i]);
+      if (specimen) {
+        specimen.position.y = specimen.userData.baseY + (reduced ? 0 : LIFT * glow[i]);
+        const seat = specimen.userData.seat as THREE.Mesh | undefined;
+        if (seat) (seat.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - (reduced ? 0 : glow[i]) * 0.5);
+      }
     });
     if (lifting && !reduced) renderer.shadowMap.needsUpdate = true; // The specimen's shadow follows it up.
 
@@ -525,9 +617,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         material.dispose();
       });
       owned.forEach((item) => item.dispose());
+      keys.forEach((key) => key.shadow.dispose()); // renderer.dispose() leaves shadow render targets alive.
       environment.dispose();
       pmrem.dispose();
       // No forceContextLoss here: in development React mounts twice and the next scene reuses this canvas's context.
+      // Side effect, development only: the two renderers' cached GL state collides, which can leave a stale shadow
+      // map (a skull-shaped shadow on case 2's empty riser). Production mounts once and renders clean.
       renderer.dispose();
     },
   };
