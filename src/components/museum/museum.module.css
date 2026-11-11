@@ -171,11 +171,11 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: clamp(232px, 18vw, 284px);
+  width: clamp(220px, 16.5vw, 262px);
   translate: 0 -50%;
   display: grid;
   gap: 4px;
-  padding: 18px 20px 18px;
+  padding: 16px 18px 16px;
   /* Aged ivory: a touch darker toward the edges, like card that has hung in a gallery for years. */
   background:
     var(--paper),
@@ -243,7 +243,7 @@
 }
 .title {
   margin: 3px 0 6px;
-  font: 400 26px/1.04 var(--serif);
+  font: 400 24px/1.04 var(--serif);
   text-wrap: balance;
 }
 .line {
@@ -404,14 +404,51 @@
   z-index: 3;
 }
 .directoryToggle {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 6px 0 16px;
+  border: 1px solid rgb(201 160 102 / 0.45);
+  border-radius: 999px;
+  background: rgb(30 36 35 / 0.62);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.directoryToggle:hover {
+  background: rgb(46 54 52 / 0.72);
+}
+@media (pointer: coarse) {
+  .directoryToggle {
+    min-height: 44px;
+  }
+}
+/* Where you are: a small brass plaque on the toggle, visible even with the directory folded away. */
+.dirCurrent {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--focus);
+  color: var(--ink);
+  letter-spacing: 0.1em;
 }
 .directoryList {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(320px, calc(100vw - 40px));
   padding: 10px 6px 6px;
   border: 1px solid rgb(201 160 102 / 0.35);
   border-radius: 10px;
-  background: rgb(30 36 35 / 0.66);
+  background: rgb(30 36 35 / 0.92);
   backdrop-filter: blur(8px);
+}
+.directory[data-open] .directoryList {
+  display: block;
 }
 .directoryTitle {
   margin: 0 8px 6px;
@@ -579,37 +616,33 @@
 
 /* ---------------------------------------------------------------- information desk */
 
-.desk {
-  max-width: 64ch;
-  margin-inline: auto;
-  padding: 88px max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 88px) max(20px, env(safe-area-inset-left, 0px));
-  display: grid;
-  gap: 14px;
+.deskCard {
+  width: clamp(250px, 21vw, 312px);
 }
-.desk h2 {
-  margin: 0;
-  font: italic 400 40px/1 var(--serif);
+.deskCard .line {
+  font-weight: 400 !important;
 }
-.desk p {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: 16px;
-  line-height: 1.6;
-}
-.desk ul {
+.deskLinks {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 22px;
-  margin: 4px 0 0;
-  padding: 0;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid rgb(138 106 68 / 0.22);
   list-style: none;
 }
-.desk a {
+.deskLinks a {
   display: inline-flex;
-  min-height: 44px;
   align-items: center;
-  color: var(--text);
-  text-underline-offset: 5px;
+  min-height: 32px;
+  color: var(--ink);
+  font-size: 14px;
+  text-underline-offset: 4px;
+}
+@media (pointer: coarse) {
+  .deskLinks a {
+    min-height: 44px;
+  }
 }
 
 /* ---------------------------------------------------------------- phones and tall screens */
@@ -635,38 +668,6 @@
     }
   }
 }
-/* Smaller screens: the directory folds into a button above the walking controls. */
-@media (max-width: 1179px), (max-height: 699px) {
-  .directory {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
-  }
-  .directoryToggle {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 16px;
-    border: 1px solid rgb(201 160 102 / 0.45);
-    border-radius: 999px;
-    background: rgb(30 36 35 / 0.62);
-    backdrop-filter: blur(8px);
-    color: var(--text);
-    font: 500 11px/1 var(--mono);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-  .directoryList {
-    display: none;
-    position: absolute;
-    left: 0;
-    bottom: calc(100% + 8px);
-    width: min(320px, calc(100vw - 40px));
-    background: rgb(30 36 35 / 0.92);
-  }
-  .directory[data-open] .directoryList {
-    display: block;
-  }
-}
 @media (max-width: 640px) {
   .top {
     flex-direction: column;
@@ -686,6 +687,12 @@
   }
   .controls button {
     padding: 0 14px;
+  }
+}
+/* Narrow screens: the directory control sits just above the walking controls. */
+@media (max-width: 899px) {
+  .directory {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
   }
 }
 

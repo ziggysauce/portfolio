@@ -9,3 +9,6 @@ next-env.d.ts
 
 # Blender autosave backups
 *.blend1
+
+# Python bytecode from the Blender build scripts
+__pycache__/

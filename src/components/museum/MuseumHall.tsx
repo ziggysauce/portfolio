@@ -47,7 +47,7 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
   const [openNote, setOpenNote] = useState<number | null>(null);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const directoryToggle = useRef<HTMLButtonElement>(null);
-  /** Folds the directory away. Where it folds (smaller screens), focus moves to its toggle instead of vanishing. */
+  /** Folds the directory away. If focus was inside it, focus moves to its toggle instead of vanishing. */
   const closeDirectory = useCallback(() => {
     setDirectoryOpen(false);
     const toggle = directoryToggle.current;
@@ -58,7 +58,9 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
   const [status, setStatus] = useState<Status>("loading");
   const [loaded, setLoaded] = useState(0);
   const [index, setIndex] = useState(0);
-  const count = exhibits.length;
+  // Stops on the walk: every exhibit, then the Information desk.
+  const deskIndex = exhibits.length;
+  const count = exhibits.length + 1;
   const ready = useRef(false);
   const idle = useRef(0); // The "finish the walk" timer.
   const direction = useRef(0); // Which way the visitor was last walking.
@@ -141,7 +143,10 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
       .then(({ createMuseumScene }) =>
         createMuseumScene({
           canvas: canvas.current!,
-          exhibits: exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status })),
+          exhibits: [
+            ...exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status, kind: "case" as const })),
+            { status: "on-view", kind: "desk" as const },
+          ],
           url: "/museum/museum.glb",
           reducedMotion: motion.matches,
           onProgress: (fraction) => setLoaded(fraction),
@@ -245,6 +250,19 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
       window.removeEventListener("pointercancel", onRelease);
     };
   }, [status, count, offsetFor, caseHeight, go]);
+
+  // A click anywhere outside the open directory folds it away.
+  useEffect(() => {
+    if (!directoryOpen) return;
+    function onDown(event: PointerEvent) {
+      const nav = directoryToggle.current?.parentElement;
+      if (nav?.contains(event.target as Node)) return;
+      if (nav?.contains(document.activeElement)) directoryToggle.current?.focus(); // Don't strand focus in a hidden list.
+      setDirectoryOpen(false);
+    }
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [directoryOpen]);
 
   // The curator's drawer follows the open note. (Walking on to another case closes the note: see onScroll.)
   useEffect(() => {
@@ -375,7 +393,7 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
               />
             )}
 
-            <ol className={styles.labels} aria-label="Exhibits">
+            <ol className={styles.labels} aria-label="Exhibits and the information desk">
               {exhibits.map((exhibit, i) => (
                 <li key={exhibit.id}>
                   <article
@@ -387,7 +405,9 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                     className={`${styles.label} ${exhibit.status === "in-preparation" ? styles.pending : ""}`}
                     onFocus={() => {
                       scene.current?.setHighlight(i);
-                      if (i !== index) go(i);
+                      // Always walk, even if this case is the one on screen: mid-walk, "on screen" still
+                      // names the case being left, and a quick Tab then Shift+Tab would strand the camera.
+                      go(i);
                     }}
                     onBlur={() => scene.current?.setHighlight(null)}
                     onPointerEnter={() => scene.current?.setHighlight(i)}
@@ -440,6 +460,55 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                   ) : null}
                 </li>
               ))}
+              <li key="desk">
+                {/* The last stop: the Information desk, with the summary and every way to get in touch. */}
+                <article
+                  ref={(node) => {
+                    labels.current[deskIndex] = node;
+                  }}
+                  tabIndex={0}
+                  aria-labelledby="desk-title"
+                  className={`${styles.label} ${styles.deskCard}`}
+                  onFocus={() => {
+                    scene.current?.setHighlight(deskIndex);
+                    go(deskIndex);
+                  }}
+                  onBlur={() => scene.current?.setHighlight(null)}
+                  onPointerEnter={() => scene.current?.setHighlight(deskIndex)}
+                  onPointerLeave={() => scene.current?.setHighlight(null)}
+                >
+                  <p className={styles.number}>Before you go</p>
+                  <h2 id="desk-title" className={styles.title}>
+                    Information desk
+                  </h2>
+                  <p className={styles.line}>{summary}</p>
+                  <ul className={styles.deskLinks}>
+                    <li>
+                      <a href={links.resume} target="_blank" rel="noreferrer">
+                        Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
+                      </a>
+                    </li>
+                    <li>
+                      <Link href={links.contact}>Contact</Link>
+                    </li>
+                    <li>
+                      <a href={links.linkedin} target="_blank" rel="noreferrer">
+                        LinkedIn
+                      </a>
+                    </li>
+                    <li>
+                      <a href={links.github} target="_blank" rel="noreferrer">
+                        GitHub
+                      </a>
+                    </li>
+                    <li>
+                      <a href={links.site} target="_blank" rel="noreferrer">
+                        Current site
+                      </a>
+                    </li>
+                  </ul>
+                </article>
+              </li>
             </ol>
 
             {fallback ? null : (
@@ -452,7 +521,12 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                   aria-controls="gallery-directory"
                   onClick={() => setDirectoryOpen((open) => !open)}
                 >
-                  Directory
+                  <span>Directory</span>
+                  {/* Where you are, always visible, even with the directory folded away. */}
+                  <span className={styles.dirCurrent}>
+                    <span className="sr-only">, you are at </span>
+                    {index === deskIndex ? "Desk" : exhibits[index]?.number}
+                  </span>
                 </button>
                 <div id="gallery-directory" className={styles.directoryList}>
                   <p className={styles.directoryTitle} aria-hidden="true">
@@ -488,6 +562,22 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                         </li>
                       );
                     })}
+                    <li key="desk">
+                      <button
+                        type="button"
+                        aria-current={index === deskIndex ? "location" : undefined}
+                        onClick={() => {
+                          go(deskIndex);
+                          closeDirectory();
+                        }}
+                      >
+                        <span className={styles.dirNumber} aria-hidden="true">
+                          ·
+                        </span>
+                        <span className={styles.dirTitle}>Information desk</span>
+                        {index === deskIndex ? <span className={styles.here}>You are here</span> : null}
+                      </button>
+                    </li>
                   </ol>
                 </div>
               </nav>
@@ -499,7 +589,7 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                   <span aria-hidden="true">←</span> Previous
                 </button>
                 <p className={styles.counter} aria-live="polite">
-                  Case {index + 1} of {count}
+                  {index === deskIndex ? "Information desk" : `Case ${index + 1} of ${exhibits.length}`}
                 </p>
                 <button type="button" onClick={() => go(index + 1)} disabled={index === count - 1}>
                   Next <span aria-hidden="true">→</span>
@@ -518,32 +608,6 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
           </div>
         </section>
 
-        <section className={styles.desk} aria-labelledby="desk-title">
-          <h2 id="desk-title">Information desk</h2>
-          <p>{summary}</p>
-          <ul>
-            <li>
-              <a href={links.linkedin} target="_blank" rel="noreferrer">
-                LinkedIn
-              </a>
-            </li>
-            <li>
-              <a href={links.github} target="_blank" rel="noreferrer">
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href={links.resume} target="_blank" rel="noreferrer">
-                Résumé (PDF)
-              </a>
-            </li>
-            <li>
-              <a href={links.site} target="_blank" rel="noreferrer">
-                Current site
-              </a>
-            </li>
-          </ul>
-        </section>
       </main>
     </div>
   );

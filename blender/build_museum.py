@@ -7,7 +7,8 @@ Builds the museum's 3D assets from scratch: no downloaded models or textures.
 Writes:
     blender/museum.blend           editable source (open it in Blender to tweak)
     blender/textures/*.png         generated textures: oak, plaster, evening sky, rug, the curator's note
-    public/museum/museum.glb       web asset: nodes "Bay", "Case" (with its "Drawer"), "Skull", "Fern", "Props"
+    public/museum/museum.glb       web asset: "Bay", "Case" (with its "Drawer"), "Skull", "Fern", "Props", and from
+                                   museum_exhibits.py the other specimens, "Desk" and the room's dressing
     public/museum/hall.jpg         still render, used as the no-WebGL fallback (with --render)
 
 Units are meters. Blender is Z-up with the exhibits facing -Y; the glTF export turns
@@ -1146,6 +1147,13 @@ def main():
     for obj in see_through:
         obj.hide_render = False
 
+    # Exhibits 002 to 006, the desk and the room's dressing: built after the bakes, so they don't
+    # shade the skull or the cabinet (in Blender they all stand in the first case).
+    sys.path.insert(0, BLEND_DIR)
+    import museum_exhibits
+
+    extras = museum_exhibits.build_all(mats)
+
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BLEND_DIR, "museum.blend"))
 
     bpy.ops.object.select_all(action="SELECT")
@@ -1166,9 +1174,13 @@ def main():
     print(f"[museum] exported, about {tris} triangles; skull {sum(len(p.vertices) - 2 for p in skull.data.polygons)}")
 
     if RENDER:
+        for group in extras:  # The still shows the first case only.
+            for obj in [group, *group.children_recursive]:
+                obj.hide_render = True
         setup_render(skull, case, bay)
         bpy.ops.render.render(write_still=True)
         print("[museum] rendered", bpy.context.scene.render.filepath)
 
 
-main()
+if __name__ == "__main__":  # museum_exhibits.py imports this file's helpers.
+    main()

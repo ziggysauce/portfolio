@@ -49,12 +49,41 @@ const TONES: Record<string, Tone> = {
   Cedar: { color: "#d7b08a", roughness: 0.8, env: 0.5 },
   MugGlaze: { color: "#6f8798", roughness: 0.28, env: 1.4 }, // Glazed stoneware: a soft highlight, no mirror.
   Coffee: { color: "#2a1a10", roughness: 0.12, env: 1.2 },
+  // Exhibits 002 to 006 and the desk: lab plastics, a dark bezel, a whiteboard, velvet, paper, enamel.
+  LabPlastic: { color: "#e9e5dc", roughness: 0.45, env: 0.9 },
+  PlungerBlue: { color: "#5f7fa0", roughness: 0.4, env: 0.9 },
+  LabGrey: { color: "#b4b8b8", roughness: 0.4, env: 0.9 },
+  TipPlastic: { color: "#efe8d4", roughness: 0.3, env: 1 },
+  RackBlue: { color: "#8aa3b8", roughness: 0.5, env: 0.7 },
+  Bezel: { color: "#2b2c2e", roughness: 0.45, env: 1 },
+  Whiteboard: { color: "#ffffff", roughness: 0.3, env: 0.8 },
+  Aluminium: { color: "#c3c5c4", roughness: 0.35, metalness: 1, env: 1.4 },
+  MarkerBody: { color: "#ece6da", roughness: 0.4, env: 0.8 },
+  MarkerCap: { color: "#9a4436", roughness: 0.4, env: 0.8 },
+  Felt: { color: "#2f3a52", roughness: 1, env: 0.4 },
+  Velvet: { color: "#3c4f6a", roughness: 1, env: 0.4 },
+  RoadmapPaper: { color: "#ffffff", roughness: 0.9, env: 0.5 },
+  KeyboardCase: { color: "#d8d0bf", roughness: 0.5, env: 0.8 },
+  Keycap: { color: "#ece6d8", roughness: 0.5, env: 0.8 },
+  KeycapAccent: { color: "#6f8578", roughness: 0.5, env: 0.8 },
+  Enamel: { color: "#c76a46", roughness: 0.25, env: 1.2 },
+  Scarf: { color: "#ffffff", roughness: 1, env: 0.4 },
+  Leather: { color: "#3e5a4a", roughness: 0.6, env: 0.6 },
+  LeafletCream: { color: "#efe4c8", roughness: 0.9, env: 0.5 },
+  LeafletSage: { color: "#a9b9a2", roughness: 0.9, env: 0.5 },
+  LeafletRose: { color: "#d6a88f", roughness: 0.9, env: 0.5 },
+  Ceramic: { color: "#ddd3c2", roughness: 0.35, env: 1 },
+  LeafDark: { color: "#4f6b4a", roughness: 0.55 },
+  BookTerracotta: { color: "#a4573f", roughness: 0.8, env: 0.5 },
+  BookTeal: { color: "#3f6466", roughness: 0.8, env: 0.5 },
+  BookMustard: { color: "#c19a45", roughness: 0.8, env: 0.5 },
   Clay: { color: "#b27c60", roughness: 0.88 },
   Leaf: { color: "#6e8a56", roughness: 0.6 },
   LeafLight: { color: "#88a46a", roughness: 0.6 },
 };
 
-export type SceneExhibit = { specimen?: string; status: string };
+/** A stop on the walk: a case with a specimen, or the Information desk at the end. */
+export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk" };
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
 export type LabelAnchor = { x: number; y: number; visible: boolean; drawer: { x: number; y: number } };
@@ -176,7 +205,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
   const bayTemplate = source.getObjectByName("Bay")!;
   const caseTemplate = source.getObjectByName("Case")!;
-  const fernTemplate = source.getObjectByName("Fern");
+  const deskTemplate = source.getObjectByName("Desk");
   const propsTemplate = source.getObjectByName("Props");
 
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -214,6 +243,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       const sky = new THREE.MeshBasicMaterial({ map: material.map, fog: false, toneMapped: false, side: THREE.DoubleSide });
       owned.push(sky);
       node.material = sky;
+      return;
+    }
+    if (node.name === "Screen") {
+      // The first KDS, mid-service: a screen gives its own light, a little dimmer than paper under the lamp.
+      const screen = new THREE.MeshBasicMaterial({ map: material.map, color: "#d9d9d9" });
+      owned.push(screen);
+      node.material = screen;
+      return;
+    }
+    if (node.name === "LampShade") {
+      // The banker's lamp's green glass, lit from inside.
+      const shade = new THREE.MeshBasicMaterial({ color: "#5f9b74", toneMapped: false, side: THREE.DoubleSide });
+      owned.push(shade);
+      node.material = shade;
       return;
     }
     if (node.name === "SconceShade") {
@@ -292,17 +335,19 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const spillGeometry = new THREE.PlaneGeometry(0.62, 1.24);
   owned.push(spillMap, spillMaterial, spillGeometry);
 
-  // Ferns: one on each window sill, and a big one between bays in the foreground for depth as you walk.
+  // The room's dressing varies bay by bay, so walking the hall never shows the same corner twice: a
+  // different thing on each window sill, and a plant between every other pair of bays.
   type Swaying = { node: THREE.Object3D; base: THREE.Euler; phase: number; rate: number; amount: number };
   const swaying: Swaying[] = [];
-  function placeFern(x: number, y: number, z: number, scale: number, seed: number) {
-    if (!fernTemplate) return;
-    const fern = fernTemplate.clone(true);
-    fern.position.set(x, y, z);
-    fern.scale.setScalar(scale);
-    fern.rotation.y = seed * 1.3;
-    scene.add(fern);
-    fern.traverse((node) => {
+  function dress(name: string, x: number, y: number, z: number, scale: number, seed: number, footprint: number) {
+    const template = source.getObjectByName(name);
+    if (!template) return;
+    const item = template.clone(true);
+    item.position.set(x, y, z);
+    item.scale.setScalar(scale);
+    item.rotation.y = seed * 1.3;
+    scene.add(item);
+    item.traverse((node) => {
       if (!node.name.startsWith("Frond")) return;
       swaying.push({
         node,
@@ -312,51 +357,79 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         amount: 0.022 + ((swaying.length * 13) % 7) / 600,
       });
     });
-    contact(x, z, 0.32 * scale, y + 0.002);
+    contact(x, z, footprint * scale, y + 0.002);
   }
+  const SILL = ["Pothos", "Fern", "Books", "SnakePlant", "Fern", "Pothos", "Books", "Fern", "SnakePlant", "Pothos"];
+  const CORNER = ["SnakePlant", "Fern", null, "SnakePlant", null, "Fern", null, "SnakePlant", null];
 
-  // One bay per exhibit, plus one at each end so the hall doesn't stop at the frame.
-  const keys: THREE.SpotLight[] = [];
-  const specimens: (THREE.Object3D | null)[] = [];
-  type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
-  const drawers: Drawer[] = [];
-  for (let i = -1; i <= exhibits.length; i++) {
+  // Stops: one bay per exhibit and one for the Information desk, plus a bay at each end so the hall
+  // doesn't stop at the frame.
+  const stops = exhibits.length;
+  for (let i = -1; i <= stops; i++) {
     const x = i * BAY_WIDTH;
     const bay = bayTemplate.clone(true);
     bay.position.x = x;
     scene.add(bay);
-    if (fernTemplate) {
-      placeFern(x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, 1, i + 2);
-      if (i < exhibits.length) placeFern(x + BAY_WIDTH / 2, 0, -0.78, 1.45, i + 7); // Between this bay and the next, by the pilaster.
-    }
-
-    // Cool evening light through the window, washing the sill, the wall beside it and the floor.
-    const windowLight = new THREE.RectAreaLight("#9db7dd", 2.3, WINDOW.width, WINDOW.top - WINDOW.sill); // Deep blue evening.
-    windowLight.position.set(x + WINDOW.x, (WINDOW.sill + WINDOW.top) / 2, WALL_Z + 0.04);
-    windowLight.lookAt(x + WINDOW.x + 0.5, 0.2, 1.6);
-    scene.add(windowLight);
-
-    // The sconce: light escapes the shade's open top and bottom, so the wall gets an upward and a
-    // downward scallop (a painted light decal, nearly free), and a small real light warms the label area.
-    const sconce = new THREE.PointLight("#ffc184", 0.4, 2.2, 2);
-    sconce.position.set(x + SCONCE.x, SCONCE.y, SCONCE.z + 0.05);
-    scene.add(sconce);
+    const sill = SILL[(i + 1) % SILL.length];
+    dress(sill, x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, sill === "Books" ? 0.9 : 1, i + 2, 0.32);
+    const corner = i < stops ? CORNER[(i + 1) % CORNER.length] : null;
+    if (corner) dress(corner, x + BAY_WIDTH / 2, 0, -0.78, corner === "Fern" ? 1.45 : 1.7, i + 7, 0.3);
+    // The sconce's painted wall glow costs nothing, so every bay keeps its own.
     const spill = new THREE.Mesh(spillGeometry, spillMaterial);
     spill.position.set(x + SCONCE.x, SCONCE.y + 0.03, WALL_Z + 0.004);
     spill.renderOrder = 1;
     scene.add(spill);
   }
 
+  // Each case is set a little differently inside: its own deck cloth, and its own mount instead of
+  // the oak riser where the specimen brings one. Hover lifts only the specimen that rests on a riser.
+  // `scale` enlarges a specimen about the middle of the deck: display models, sized to hold the case.
+  type Staging = { deck: string; riser: boolean; lift: boolean; scale: number };
+  const STAGING: Record<string, Staging> = {
+    Skull: { deck: "#d8caae", riser: true, lift: true, scale: 1 }, // linen
+    Pipette: { deck: "#c6cdc3", riser: false, lift: false, scale: 1.3 }, // pale lab green
+    KDS: { deck: "#5c6668", riser: false, lift: false, scale: 1.12 }, // slate felt
+    Marker: { deck: "#e4dac5", riser: false, lift: false, scale: 1.3 }, // cream
+    Roadmap: { deck: "#b49c78", riser: false, lift: false, scale: 1.45 }, // parchment tan
+    AfterHours: { deck: "#4d5f52", riser: false, lift: false, scale: 1.25 }, // green baize, so the pan and scarf stand out
+  };
+
   const dustTexture = radialTexture("rgba(255,236,205,1)", "rgba(255,236,205,0)");
   owned.push(dustTexture);
   const dust: { points: THREE.Points; seeds: Float32Array; origin: THREE.Vector3 }[] = [];
+  const specimens: (THREE.Object3D | null)[] = [];
+  type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
+  const drawers: Drawer[] = [];
+  const deskIndex = exhibits.findIndex((exhibit) => exhibit.kind === "desk");
 
   exhibits.forEach((exhibit, i) => {
     const x = i * BAY_WIDTH;
+    if (exhibit.kind === "desk") {
+      // The Information desk stands where a cabinet would.
+      const desk = deskTemplate?.clone(true);
+      if (desk) {
+        desk.position.x += x;
+        scene.add(desk);
+      }
+      contact(x, CASE_Z, 1.15, 0.002, 0.72);
+      specimens.push(null);
+      drawers.push({ node: null, baseZ: 0, note: null, noteBase: 0 });
+      return;
+    }
+    const staging = STAGING[exhibit.specimen ?? ""] ?? STAGING.Skull;
     const display = caseTemplate.clone(true);
     display.position.x = x;
     scene.add(display);
     contact(x + (CABINET.x0 + CABINET.x1) / 2, CASE_Z, CABINET.x1 - CABINET.x0 + 0.2, 0.002, 0.74);
+    const deck = display.getObjectByName("Deck") as THREE.Mesh | undefined;
+    if (deck) {
+      const cloth = (deck.material as THREE.MeshStandardMaterial).clone();
+      cloth.color.set(staging.deck);
+      deck.material = cloth;
+      owned.push(cloth);
+    }
+    const riser = display.getObjectByName("Riser");
+    if (riser) riser.visible = staging.riser;
     const drawer = display.getObjectByName("Drawer") ?? null;
     const note = drawer?.getObjectByName("DrawerNote") ?? null;
     drawers.push({ node: drawer, baseZ: drawer?.position.z ?? 0, note, noteBase: note?.rotation.x ?? 0 });
@@ -366,52 +439,39 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       props.position.x += x;
       scene.add(props);
     }
-    // Contact where the riser meets the linen deck: small, soft, inside the case.
-    const riserContact = new THREE.Mesh(contactGeometry, deckContactMaterial);
-    riserContact.position.set(x, DECK_Y + 0.0008, CASE_Z - 0.005);
-    riserContact.scale.set(0.27, 1, 0.24);
-    scene.add(riserContact);
+    if (staging.riser) {
+      // Contact where the riser meets the deck: small, soft, inside the case.
+      const riserContact = new THREE.Mesh(contactGeometry, deckContactMaterial);
+      riserContact.position.set(x, DECK_Y + 0.0008, CASE_Z - 0.005);
+      riserContact.scale.set(0.27, 1, 0.24);
+      scene.add(riserContact);
+    }
 
     const template = exhibit.specimen ? source.getObjectByName(exhibit.specimen) : undefined;
     const specimen = exhibit.status === "on-view" && template ? template.clone(true) : null;
     if (specimen) {
-      specimen.position.x += x;
+      // Scale about the deck's centre (c): the node's own position P becomes c(1 - k) + kP.
+      const k = staging.scale;
+      specimen.scale.multiplyScalar(k);
+      specimen.position.set(k * specimen.position.x + x, DECK_Y * (1 - k) + k * specimen.position.y, CASE_Z * (1 - k) + k * specimen.position.z);
       specimen.userData.baseY = specimen.position.y;
       specimen.userData.baseRotation = specimen.rotation.clone();
+      specimen.userData.lift = staging.lift;
       scene.add(specimen);
-      // And where the skull rests on the riser. It fades a little as the skull lifts on hover.
-      const seat = new THREE.Mesh(contactGeometry, seatMaterial.clone());
-      seat.position.set(x, DECK_Y + 0.035 + 0.0008, CASE_Z - 0.012);
-      seat.scale.set(0.13, 1, 0.16);
-      seat.rotation.y = specimen.rotation.y;
-      scene.add(seat);
-      owned.push(seat.material as THREE.Material);
-      specimen.userData.seat = seat;
+      if (staging.riser) {
+        // Where the specimen rests on the riser. It fades a little as the specimen lifts on hover.
+        const seat = new THREE.Mesh(contactGeometry, seatMaterial.clone());
+        seat.position.set(x, DECK_Y + 0.035 + 0.0008, CASE_Z - 0.012);
+        seat.scale.set(0.13, 1, 0.16);
+        seat.rotation.y = specimen.rotation.y;
+        scene.add(seat);
+        owned.push(seat.material as THREE.Material);
+        specimen.userData.seat = seat;
+      }
     }
     specimens.push(specimen);
 
-    // The exhibit light: broad, warm, from high above and a little to the right, so it models the
-    // skull's form and drops its shadows short and soft instead of raking them up the wall.
-    const key = new THREE.SpotLight(AMBER, KEY_INTENSITY, 0, THREE.MathUtils.degToRad(25), 0.9, 2);
-    key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
-    key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048); // Fine enough for the skull's shadow at gallery distance.
-    key.shadow.camera.near = 1.2; // A tight depth range keeps the shadow precise.
-    key.shadow.camera.far = 3.8;
-    key.shadow.bias = -0.0002;
-    key.shadow.normalBias = 0.006; // Small, so shadows stay attached where things touch.
-    key.shadow.radius = 10;
-    key.shadow.blurSamples = 16;
-    scene.add(key, key.target);
-    keys.push(key);
-
-    // Warm light bounced up from the linen deck, so the underside of the jaw isn't a dead shadow.
-    const bounce = new THREE.PointLight("#ffd3a0", 0.03, 0.5, 2);
-    bounce.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16);
-    scene.add(bounce);
-
-    // Sparse dust drifting in that beam: about forty motes, only visible where the light catches them.
+    // Sparse dust drifting in the exhibit's beam: a few dozen motes, visible only where the light catches them.
     const count = 28;
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count * 4);
@@ -438,6 +498,94 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     dust.push({ points, seeds, origin: new THREE.Vector3(x + 0.22, 1.11, CASE_Z + 0.35) });
   });
 
+  // ---------------------------------------------------------------- the light pool
+  //
+  // Lights cost every pixel, so the hall doesn't get a set per bay. Four sets follow the camera, one per
+  // bay from the one behind it to two ahead: a cool window light, the warm sconce, the exhibit's key
+  // spot and a small warm fill (the bounce under a specimen, or the desk's banker's lamp). The count
+  // never changes, so no shader recompiles as you walk. Only the three nearest cases cast shadows.
+  type LightSet = { bay: number; window: THREE.RectAreaLight; sconce: THREE.PointLight; key: THREE.SpotLight; fill: THREE.PointLight };
+  const pool: LightSet[] = [0, 1, 2, 3].map((slot) => {
+    const window = new THREE.RectAreaLight("#9db7dd", 2.3, WINDOW.width, WINDOW.top - WINDOW.sill); // Deep blue evening.
+    const sconce = new THREE.PointLight("#ffc184", 0.4, 2.2, 2);
+    // The exhibit light: broad, warm, from high above and a little to the right, so it models the
+    // specimen and drops its shadows short and soft instead of raking them up the wall.
+    const key = new THREE.SpotLight(AMBER, KEY_INTENSITY, 0, THREE.MathUtils.degToRad(25), 0.9, 2);
+    key.castShadow = slot >= 1; // Exactly three at a time; which three follows the walk.
+    key.shadow.mapSize.set(2048, 2048); // Fine enough for the skull's shadow at gallery distance.
+    key.shadow.camera.near = 1.2; // A tight depth range keeps the shadow precise.
+    key.shadow.camera.far = 3.8;
+    key.shadow.bias = -0.0002;
+    key.shadow.normalBias = 0.006; // Small, so shadows stay attached where things touch.
+    key.shadow.radius = 10;
+    key.shadow.blurSamples = 16;
+    const fill = new THREE.PointLight("#ffd3a0", 0.03, 0.5, 2);
+    scene.add(window, sconce, key, key.target, fill);
+    return { bay: Number.NaN, window, sconce, key, fill };
+  });
+  const keys = pool.map(({ key }) => key);
+  /** How much of a pooled set's light a bay gets, by its distance from the camera's position along the
+   *  hall (rel, in bays). Zero at the pool's edges, so a set joins and leaves the pool unseen. */
+  function presence(rel: number) {
+    if (rel < -1) return THREE.MathUtils.smoothstep(rel, -1.5, -1);
+    if (rel > 2) return 1 - THREE.MathUtils.smoothstep(rel, 2, 2.5);
+    return 1;
+  }
+  /** Moves the pool so its sets light bays base - 1 to base + 2. */
+  function assignLights(base: number) {
+    let moved = false;
+    pool.forEach((set, slot) => {
+      const bay = base - 1 + slot;
+      if (set.bay === bay) return;
+      set.bay = bay;
+      moved = true;
+      const x = bay * BAY_WIDTH;
+      set.window.position.set(x + WINDOW.x, (WINDOW.sill + WINDOW.top) / 2, WALL_Z + 0.04);
+      set.window.lookAt(x + WINDOW.x + 0.5, 0.2, 1.6);
+      set.sconce.position.set(x + SCONCE.x, SCONCE.y, SCONCE.z + 0.05);
+      set.key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
+      set.key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
+      set.key.target.updateMatrixWorld();
+      const isStop = bay >= 0 && bay < stops;
+      set.key.visible = true; // Kept in the count either way; dark bays just get no key.
+      set.key.userData.on = isStop;
+      if (bay === deskIndex) {
+        set.fill.position.set(x + 0.02, 1.08, CASE_Z + 0.08); // Under the banker's lamp.
+        set.fill.color.set("#ffc98a");
+        set.fill.userData.full = 0.35;
+        set.fill.distance = 1.6;
+      } else {
+        set.fill.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16); // Bounced up from the deck.
+        set.fill.color.set("#ffd3a0");
+        set.fill.userData.full = isStop ? 0.03 : 0;
+        set.fill.distance = 0.5;
+      }
+    });
+    if (moved) renderer.shadowMap.needsUpdate = true;
+  }
+  /** Fades each set by its bay's distance, and gives shadows to the two cases the camera is between plus
+   *  the one peeking in at the right, so no visible case gains or loses its shadow as you walk. */
+  function lightPool(position: number) {
+    const near = Math.floor(position + 0.0001);
+    let shadowsMoved = false;
+    for (const set of pool) {
+      const w = presence(set.bay - position);
+      set.window.intensity = 2.3 * w;
+      set.sconce.intensity = 0.4 * w;
+      set.fill.intensity = (set.fill.userData.full as number) * w;
+      const on = set.key.userData.on as boolean;
+      const g = on ? glow[set.bay] : 0;
+      set.key.intensity = on ? KEY_INTENSITY * (1 + 0.32 * g) * w : 0;
+      set.key.color.copy(AMBER).lerp(AMBER_HOVER, g * 0.6);
+      const shadowed = set.bay >= near && set.bay <= near + 2;
+      if (set.key.castShadow !== shadowed) {
+        set.key.castShadow = shadowed;
+        shadowsMoved = true;
+      }
+    }
+    if (shadowsMoved) renderer.shadowMap.needsUpdate = true;
+  }
+
   /** Moves each mote along the beam from the lamp down toward the case, drifting slowly sideways. */
   function updateDust(time: number) {
     for (const { points, seeds, origin } of dust) {
@@ -463,8 +611,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   updateDust(0); // Place the motes before the first frame, even if they never move (reduced motion).
 
   // Hit boxes for hover: the glass case and its cabinet, and each drawer front (which moves with it).
-  const boxes = exhibits.map((_, i) => {
+  const boxes = exhibits.map((exhibit, i) => {
     const x = i * BAY_WIDTH;
+    if (exhibit.kind === "desk") return new THREE.Box3(new THREE.Vector3(x - 0.48, 0, CASE_Z - 0.27), new THREE.Vector3(x + 0.48, 1.15, CASE_Z + 0.27));
     return new THREE.Box3(new THREE.Vector3(x + CABINET.x0, 0, CASE_Z - 0.27), new THREE.Vector3(x + CABINET.x1, DECK_Y + 0.36, CASE_Z + 0.29));
   });
   const drawerBox = new THREE.Box3();
@@ -499,12 +648,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     if (aspect >= 0.8) {
       // Back far enough for the floor and the rug, and turned a little down the hall, so the cabinet,
       // its shelf and label make one vignette left of center and the next case peeks in at the right.
-      framing.distance = Math.max(3.5, 1.45 / halfH);
+      // A step closer than the room-wide view: the case fills more of the frame, and the next case is
+      // a sliver at the right edge.
+      framing.distance = Math.max(3.15, 1.3 / halfH);
       const wide = THREE.MathUtils.clamp((aspect - 1.2) / 0.4, 0, 1); // 0 on squarer screens, 1 from 16:10.
-      framing.camX = -0.05;
-      framing.lookX = 0.2 + 0.42 * wide;
-      framing.lookY = 0.74;
-      framing.height = 1.5;
+      framing.camX = -0.08;
+      framing.lookX = 0.2 + 0.46 * wide;
+      framing.lookY = 0.8;
+      framing.height = 1.48;
     } else {
       // Phones: the case in the upper half, the label below it.
       framing.distance = Math.max(2.75, 0.55 / halfH);
@@ -531,10 +682,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
   function anchors(): LabelAnchor[] {
     const portrait = width / height < 0.8;
-    return exhibits.map((_, i) => {
+    return exhibits.map((exhibit, i) => {
       const x = i * BAY_WIDTH;
-      // Wide screens: pinned to the wall above the shelf. Phones: under the case, clear of the drawer.
-      const label = toScreen(anchorPoint.set(portrait ? x + framing.lookX : x + 0.27, portrait ? 0.5 : 1.2, portrait ? CASE_Z + 0.3 : CASE_Z));
+      // Wide screens: pinned to the wall above the shelf (beside the desk at the end). Phones: under the
+      // case, clear of the drawer.
+      const desk = exhibit.kind === "desk";
+      const label = portrait
+        ? toScreen(anchorPoint.set(x + framing.lookX, desk ? 0.62 : 0.5, CASE_Z + 0.3))
+        : toScreen(anchorPoint.set(x + (desk ? 0.55 : 0.27), desk ? 1.22 : 1.2, CASE_Z));
       const front = toScreen(anchorPoint.set(x + DRAWER.x1, (DRAWER.y0 + DRAWER.y1) / 2, DRAWER.front + DRAWER.travel * drawerOpen[i]));
       return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y } };
     });
@@ -555,16 +710,19 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     if (current !== target) moving = true;
 
     let lifting = false;
+    // The light pool follows the camera: sets for the bay behind it to two bays ahead. It re-centres at
+    // the midpoint of a walk, where the bays it hands over are out of frame either way.
+    assignLights(Math.round(current));
+    lightPool(current);
     glow.forEach((value, i) => {
       const goal = highlightIndex === i ? 1 : 0;
       const next = reduced ? goal : value + (goal - value) * (1 - Math.exp(-7 * dt));
       glow[i] = Math.abs(goal - next) < 0.002 ? goal : next;
-      if (glow[i] !== goal) moving = lifting = true;
-      keys[i].intensity = KEY_INTENSITY * (1 + 0.32 * glow[i]);
-      keys[i].color.copy(AMBER).lerp(AMBER_HOVER, glow[i] * 0.6);
+      if (glow[i] !== goal) moving = true;
       const specimen = specimens[i];
+      if (glow[i] !== goal && specimen?.userData.lift) lifting = true;
       if (specimen) {
-        specimen.position.y = specimen.userData.baseY + (reduced ? 0 : LIFT * glow[i]);
+        specimen.position.y = specimen.userData.baseY + (reduced || !specimen.userData.lift ? 0 : LIFT * glow[i]);
         const seat = specimen.userData.seat as THREE.Mesh | undefined;
         if (seat) (seat.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - (reduced ? 0 : glow[i]) * 0.5);
       }
@@ -679,7 +837,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     raycaster.setFromCamera(pointer, camera);
   }
 
-  return {
+  const api: MuseumScene = {
     setTarget(progress) {
       target = THREE.MathUtils.clamp(progress, 0, exhibits.length - 1);
       kick();
@@ -745,4 +903,6 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       renderer.dispose();
     },
   };
+  if (options.frameLog) Object.assign(window, { __museumApi: api }); // Debug only (?debug): lets tests park the camera.
+  return api;
 }
