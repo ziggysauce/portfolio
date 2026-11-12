@@ -43,7 +43,8 @@ const TONES: Record<string, Tone> = {
   FloorOak: { color: "#a48d75", roughness: 2.4, grainRoughness: true, env: 0.55 },
   Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
   Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
-  SkullPlaster: { color: "#ece5d7", roughness: 0.92, env: 0.5 },
+  // Plaster with a broad satin sheen, so the key light describes the cast's curvature (benchmark, 2026-11-12).
+  SkullPlaster: { color: "#e3dacb", roughness: 0.58, env: 0.8 },
   Rug: { color: "#f4ece0", roughness: 1, env: 0.45 },
   Paper: { color: "#efe6d2", roughness: 0.9, env: 0.5 },
   NotePaper: { color: "#ffffff", roughness: 0.9, env: 0.5 },
@@ -153,6 +154,16 @@ function radialTexture(inner: string, outer: string) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
+}
+
+/** The benchmark's waxed oak (case 1's cabinet and riser): a satin finish whose roughness follows the
+ *  grain only gently and stays in a narrow band, so rounded edges catch one broad highlight and the
+ *  darkest grain lines never turn glossy. The grain samples at about 0.37 to 0.43 in linear color. */
+function satinOak(shader: { fragmentShader: string }) {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <roughnessmap_fragment>",
+    "#include <roughnessmap_fragment>\n\troughnessFactor = clamp(0.5 + (texelRoughness.g - 0.4) * 2.4, 0.44, 0.62);",
+  );
 }
 
 /** Keeps waxed oak from going glossy where its grain map is darkest. */
@@ -463,6 +474,29 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       owned.push(cloth);
     }
     const riser = part(display, "Riser");
+    // The visual benchmark (case 1 only, until the treatment is approved for the whole museum): its
+    // cabinet, drawer and riser take a local satin-oak variant; every other case keeps the shared oak.
+    if (i === 0) {
+      const variants = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+      display.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const shared = node.material as THREE.MeshStandardMaterial;
+        if (!shared.name.startsWith("OakGrain") || !shared.map) return;
+        let variant = variants.get(shared);
+        if (!variant) {
+          variant = shared.clone();
+          variant.color.set("#ad937c"); // A touch less orange under the warm key.
+          variant.roughness = 1;
+          variant.roughnessMap = shared.map;
+          variant.envMap = environment;
+          variant.envMapIntensity = ENV_INTENSITY * 0.9; // Enough room light for an edge to read as waxed.
+          variant.onBeforeCompile = satinOak;
+          variants.set(shared, variant);
+          owned.push(variant);
+        }
+        node.material = variant;
+      });
+    }
     if (riser) riser.visible = staging.riser;
     const drawer = part(display, "Drawer") ?? null;
     const note = drawer ? (part(drawer, "DrawerNote") ?? null) : null;
@@ -491,6 +525,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       specimen.userData.baseY = specimen.position.y;
       specimen.userData.baseRotation = specimen.rotation.clone();
       specimen.userData.lift = staging.lift;
+      if (exhibit.specimen === "Skull") {
+        // The cast still throws its shadow on the riser and deck, but doesn't receive its own: variance
+        // shadows self-shadowing a smooth dome leave a grey band at the terminator (the rough band on
+        // the forehead and temples). Its hollows keep their depth from the baked occlusion.
+        specimen.traverse((node) => {
+          if (node instanceof THREE.Mesh) node.receiveShadow = false;
+        });
+      }
       scene.add(specimen);
       if (staging.riser) {
         // Where the specimen rests on the riser. It fades a little as the specimen lifts on hover.
@@ -611,6 +653,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       set.key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
       set.key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
       set.key.target.updateMatrixWorld();
+      // The benchmark bay's key is a tighter pool, falling off toward the cabinet's front as in the reference.
+      set.key.angle = THREE.MathUtils.degToRad(bay === 0 ? 20 : 25);
       const isStop = bay >= 0 && bay < stops;
       set.key.visible = true; // Kept in the count either way; dark bays just get no key.
       set.key.userData.on = isStop;
@@ -622,7 +666,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       } else {
         set.fill.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16); // Bounced up from the deck.
         set.fill.color.set("#ffd3a0");
-        set.fill.userData.full = isStop ? 0.03 : 0;
+        // The benchmark bay (case 1) gets a stronger bounce: the linen deck's warm light lifting the
+        // underside of the cranium, the sockets and the shadowed cheek, as it does in the reference.
+        set.fill.userData.full = bay === 0 ? 0.09 : isStop ? 0.03 : 0;
         set.fill.distance = 0.5;
       }
     });

@@ -505,11 +505,21 @@ def build_skull(material):
     parts.append(jaw)
     add((0, -0.08, -0.014), (0.016, 0.009, 0.011))  # chin
     add((0, -0.058, 0.017), (0.027, 0.03, 0.011))  # palate and floor of the mouth, behind the teeth
-    # Teeth, upper and lower, along the dental arch: fewer, broader and shorter, so they soften
-    # into the cast instead of reading as a grin.
-    for z, back in ((0.0245, 0.0), (0.0105, 0.002)):
-        for s in np.linspace(-0.86, 0.86, 8):
-            add(dental(s, z, back), (0.0066, 0.0052, 0.0062), 16, 10)
+    # Teeth, upper and lower: one smooth band per row along the dental arch, divided later by shallow
+    # grooves. Separate tooth balls merged into lumps; a band reads as a softened cast of teeth.
+    tooth_rows = ((0.0245, 0.0), (0.0105, 0.002))
+    for z, back in tooth_rows:
+        row = tube(lifted([dental(s, z, back) for s in np.linspace(-0.9, 0.9, 7)]), 0.0058, "TeethRow")
+        activate(row)
+        bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
+        row.scale = (1, 1, 1.15)
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        parts.append(row)
+    for s in (-1, 1):
+        # The temporal fossa, filled: in a cast the bone behind the cheek arch reads as a soft recess,
+        # not a hole through the side of the head.
+        add((s * 0.05, -0.016, 0.06), (0.0095, 0.036, 0.016))
+        add((s * 0.054, -0.036, 0.075), (0.0095, 0.026, 0.02))  # behind the orbit rim, where the brow meets the temple
 
     skull = join(parts, "Skull")
     activate(skull)
@@ -527,13 +537,34 @@ def build_skull(material):
     cutters.append(ellipsoid((0, -0.096, 0.058 + lift), (0.011, 0.034, 0.0165)))  # nasal aperture
     cutters.append(ellipsoid((0, -0.096, 0.047 + lift), (0.014, 0.028, 0.0075)))  # its wider base
     cutters.append(ellipsoid((0, -0.092, 0.017 + lift), (0.032, 0.03, 0.0018)))  # the bite line, barely open
+    # Shallow grooves between the front teeth, which the smoothing below softens to gentle divisions.
+    for z, back in tooth_rows:
+        for s in np.linspace(-0.62, 0.62, 5):
+            x, y, zz = dental(s, z, back)
+            groove = ellipsoid((x, y - 0.006, zz + lift), (0.0011, 0.004, 0.0062), 10, 8)
+            groove.rotation_euler.z = math.atan2(0.1 * s, 0.034)  # Square to the arch.
+            cutters.append(groove)
     # One cutter at a time: overlapping cutters joined into one object confuse the exact solver.
+    # A cut that collapses the mesh (the exact solver occasionally fails on a tiny cutter) is undone.
     for cutter in cutters:
+        before = skull.data.copy()
         boolean = skull.modifiers.new("Carve", "BOOLEAN")
         boolean.operation = "DIFFERENCE"
         boolean.object = cutter
         boolean.solver = "EXACT"
-        apply_modifiers(skull)
+        try:
+            apply_modifiers(skull)
+            broke = len(skull.data.polygons) < 0.8 * len(before.polygons)
+        except RuntimeError:
+            skull.modifiers.remove(boolean)
+            broke = True
+        if broke:
+            print(f"[skull] skipped a cutter that broke the mesh: {cutter.name}")
+            broken = skull.data
+            skull.data = before
+            bpy.data.meshes.remove(broken)
+        else:
+            bpy.data.meshes.remove(before)
         bpy.data.objects.remove(cutter, do_unlink=True)
     print(f"[skull] carved: {len(skull.data.polygons)} faces")
 
@@ -543,28 +574,22 @@ def build_skull(material):
     coarse.mode = "VOXEL"
     coarse.voxel_size = 0.0036
     relax = skull.modifiers.new("Relax", "LAPLACIANSMOOTH")
-    relax.iterations = 24
-    relax.lambda_factor = 0.85
+    relax.iterations = 32
+    relax.lambda_factor = 0.9
     relax.use_volume_preserve = True
     fine = skull.modifiers.new("Refine", "REMESH")
     fine.mode = "VOXEL"
     fine.voxel_size = 0.0017
     apply_modifiers(skull)
 
-    # Plaster tooth: a fraction of a millimeter of irregularity, enough to catch the light.
-    tooth = bpy.data.textures.new("PlasterTooth", "CLOUDS")
-    tooth.noise_scale = 0.005
-    tooth.noise_depth = 1
-    displace = skull.modifiers.new("Tooth", "DISPLACE")
-    displace.texture = tooth
-    displace.strength = 0.0006
-    displace.mid_level = 0.5
-    settle = skull.modifiers.new("Settle", "LAPLACIANSMOOTH")
-    settle.iterations = 2
-    settle.lambda_factor = 0.4
-    settle.use_volume_preserve = True
+    # No surface noise in the geometry: it read as orange peel and a grey band at gallery distance.
+    # Plaster's fine variation lives in the material instead. Decimate keeps the export light; a light
+    # smooth afterwards evens out the triangle fans it leaves, so highlights run unbroken.
     decimate = skull.modifiers.new("Decimate", "DECIMATE")
-    decimate.ratio = 0.3
+    decimate.ratio = 0.32
+    even = skull.modifiers.new("Even", "CORRECTIVE_SMOOTH")
+    even.iterations = 4
+    even.smooth_type = "LENGTH_WEIGHTED"
     apply_modifiers(skull)
     print(f"[skull] finished: {len(skull.data.polygons)} faces, dims {tuple(round(d, 3) for d in skull.dimensions)}")
     shade_smooth(skull)
@@ -1159,7 +1184,8 @@ def main():
     for obj in see_through:
         obj.hide_render = True
     bpy.context.view_layer.update()
-    bake_ao_vertices(skull, distance=0.035, strength=0.75, floor=0.55)
+    # Light occlusion only: the cast should read pale, with the light describing its form, not grime in every hollow.
+    bake_ao_vertices(skull, distance=0.03, strength=0.45, floor=0.74)
     bake_ao_texture(bpy.data.objects["Cabinet"], "cabinet", 512, distance=0.1, strength=0.8)
     # The wide cabinet bakes alone in the same niche, with the standard case and its things hidden.
     first_case = case_objects + [skull, *bpy.data.objects["Props"].children_recursive]
