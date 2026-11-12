@@ -13,6 +13,10 @@ const WINDOW = { x: -0.94, width: 0.36, sill: 1.0, top: 2.04 };
 const SCONCE = { x: 1.0, y: 1.63, z: -0.885 };
 // The squat cabinet runs wider on the right (a shelf for the curator's things); its drawer slides out.
 const CABINET = { x0: -0.32, x1: 0.54 };
+// 006's case is wider and symmetric (blender WIDE_X0/X1, plus the base moulding).
+const WIDE_CABINET = { x0: -0.45, x1: 0.45 };
+// The fatherhood plinth: under the desk bay's window, between case 006 and the desk.
+const PLINTH = { x: WINDOW.x, z: -0.765, top: 0.744 };
 const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, travel: 0.17 };
 
 // The light: a broad warm key on the exhibit, a warm sconce, a cool evening window, a blue-green room.
@@ -49,25 +53,40 @@ const TONES: Record<string, Tone> = {
   Cedar: { color: "#d7b08a", roughness: 0.8, env: 0.5 },
   MugGlaze: { color: "#6f8798", roughness: 0.28, env: 1.4 }, // Glazed stoneware: a soft highlight, no mirror.
   Coffee: { color: "#2a1a10", roughness: 0.12, env: 1.2 },
-  // Exhibits 002 to 006 and the desk: lab plastics, a dark bezel, a whiteboard, velvet, paper, enamel.
-  LabPlastic: { color: "#e9e5dc", roughness: 0.45, env: 0.9 },
-  PlungerBlue: { color: "#5f7fa0", roughness: 0.4, env: 0.9 },
-  LabGrey: { color: "#b4b8b8", roughness: 0.4, env: 0.9 },
-  TipPlastic: { color: "#efe8d4", roughness: 0.3, env: 1 },
-  RackBlue: { color: "#8aa3b8", roughness: 0.5, env: 0.7 },
+  // Exhibits 002 to 006 and the desk.
+  SampleGlass: { color: "#e8eef0", roughness: 0.08, env: 2.4 }, // Clear and a little bright at the edges.
+  Ruby: { color: "#8a2d34", roughness: 0.25, env: 1.1 }, // Restrained, not red paint.
+  Stopper: { color: "#a98a64", roughness: 0.75, env: 0.5 }, // cork
+  SampleLabel: { color: "#f1e8d6", roughness: 0.85, env: 0.5 },
+  SlideGlass: { color: "#eef2f0", roughness: 0.06, env: 2.4 },
   Bezel: { color: "#2b2c2e", roughness: 0.45, env: 1 },
-  Whiteboard: { color: "#ffffff", roughness: 0.3, env: 0.8 },
+  Keycap: { color: "#ece6d8", roughness: 0.5, env: 0.8 },
+  KeycapAccent: { color: "#6f8578", roughness: 0.5, env: 0.8 },
   Aluminium: { color: "#c3c5c4", roughness: 0.35, metalness: 1, env: 1.4 },
+  Trackpad: { color: "#b3b6b6", roughness: 0.3, metalness: 1, env: 1.2 },
+  LaptopKey: { color: "#303133", roughness: 0.5, env: 0.8 },
+  Whiteboard: { color: "#ffffff", roughness: 0.3, env: 0.8 },
   MarkerBody: { color: "#ece6da", roughness: 0.4, env: 0.8 },
   MarkerCap: { color: "#9a4436", roughness: 0.4, env: 0.8 },
   Felt: { color: "#2f3a52", roughness: 1, env: 0.4 },
-  Velvet: { color: "#3c4f6a", roughness: 1, env: 0.4 },
-  RoadmapPaper: { color: "#ffffff", roughness: 0.9, env: 0.5 },
-  KeyboardCase: { color: "#d8d0bf", roughness: 0.5, env: 0.8 },
-  Keycap: { color: "#ece6d8", roughness: 0.5, env: 0.8 },
-  KeycapAccent: { color: "#6f8578", roughness: 0.5, env: 0.8 },
-  Enamel: { color: "#c76a46", roughness: 0.25, env: 1.2 },
-  Scarf: { color: "#ffffff", roughness: 1, env: 0.4 },
+  Cork: { color: "#ffffff", roughness: 0.95, env: 0.45 },
+  PlanCard: { color: "#ffffff", roughness: 0.9, env: 0.5 },
+  CodeCard: { color: "#ffffff", roughness: 0.9, env: 0.5 },
+  TabSage: { color: "#8fa38f", roughness: 0.8, env: 0.5 },
+  TabRust: { color: "#b9775c", roughness: 0.8, env: 0.5 },
+  TabSlate: { color: "#7488a0", roughness: 0.8, env: 0.5 },
+  Thread: { color: "#9c4a3c", roughness: 0.8, env: 0.5 },
+  CalendarPage: { color: "#ffffff", roughness: 0.9, env: 0.5 },
+  CalendarBoard: { color: "#4c5256", roughness: 0.7, env: 0.7 },
+  CastIron: { color: "#2a2928", roughness: 0.55, metalness: 0.6, env: 1.3 }, // Seasoned: a dull sheen.
+  RecordSleeve: { color: "#ffffff", roughness: 0.85, env: 0.5 },
+  Vinyl: { color: "#ffffff", roughness: 0.35, env: 1.4 }, // Grooves catch a soft highlight.
+  Leatherette: { color: "#2c2b29", roughness: 0.85, env: 0.6 },
+  LensGlass: { color: "#1b2228", roughness: 0.08, env: 2 },
+  PlaqueInk: { color: "#2a2520", roughness: 0.7, env: 0.5 },
+  BookOat: { color: "#cdbf9f", roughness: 0.8, env: 0.5 },
+  BookSlate: { color: "#56646e", roughness: 0.8, env: 0.5 },
+  BookOlive: { color: "#7b7a52", roughness: 0.8, env: 0.5 },
   Leather: { color: "#3e5a4a", roughness: 0.6, env: 0.6 },
   LeafletCream: { color: "#efe4c8", roughness: 0.9, env: 0.5 },
   LeafletSage: { color: "#a9b9a2", roughness: 0.9, env: 0.5 },
@@ -87,6 +106,9 @@ export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | 
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
 export type LabelAnchor = { x: number; y: number; visible: boolean; drawer: { x: number; y: number } };
+
+/** Where the fatherhood plinth's card goes, in CSS pixels, and how much of it shows (0 when out of view). */
+export type PlinthAnchor = { x: number; y: number; opacity: number };
 
 export type MuseumScene = {
   /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. */
@@ -112,7 +134,7 @@ type Options = {
   reducedMotion: boolean;
   onProgress?: (fraction: number) => void;
   /** Called after each rendered frame with each case's label anchor, in CSS pixels. */
-  onFrame?: (anchors: LabelAnchor[], progress: number) => void;
+  onFrame?: (anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) => void;
   /** Frame times in ms, for measuring smoothness. Only collected when provided. */
   frameLog?: number[];
 };
@@ -205,6 +227,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
   const bayTemplate = source.getObjectByName("Bay")!;
   const caseTemplate = source.getObjectByName("Case")!;
+  const wideTemplate = source.getObjectByName("CaseWide") ?? caseTemplate;
+  const plinthTemplate = source.getObjectByName("Plinth");
+  /** A part of a case by name. 006's wide case names its parts with a "Wide" suffix. */
+  const part = (root: THREE.Object3D, name: string) => root.getObjectByName(name) ?? root.getObjectByName(`${name}Wide`);
+  const baseName = (name: string) => name.replace(/Wide$/, "");
   const deskTemplate = source.getObjectByName("Desk");
   const propsTemplate = source.getObjectByName("Props");
 
@@ -233,7 +260,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   source.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     const material = node.material as THREE.MeshStandardMaterial;
-    if (node.name === "Glass") {
+    const name = baseName(node.name);
+    if (name === "Glass") {
       node.material = glass; // One pane layer, no transmission: cheap, and the specimen stays clear.
       node.renderOrder = 2;
       return;
@@ -245,8 +273,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       node.material = sky;
       return;
     }
-    if (node.name === "Screen") {
-      // The first KDS, mid-service: a screen gives its own light, a little dimmer than paper under the lamp.
+    if (name === "Screen" || name === "LaptopScreen") {
+      // The first KDS mid-service, and 004's code review: a screen gives its own light, a little dimmer
+      // than paper under the lamp.
       const screen = new THREE.MeshBasicMaterial({ map: material.map, color: "#d9d9d9" });
       owned.push(screen);
       node.material = screen;
@@ -270,7 +299,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     // A mesh with two materials loads as a group of meshes named after its data (the Wall is "Cube" and
     // "Cube_1"), so check the parent's name too.
-    const names = [node.name, node.parent?.name ?? ""];
+    const names = [name, baseName(node.parent?.name ?? "")];
     const quiet = ["Floor", "Rug", "Wall", "Pilaster", "Frame", "Wainscot", "Soil", "Coffee"];
     node.castShadow = !names.some((name) => name.startsWith("Frond") || quiet.includes(name));
     node.receiveShadow = true;
@@ -365,13 +394,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   // Stops: one bay per exhibit and one for the Information desk, plus a bay at each end so the hall
   // doesn't stop at the frame.
   const stops = exhibits.length;
+  const deskIndex = exhibits.findIndex((exhibit) => exhibit.kind === "desk");
   for (let i = -1; i <= stops; i++) {
     const x = i * BAY_WIDTH;
     const bay = bayTemplate.clone(true);
     bay.position.x = x;
     scene.add(bay);
     const sill = SILL[(i + 1) % SILL.length];
-    dress(sill, x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, sill === "Books" ? 0.9 : 1, i + 2, 0.32);
+    // The desk bay's sill stays bare: the fatherhood plinth stands under that window.
+    if (i !== deskIndex) dress(sill, x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, sill === "Books" ? 0.9 : 1, i + 2, 0.32);
     const corner = i < stops ? CORNER[(i + 1) % CORNER.length] : null;
     if (corner) dress(corner, x + BAY_WIDTH / 2, 0, -0.78, corner === "Fern" ? 1.45 : 1.7, i + 7, 0.3);
     // The sconce's painted wall glow costs nothing, so every bay keeps its own.
@@ -384,15 +415,18 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   // Each case is set a little differently inside: its own deck cloth, and its own mount instead of
   // the oak riser where the specimen brings one. Hover lifts only the specimen that rests on a riser.
   // `scale` enlarges a specimen about the middle of the deck: display models, sized to hold the case.
-  type Staging = { deck: string; riser: boolean; lift: boolean; scale: number };
+  // `wide` puts the specimen in the wider case (006's still life).
+  type Staging = { deck: string; riser: boolean; lift: boolean; scale: number; wide?: boolean };
   const STAGING: Record<string, Staging> = {
     Skull: { deck: "#d8caae", riser: true, lift: true, scale: 1 }, // linen
-    Pipette: { deck: "#c6cdc3", riser: false, lift: false, scale: 1.3 }, // pale lab green
+    Samples: { deck: "#c6cdc3", riser: false, lift: false, scale: 1.4 }, // pale lab green
     KDS: { deck: "#5c6668", riser: false, lift: false, scale: 1.12 }, // slate felt
-    Marker: { deck: "#e4dac5", riser: false, lift: false, scale: 1.3 }, // cream
-    Roadmap: { deck: "#b49c78", riser: false, lift: false, scale: 1.45 }, // parchment tan
-    AfterHours: { deck: "#4d5f52", riser: false, lift: false, scale: 1.25 }, // green baize, so the pan and scarf stand out
+    Laptop: { deck: "#e4dac5", riser: false, lift: false, scale: 1.2 }, // cream
+    Planning: { deck: "#8796a0", riser: false, lift: false, scale: 1.25 }, // dusty blue, so the cork stands out
+    AfterHours: { deck: "#a89a86", riser: false, lift: false, scale: 1.1, wide: true }, // warm taupe: the iron and the camera read
   };
+  const stagingFor = (exhibit: SceneExhibit) => STAGING[exhibit.specimen ?? ""] ?? STAGING.Skull;
+  const cabinetFor = (exhibit: SceneExhibit) => (stagingFor(exhibit).wide ? WIDE_CABINET : CABINET);
 
   const dustTexture = radialTexture("rgba(255,236,205,1)", "rgba(255,236,205,0)");
   owned.push(dustTexture);
@@ -400,7 +434,6 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const specimens: (THREE.Object3D | null)[] = [];
   type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
   const drawers: Drawer[] = [];
-  const deskIndex = exhibits.findIndex((exhibit) => exhibit.kind === "desk");
 
   exhibits.forEach((exhibit, i) => {
     const x = i * BAY_WIDTH;
@@ -416,22 +449,23 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       drawers.push({ node: null, baseZ: 0, note: null, noteBase: 0 });
       return;
     }
-    const staging = STAGING[exhibit.specimen ?? ""] ?? STAGING.Skull;
-    const display = caseTemplate.clone(true);
+    const staging = stagingFor(exhibit);
+    const cabinet = cabinetFor(exhibit);
+    const display = (staging.wide ? wideTemplate : caseTemplate).clone(true);
     display.position.x = x;
     scene.add(display);
-    contact(x + (CABINET.x0 + CABINET.x1) / 2, CASE_Z, CABINET.x1 - CABINET.x0 + 0.2, 0.002, 0.74);
-    const deck = display.getObjectByName("Deck") as THREE.Mesh | undefined;
+    contact(x + (cabinet.x0 + cabinet.x1) / 2, CASE_Z, cabinet.x1 - cabinet.x0 + 0.2, 0.002, 0.74);
+    const deck = part(display, "Deck") as THREE.Mesh | undefined;
     if (deck) {
       const cloth = (deck.material as THREE.MeshStandardMaterial).clone();
       cloth.color.set(staging.deck);
       deck.material = cloth;
       owned.push(cloth);
     }
-    const riser = display.getObjectByName("Riser");
+    const riser = part(display, "Riser");
     if (riser) riser.visible = staging.riser;
-    const drawer = display.getObjectByName("Drawer") ?? null;
-    const note = drawer?.getObjectByName("DrawerNote") ?? null;
+    const drawer = part(display, "Drawer") ?? null;
+    const note = drawer ? (part(drawer, "DrawerNote") ?? null) : null;
     drawers.push({ node: drawer, baseZ: drawer?.position.z ?? 0, note, noteBase: note?.rotation.x ?? 0 });
     // The curator's things live in the first gallery only.
     if (i === 0 && propsTemplate) {
@@ -497,6 +531,37 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     scene.add(points);
     dust.push({ points, seeds, origin: new THREE.Vector3(x + 0.22, 1.11, CASE_Z + 0.35) });
   });
+
+  // ---------------------------------------------------------------- the fatherhood plinth
+  //
+  // A small empty plinth under the desk bay's window, between case 006 and the desk: not a stop. Its
+  // warm pool of light is painted, not lit (no light added to the pool, so no shader recompiles): a
+  // glow on the floor, a softer one on the wainscot behind it, and a little on its linen top.
+  const plinthX = deskIndex >= 0 ? deskIndex * BAY_WIDTH + PLINTH.x : null;
+  if (plinthX !== null && plinthTemplate) {
+    const plinth = plinthTemplate.clone(true);
+    plinth.position.set(plinthX, 0, PLINTH.z);
+    plinth.rotation.y = THREE.MathUtils.degToRad(-2); // Set down by hand.
+    scene.add(plinth);
+    contact(plinthX, PLINTH.z, 0.56, 0.003);
+    const poolTexture = radialTexture("rgba(255,196,128,1)", "rgba(255,170,96,0)");
+    const pool = (opacity: number) => new THREE.MeshBasicMaterial({ map: poolTexture, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const floorPool = pool(0.32);
+    const wallPool = pool(0.2);
+    const topPool = pool(0.2);
+    owned.push(poolTexture, floorPool, wallPool, topPool);
+    const glowAt = (material: THREE.Material, x: number, y: number, z: number, w: number, h: number, flat: boolean) => {
+      const glow = new THREE.Mesh(flat ? contactGeometry : new THREE.PlaneGeometry(1, 1), material);
+      if (!flat) owned.push(glow.geometry);
+      glow.position.set(x, y, z);
+      glow.scale.set(w, flat ? 1 : h, flat ? h : 1);
+      glow.renderOrder = 1;
+      scene.add(glow);
+    };
+    glowAt(floorPool, plinthX, 0.004, PLINTH.z + 0.12, 1.1, 0.8, true);
+    glowAt(wallPool, plinthX, 0.95, WALL_Z + 0.045, 0.9, 1.5, false);
+    glowAt(topPool, plinthX, PLINTH.top + 0.002, PLINTH.z, 0.36, 0.36, true);
+  }
 
   // ---------------------------------------------------------------- the light pool
   //
@@ -614,7 +679,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const boxes = exhibits.map((exhibit, i) => {
     const x = i * BAY_WIDTH;
     if (exhibit.kind === "desk") return new THREE.Box3(new THREE.Vector3(x - 0.48, 0, CASE_Z - 0.27), new THREE.Vector3(x + 0.48, 1.15, CASE_Z + 0.27));
-    return new THREE.Box3(new THREE.Vector3(x + CABINET.x0, 0, CASE_Z - 0.27), new THREE.Vector3(x + CABINET.x1, DECK_Y + 0.36, CASE_Z + 0.29));
+    const cabinet = cabinetFor(exhibit);
+    return new THREE.Box3(new THREE.Vector3(x + cabinet.x0, 0, CASE_Z - 0.27), new THREE.Vector3(x + cabinet.x1, DECK_Y + 0.36, CASE_Z + 0.29));
   });
   const drawerBox = new THREE.Box3();
 
@@ -689,10 +755,22 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       const desk = exhibit.kind === "desk";
       const label = portrait
         ? toScreen(anchorPoint.set(x + framing.lookX, desk ? 0.62 : 0.5, CASE_Z + 0.3))
-        : toScreen(anchorPoint.set(x + (desk ? 0.55 : 0.27), desk ? 1.22 : 1.2, CASE_Z));
+        : toScreen(anchorPoint.set(x + (desk ? 0.55 : stagingFor(exhibit).wide ? 0.36 : 0.27), desk ? 1.22 : 1.2, CASE_Z));
       const front = toScreen(anchorPoint.set(x + DRAWER.x1, (DRAWER.y0 + DRAWER.y1) / 2, DRAWER.front + DRAWER.travel * drawerOpen[i]));
       return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y } };
     });
+  }
+
+  const hidden: PlinthAnchor = { x: 0, y: 0, opacity: 0 };
+  /** The plinth card sits on the plinth's front face, below its top; it fades out toward the frame's edges. */
+  function plinthAnchor(): PlinthAnchor {
+    if (plinthX === null) return hidden;
+    anchorPoint.set(plinthX, PLINTH.top - 0.13, PLINTH.z + 0.19);
+    const behind = anchorPoint.clone().applyMatrix4(camera.matrixWorldInverse).z > 0;
+    const point = toScreen(anchorPoint);
+    if (behind) return hidden;
+    const edge = Math.abs(point.ndc);
+    return { x: point.x, y: point.y, opacity: THREE.MathUtils.clamp((0.92 - edge) / 0.22, 0, 1) };
   }
 
   /** Advances everything by dt seconds. Returns true while the camera or a highlight is still moving. */
@@ -797,7 +875,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     last = now;
     const moving = update(dt);
     renderer.render(scene, camera);
-    options.onFrame?.(anchors(), current);
+    options.onFrame?.(anchors(), current, plinthAnchor());
     if (options.frameLog) options.frameLog.push(dt * 1000);
     if (moving || ambient()) raf = requestAnimationFrame(tick);
   }
@@ -825,7 +903,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   if (options.frameLog) Object.assign(window, { __museum: { THREE, scene, renderer, camera } }); // Debug only (?debug).
   renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
-  options.onFrame?.(anchors(), current);
+  options.onFrame?.(anchors(), current, plinthAnchor());
   kick();
 
   const raycaster = new THREE.Raycaster();

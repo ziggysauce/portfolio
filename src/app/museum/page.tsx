@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import { MuseumHall } from "@/components/museum/MuseumHall";
-import { exhibits, hall, onView } from "@/content/exhibits";
-import { pitch, site } from "@/content/site";
+import { desk, exhibits, fatherhood, hall, onView } from "@/content/exhibits";
+import { site } from "@/content/site";
 
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-instrument" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
@@ -20,7 +20,8 @@ export default function MuseumPage() {
         hall={hall}
         exhibits={onView}
         directory={exhibits.map(({ id, number, title, status }) => ({ id, number, title, status }))}
-        summary={pitch}
+        desk={desk}
+        fatherhood={fatherhood}
         links={{
           about: "/about",
           resume: site.resume,

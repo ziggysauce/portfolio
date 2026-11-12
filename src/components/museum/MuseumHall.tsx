@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exhibit } from "@/content/exhibits";
-import type { LabelAnchor, MuseumScene } from "./scene";
+import type { LabelAnchor, MuseumScene, PlinthAnchor } from "./scene";
 import styles from "./museum.module.css";
 
 type Status = "loading" | "ready" | "fallback";
@@ -14,7 +14,9 @@ type Props = {
   /** Every exhibit, planned ones included, for the gallery directory. */
   directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
   links: { about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
-  summary: string;
+  desk: { summary: string; farewell: string };
+  /** The small unnumbered display between the last case and the desk: a card, not a stop. */
+  fatherhood: { title: string; note: string };
 };
 
 /**
@@ -38,10 +40,11 @@ function supportsWebGL() {
   }
 }
 
-export function MuseumHall({ hall, exhibits, directory, links, summary }: Props) {
+export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLElement | null)[]>([]);
+  const plinthCard = useRef<HTMLDivElement>(null);
   const notes = useRef<(HTMLElement | null)[]>([]);
   const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
   const [openNote, setOpenNote] = useState<number | null>(null);
@@ -120,7 +123,15 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
     const frameLog: number[] = [];
     if (debug) (window as unknown as { __museumFrames: number[] }).__museumFrames = frameLog;
 
-    function placeLabels(anchors: LabelAnchor[], progress: number) {
+    function placeLabels(anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) {
+      // The fatherhood card stays with its plinth and shows whenever the plinth is in view: a quiet
+      // discovery on the way to the desk, never a stop, so nothing to tab to or click.
+      const card = plinthCard.current;
+      if (card) {
+        card.style.transform = `translate3d(${plinth.x.toFixed(1)}px, ${plinth.y.toFixed(1)}px, 0)`;
+        card.style.opacity = plinth.opacity.toFixed(3);
+        card.style.visibility = "visible";
+      }
       anchors.forEach((anchor, i) => {
         const label = labels.current[i];
         if (!label) return;
@@ -422,6 +433,7 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                         {line}
                       </p>
                     ))}
+                    {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
                     {exhibit.note && !fallback ? (
                       <button
@@ -460,6 +472,17 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                   ) : null}
                 </li>
               ))}
+              <li key="fatherhood">
+                {/* Between the last case and the desk: an empty plinth and its card. Read in order, not a stop. */}
+                <div ref={plinthCard} className={styles.plinthCard}>
+                  <h2 id="fatherhood-title" className={styles.plinthTitle}>
+                    {fatherhood.title}
+                  </h2>
+                  <p className={styles.plinthNote}>
+                    <em>{fatherhood.note}</em>
+                  </p>
+                </div>
+              </li>
               <li key="desk">
                 {/* The last stop: the Information desk, with the summary and every way to get in touch. */}
                 <article
@@ -481,7 +504,8 @@ export function MuseumHall({ hall, exhibits, directory, links, summary }: Props)
                   <h2 id="desk-title" className={styles.title}>
                     Information desk
                   </h2>
-                  <p className={styles.line}>{summary}</p>
+                  <p className={styles.line}>{desk.summary}</p>
+                  <p className={styles.farewell}>{desk.farewell}</p>
                   <ul className={styles.deskLinks}>
                     <li>
                       <a href={links.resume} target="_blank" rel="noreferrer">

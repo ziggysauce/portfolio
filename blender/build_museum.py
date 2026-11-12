@@ -39,6 +39,8 @@ DECK_Z = PLINTH_H + 0.045
 CAB_X0, CAB_X1, CAB_D = -0.30, 0.52, 0.25  # left side, right side, half depth
 # The drawer under the top, which holds the curator's note. The web scene slides the "Drawer" node.
 DRAWER_X0, DRAWER_X1, DRAWER_Z0, DRAWER_Z1, DRAWER_DEPTH = CAB_X0 + 0.055, CAB_X1 - 0.055, 0.555, 0.695, 0.3
+# 006's wider case (scene.ts WIDE): symmetric, no shelf, glass half as wide again.
+WIDE_X0, WIDE_X1, WIDE_HALF = -0.43, 0.43, 0.31
 
 
 # ---------------------------------------------------------------- helpers
@@ -455,8 +457,9 @@ def build_skull(material):
         """A point on the dental arch: a parabola, widest at the back molars."""
         return (0.034 * s, -0.087 + back + 0.05 * s * s, z)
 
-    add((0, 0.004, 0.124), (0.068, 0.098, 0.077), 48, 32)  # vault, forehead included
-    add((0, 0.06, 0.098), (0.05, 0.04, 0.046))  # occipital
+    # The vault runs a little oversized, rounder at the forehead: friendlier, still a skull.
+    add((0, 0.003, 0.125), (0.073, 0.101, 0.077), 48, 32)  # vault, forehead included
+    add((0, 0.061, 0.099), (0.052, 0.041, 0.047))  # occipital
     # Cranial base: the skull is widest low at the sides, so the arches and jaw joints have bone to
     # meet instead of hanging in the air beside a narrow vault.
     add((0, 0.012, 0.072), (0.058, 0.068, 0.036), 36, 22)
@@ -466,8 +469,9 @@ def build_skull(material):
     parts.append(tube(lifted([dental(s, 0.031, 0.005) for s in (-0.95, -0.5, 0.0, 0.5, 0.95)]), 0.0075, "Alveolus"))
     for s in (-1, 1):
         # Cheekbone: a plate facing forward and out, not a ball. It is what makes the face wide.
-        cheek = ellipsoid((s * 0.047, -0.06, 0.064 + lift), (0.017, 0.008, 0.015), 28, 18, "Cheek")
-        cheek.rotation_euler = (0, 0, math.radians(s * 32))
+        # Rounded rather than sharp: a fuller cheek reads softer without changing the anatomy.
+        cheek = ellipsoid((s * 0.047, -0.06, 0.063 + lift), (0.019, 0.011, 0.017), 28, 18, "Cheek")
+        cheek.rotation_euler = (0, 0, math.radians(s * 28))
         activate(cheek)
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
         parts.append(cheek)
@@ -501,10 +505,11 @@ def build_skull(material):
     parts.append(jaw)
     add((0, -0.08, -0.014), (0.016, 0.009, 0.011))  # chin
     add((0, -0.058, 0.017), (0.027, 0.03, 0.011))  # palate and floor of the mouth, behind the teeth
-    # Teeth, upper and lower, along the dental arch.
-    for z, back in ((0.024, 0.0), (0.010, 0.002)):
-        for s in np.linspace(-0.92, 0.92, 10):
-            add(dental(s, z, back), (0.0058, 0.0052, 0.0072), 16, 10)
+    # Teeth, upper and lower, along the dental arch: fewer, broader and shorter, so they soften
+    # into the cast instead of reading as a grin.
+    for z, back in ((0.0245, 0.0), (0.0105, 0.002)):
+        for s in np.linspace(-0.86, 0.86, 8):
+            add(dental(s, z, back), (0.0066, 0.0052, 0.0062), 16, 10)
 
     skull = join(parts, "Skull")
     activate(skull)
@@ -538,7 +543,7 @@ def build_skull(material):
     coarse.mode = "VOXEL"
     coarse.voxel_size = 0.0036
     relax = skull.modifiers.new("Relax", "LAPLACIANSMOOTH")
-    relax.iterations = 20
+    relax.iterations = 24
     relax.lambda_factor = 0.85
     relax.use_volume_preserve = True
     fine = skull.modifiers.new("Refine", "REMESH")
@@ -565,20 +570,24 @@ def build_skull(material):
     shade_smooth(skull)
     skull.data.materials.append(material)
 
-    # Seated on its riser, turned a little toward the visitor's left for a three-quarter view.
+    # Seated on its riser, turned a little toward the visitor's left for a three-quarter view, with
+    # a slight resting tilt, as if listening. Re-seated so the lowest point still meets the riser.
+    skull.rotation_euler = (0, math.radians(7), math.radians(-18))
     skull.location = (0, CASE_Y + 0.01, DECK_Z + 0.035)
-    skull.rotation_euler = (0, 0, math.radians(-18))
+    bpy.context.view_layer.update()
+    low = min((skull.matrix_world @ v.co).z for v in skull.data.vertices)
+    skull.location.z += DECK_Z + 0.035 - low
     return skull
 
 
 # ---------------------------------------------------------------- the case
 
 
-def build_drawer(mats, front):
+def build_drawer(mats, front, x0=DRAWER_X0, x1=DRAWER_X1):
     """The curator's drawer: an oak box behind a rounded front, a brass card holder and knob, and a
     folded note lying inside. The web scene slides the "Drawer" node out and stands the note up on
     its hinge ("DrawerNote", origin at its front edge)."""
-    x0, x1, z0, z1 = DRAWER_X0, DRAWER_X1, DRAWER_Z0, DRAWER_Z1
+    z0, z1 = DRAWER_Z0, DRAWER_Z1
     mid = (x0 + x1) / 2
     oak = [box("DrawerFront", x0, x1, front - 0.024, front - 0.002, z0, z1, bevel=0.01, segments=4)]
     bx0, bx1, bz0, bz1 = x0 + 0.012, x1 - 0.012, z0 + 0.008, z1 - 0.022
@@ -632,12 +641,13 @@ def build_drawer(mats, front):
     return parent([drawer_oak, drawer_brass, card, note], "Drawer")
 
 
-def build_case(mats):
+def build_case(mats, x0=CAB_X0, x1=CAB_X1, half_x=0.232):
     """A squat oak specimen cabinet with softly rounded edges: bun feet, a base moulding, two raised
-    panels and the curator's drawer, then the glass case on top. The cabinet runs wider than the
-    case on the right, leaving a shelf. Edges are softened as if handled for decades."""
+    panels and the curator's drawer, then the glass case on top. The standard cabinet runs wider than
+    the case on the right, leaving a shelf. Edges are softened as if handled for decades.
+    half_x is half the glass case's width; its depth is the same for every case."""
     cx, cy = 0.0, CASE_Y
-    x0, x1, d = CAB_X0, CAB_X1, CAB_D
+    d = CAB_D
     front = cy - d
     parts_oak = []
     for fx in (x0 + 0.07, x1 - 0.07):
@@ -657,14 +667,14 @@ def build_case(mats):
     shade_smooth(cabinet)
 
     # The dark opening behind the drawer front, seen once the drawer slides out.
-    opening = box("DrawerOpening", DRAWER_X0 + 0.004, DRAWER_X1 - 0.004, front - 0.003, front + 0.001, DRAWER_Z0 + 0.004, DRAWER_Z1 - 0.004)
+    opening = box("DrawerOpening", x0 + 0.059, x1 - 0.059, front - 0.003, front + 0.001, DRAWER_Z0 + 0.004, DRAWER_Z1 - 0.004)
     opening.data.materials.append(mats["shadow"])
-    drawer = build_drawer(mats, front)
+    drawer = build_drawer(mats, front, x0 + 0.055, x1 - 0.055)
 
-    trim = box("Trim", cx - 0.258, cx + 0.258, cy - 0.258, cy + 0.258, PLINTH_H, PLINTH_H + 0.028, bevel=0.008)
+    trim = box("Trim", cx - half_x - 0.026, cx + half_x + 0.026, cy - 0.258, cy + 0.258, PLINTH_H, PLINTH_H + 0.028, bevel=0.008)
     trim.data.materials.append(mats["bronze"])
 
-    deck = box("Deck", cx - 0.225, cx + 0.225, cy - 0.225, cy + 0.225, PLINTH_H + 0.028, DECK_Z, bevel=0.004)
+    deck = box("Deck", cx - half_x + 0.007, cx + half_x - 0.007, cy - 0.225, cy + 0.225, PLINTH_H + 0.028, DECK_Z, bevel=0.004)
     deck.data.materials.append(mats["linen"])
 
     riser = box("Riser", cx - 0.085, cx + 0.085, cy - 0.07, cy + 0.08, DECK_Z, DECK_Z + 0.035, bevel=0.008)
@@ -675,7 +685,7 @@ def build_case(mats):
     top = DECK_Z + 0.34
     half = 0.232
     bm = bmesh.new()
-    corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
+    corners = [(-half_x, -half), (half_x, -half), (half_x, half), (-half_x, half)]
     low = [bm.verts.new((cx + x, cy + y, DECK_Z)) for x, y in corners]
     high = [bm.verts.new((cx + x, cy + y, top)) for x, y in corners]
     for i in range(4):
@@ -1130,6 +1140,15 @@ def main():
 
     bay = build_bay(mats)
     case = build_case(mats)
+    case_objects = [case, *case.children_recursive]
+    # 006's case: wider glass on a wider cabinet, with no shelf. Its parts get a "Wide" suffix, so
+    # the glTF keeps both sets of names apart; the web scene strips it to match parts by name.
+    wide = build_case(mats, WIDE_X0, WIDE_X1, WIDE_HALF)
+    for obj in [wide, *wide.children_recursive]:
+        obj.name = obj.name.split(".")[0] + "Wide"
+    wide_objects = [wide, *wide.children_recursive]
+    for obj in wide_objects:
+        obj.hide_render = True
     skull = build_skull(mats["skull"])
     fern = build_fern(mats)
     fern.location = (WINDOW_X, WALL_Y + 0.05, WINDOW_SILL)  # On the window sill, for the still.
@@ -1142,6 +1161,17 @@ def main():
     bpy.context.view_layer.update()
     bake_ao_vertices(skull, distance=0.035, strength=0.75, floor=0.55)
     bake_ao_texture(bpy.data.objects["Cabinet"], "cabinet", 512, distance=0.1, strength=0.8)
+    # The wide cabinet bakes alone in the same niche, with the standard case and its things hidden.
+    first_case = case_objects + [skull, *bpy.data.objects["Props"].children_recursive]
+    for obj in first_case:
+        obj.hide_render = True
+    for obj in wide_objects:
+        obj.hide_render = obj.name == "GlassWide"
+    bake_ao_texture(bpy.data.objects["CabinetWide"], "cabinet-wide", 512, distance=0.1, strength=0.8)
+    for obj in wide_objects:
+        obj.hide_render = True
+    for obj in first_case:
+        obj.hide_render = obj.name == "Glass"
     bake_ao_texture(bpy.data.objects["Wainscot"], "wainscot", 512, distance=0.12, strength=0.75)
     bake_ao_texture(bpy.data.objects["Wall"], "wall", 1024, distance=0.3, strength=0.7)
     for obj in see_through:
@@ -1174,7 +1204,7 @@ def main():
     print(f"[museum] exported, about {tris} triangles; skull {sum(len(p.vertices) - 2 for p in skull.data.polygons)}")
 
     if RENDER:
-        for group in extras:  # The still shows the first case only.
+        for group in extras + [wide]:  # The still shows the first case only.
             for obj in [group, *group.children_recursive]:
                 obj.hide_render = True
         setup_render(skull, case, bay)
