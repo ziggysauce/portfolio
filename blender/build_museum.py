@@ -437,115 +437,44 @@ def note_image(width=256, height=320, seed=17):
 
 
 def build_skull(material):
-    """An original, stylized anthropology teaching cast. No scan or downloaded model is involved.
+    """An original, stylized skull: a charming sculpted museum collectible rather than an anatomy cast.
+    No scan or downloaded model is involved.
 
-    Overlapping ellipsoid volumes are merged by a coarse voxel remesh, which also rounds the joins
-    between them, then relaxed with volume-preserving smoothing so it reads as one plaster casting.
-    The orbits and nasal opening are carved afterwards so their edges stay defined.
+    The proportions are deliberate. A broad, rounded cranium takes most of the height. The face is
+    short, with soft rounded cheeks, two large round sockets with soft rims and a tiny nose. A small
+    rounded jaw carries a few simple teeth. Volumes are merged by a voxel remesh. The features are
+    carved, then softened so every rim is rounded; there are no anatomical creases or surface noise.
     """
-    lift = 0.026  # Puts the bottom of the mandible on z = 0.
     parts = []
 
-    def add(center, radii, segments=28, rings=18):
-        c = (center[0], center[1], center[2] + lift)
-        parts.append(ellipsoid(c, radii, segments, rings))
+    def add(center, radii, segments=40, rings=24):
+        parts.append(ellipsoid(center, radii, segments, rings))
 
-    def lifted(points):
-        return [(x, y, z + lift) for x, y, z in points]
-
-    def dental(s, z, back=0.0):
-        """A point on the dental arch: a parabola, widest at the back molars."""
-        return (0.034 * s, -0.087 + back + 0.05 * s * s, z)
-
-    # The vault runs a little oversized, rounder at the forehead: friendlier, still a skull.
-    add((0, 0.003, 0.125), (0.073, 0.101, 0.077), 48, 32)  # vault, forehead included
-    add((0, 0.061, 0.099), (0.052, 0.041, 0.047))  # occipital
-    # Cranial base: the skull is widest low at the sides, so the arches and jaw joints have bone to
-    # meet instead of hanging in the air beside a narrow vault.
-    add((0, 0.012, 0.072), (0.058, 0.068, 0.036), 36, 22)
-    add((0, -0.071, 0.097), (0.051, 0.016, 0.013))  # brow ridge, ending inside the orbit rims
-    add((0, -0.063, 0.05), (0.043, 0.032, 0.037))  # maxilla
-    # The ridge that holds the upper teeth, so they sit in bone rather than hanging below it.
-    parts.append(tube(lifted([dental(s, 0.031, 0.005) for s in (-0.95, -0.5, 0.0, 0.5, 0.95)]), 0.0075, "Alveolus"))
+    add((0, 0.008, 0.122), (0.086, 0.088, 0.079), 56, 36)  # the cranium: broad, round, most of the head
+    add((0, 0.036, 0.104), (0.072, 0.064, 0.062))  # the back of the head, so it sits full and round
+    add((0, -0.034, 0.078), (0.069, 0.056, 0.05))  # the face: short and wide
     for s in (-1, 1):
-        # Cheekbone: a plate facing forward and out, not a ball. It is what makes the face wide.
-        # Rounded rather than sharp: a fuller cheek reads softer without changing the anatomy.
-        cheek = ellipsoid((s * 0.047, -0.06, 0.063 + lift), (0.019, 0.011, 0.017), 28, 18, "Cheek")
-        cheek.rotation_euler = (0, 0, math.radians(s * 28))
-        activate(cheek)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-        parts.append(cheek)
-        # Outer orbit rim: the brow's end runs down into the cheekbone in one stroke.
-        parts.append(tube(lifted([(s * 0.047, -0.07, 0.097), (s * 0.054, -0.066, 0.083), (s * 0.051, -0.062, 0.068)]), 0.0055, "Rim"))
-        add((s * 0.044, -0.06, 0.083), (0.012, 0.011, 0.016))  # the orbit's side wall, behind the rim
-        # The bone behind the upper jaw and behind the last molars, so the gaps under the arch and
-        # at the back of the bite read as recesses, not holes through the head.
-        add((s * 0.03, -0.026, 0.038), (0.014, 0.022, 0.022))
-        add((s * 0.037, -0.03, 0.018), (0.009, 0.015, 0.012))
-        add((s * 0.047, -0.013, 0.044), (0.006, 0.009, 0.013))  # coronoid, rising under the arch
-        add((s * 0.05, 0.03, 0.06), (0.014, 0.016, 0.022))  # mastoid
-        # Zygomatic arch: a swept tube from the cheekbone back to the ear, close along the skull's side.
-        parts.append(tube(lifted([(s * 0.046, -0.056, 0.064), (s * 0.058, -0.034, 0.066), (s * 0.061, -0.008, 0.064), (s * 0.056, 0.014, 0.06)]), 0.006, "Arch"))
-        # Ramus: a flat blade rising from the jaw's angle to the joint under the arch, leaning back as
-        # it rises. A real ramus is a plate; the earlier tube read as a finger.
-        ramus = ellipsoid((s * 0.049, 0.002, 0.027 + lift), (0.0075, 0.018, 0.028), 28, 18, "Ramus")
-        ramus.rotation_euler = (math.radians(-10), 0, 0)
-        activate(ramus)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-        parts.append(ramus)
-        add((s * 0.05, 0.012, 0.054), (0.009, 0.0065, 0.006))  # condyle, seated under the arch's root
-    # Mandible body: one U from angle to angle through the chin, then stretched upright so its
-    # section is a tall oval like real bone, not a round rope.
-    body = [(-0.047, 0.004, 0.0), (-0.043, -0.03, -0.004), (-0.03, -0.062, -0.007), (0.0, -0.078, -0.008), (0.03, -0.062, -0.007), (0.043, -0.03, -0.004), (0.047, 0.004, 0.0)]
-    jaw = tube(lifted(body), 0.0085, "Jaw")
-    activate(jaw)
-    bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
-    jaw.scale = (1, 1, 1.8)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    parts.append(jaw)
-    add((0, -0.08, -0.014), (0.016, 0.009, 0.011))  # chin
-    add((0, -0.058, 0.017), (0.027, 0.03, 0.011))  # palate and floor of the mouth, behind the teeth
-    # Teeth, upper and lower: one smooth band per row along the dental arch, divided later by shallow
-    # grooves. Separate tooth balls merged into lumps; a band reads as a softened cast of teeth.
-    tooth_rows = ((0.0245, 0.0), (0.0105, 0.002))
-    for z, back in tooth_rows:
-        row = tube(lifted([dental(s, z, back) for s in np.linspace(-0.9, 0.9, 7)]), 0.0058, "TeethRow")
-        activate(row)
-        bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
-        row.scale = (1, 1, 1.15)
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        parts.append(row)
-    for s in (-1, 1):
-        # The temporal fossa, filled: in a cast the bone behind the cheek arch reads as a soft recess,
-        # not a hole through the side of the head.
-        add((s * 0.05, -0.016, 0.06), (0.0095, 0.036, 0.016))
-        add((s * 0.054, -0.036, 0.075), (0.0095, 0.026, 0.02))  # behind the orbit rim, where the brow meets the temple
+        add((s * 0.042, -0.046, 0.062), (0.026, 0.024, 0.022))  # rounded cheeks, sunk into the face
+    add((0, -0.04, 0.032), (0.05, 0.047, 0.03))  # a small rounded jaw
+    add((0, -0.076, 0.046), (0.031, 0.012, 0.0125))  # the row of front teeth, flush with the face
 
     skull = join(parts, "Skull")
     activate(skull)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")  # The cursor sits at the world origin.
-
-    # Merge the volumes into one closed surface first, so the cutters have something clean to carve.
     merge = skull.modifiers.new("Merge", "REMESH")
     merge.mode = "VOXEL"
-    merge.voxel_size = 0.0022
+    merge.voxel_size = 0.002
     apply_modifiers(skull)
 
     cutters = []
     for s in (-1, 1):
-        cutters.append(ellipsoid((s * 0.026, -0.09, 0.082 + lift), (0.0205, 0.034, 0.0185)))  # orbits, deep
-    cutters.append(ellipsoid((0, -0.096, 0.058 + lift), (0.011, 0.034, 0.0165)))  # nasal aperture
-    cutters.append(ellipsoid((0, -0.096, 0.047 + lift), (0.014, 0.028, 0.0075)))  # its wider base
-    cutters.append(ellipsoid((0, -0.092, 0.017 + lift), (0.032, 0.03, 0.0018)))  # the bite line, barely open
-    # Shallow grooves between the front teeth, which the smoothing below softens to gentle divisions.
-    for z, back in tooth_rows:
-        for s in np.linspace(-0.62, 0.62, 5):
-            x, y, zz = dental(s, z, back)
-            groove = ellipsoid((x, y - 0.006, zz + lift), (0.0011, 0.004, 0.0062), 10, 8)
-            groove.rotation_euler.z = math.atan2(0.1 * s, 0.034)  # Square to the arch.
-            cutters.append(groove)
+        cutters.append(ellipsoid((s * 0.034, -0.084, 0.104), (0.027, 0.028, 0.026)))  # big round sockets, deep enough to read
+    cutters.append(ellipsoid((0, -0.09, 0.07), (0.0075, 0.024, 0.0105)))  # a tiny nose
+    cutters.append(ellipsoid((0, -0.09, 0.0355), (0.035, 0.026, 0.0032)))  # the bite, under the teeth
+    for x in (-0.0145, 0.0, 0.0145):  # three soft grooves: four simple teeth
+        cutters.append(ellipsoid((x, -0.088, 0.048), (0.003, 0.014, 0.0105), 12, 10))
     # One cutter at a time: overlapping cutters joined into one object confuse the exact solver.
-    # A cut that collapses the mesh (the exact solver occasionally fails on a tiny cutter) is undone.
+    # A cut that collapses the mesh or fails (the exact solver occasionally does on a tiny cutter) is undone.
     for cutter in cutters:
         before = skull.data.copy()
         boolean = skull.modifiers.new("Carve", "BOOLEAN")
@@ -568,36 +497,34 @@ def build_skull(material):
         bpy.data.objects.remove(cutter, do_unlink=True)
     print(f"[skull] carved: {len(skull.data.polygons)} faces")
 
-    # A coarse remesh now rounds every join and every carved rim the way a plaster mould would,
-    # then volume-preserving smoothing settles it into one casting.
+    # Soft rims everywhere: a coarser remesh rounds each carved edge, volume-preserving smoothing settles
+    # the forms into one sculpted piece, and a finer remesh gives clean, even topology for the highlights.
     coarse = skull.modifiers.new("Round", "REMESH")
     coarse.mode = "VOXEL"
-    coarse.voxel_size = 0.0036
+    coarse.voxel_size = 0.0028
     relax = skull.modifiers.new("Relax", "LAPLACIANSMOOTH")
-    relax.iterations = 32
-    relax.lambda_factor = 0.9
+    relax.iterations = 14
+    relax.lambda_factor = 0.8
     relax.use_volume_preserve = True
     fine = skull.modifiers.new("Refine", "REMESH")
     fine.mode = "VOXEL"
-    fine.voxel_size = 0.0017
-    apply_modifiers(skull)
-
-    # No surface noise in the geometry: it read as orange peel and a grey band at gallery distance.
-    # Plaster's fine variation lives in the material instead. Decimate keeps the export light; a light
-    # smooth afterwards evens out the triangle fans it leaves, so highlights run unbroken.
+    fine.voxel_size = 0.0018
     decimate = skull.modifiers.new("Decimate", "DECIMATE")
-    decimate.ratio = 0.32
+    decimate.ratio = 0.3
     even = skull.modifiers.new("Even", "CORRECTIVE_SMOOTH")
     even.iterations = 4
     even.smooth_type = "LENGTH_WEIGHTED"
     apply_modifiers(skull)
     print(f"[skull] finished: {len(skull.data.polygons)} faces, dims {tuple(round(d, 3) for d in skull.dimensions)}")
     shade_smooth(skull)
+    # The boolean cuts leave an empty material slot first, and every face uses it: clear it, so the export
+    # carries the plaster (without this, the browser drew the skull with a default white material).
+    skull.data.materials.clear()
     skull.data.materials.append(material)
 
     # Seated on its riser, turned a little toward the visitor's left for a three-quarter view, with
     # a slight resting tilt, as if listening. Re-seated so the lowest point still meets the riser.
-    skull.rotation_euler = (0, math.radians(7), math.radians(-18))
+    skull.rotation_euler = (math.radians(-4), math.radians(9), math.radians(-16))  # a small tilt, a hint of a nod
     skull.location = (0, CASE_Y + 0.01, DECK_Z + 0.035)
     bpy.context.view_layer.update()
     low = min((skull.matrix_world @ v.co).z for v in skull.data.vertices)
@@ -1184,8 +1111,9 @@ def main():
     for obj in see_through:
         obj.hide_render = True
     bpy.context.view_layer.update()
-    # Light occlusion only: the cast should read pale, with the light describing its form, not grime in every hollow.
-    bake_ao_vertices(skull, distance=0.03, strength=0.45, floor=0.74)
+    # Gentle socket shading: the stylized skull's hollows are few, large and smooth, so occlusion shades the
+    # sockets, nose and mouth softly (the browser skull doesn't receive its own shadow) without grime.
+    bake_ao_vertices(skull, distance=0.045, strength=0.85, floor=0.46)
     bake_ao_texture(bpy.data.objects["Cabinet"], "cabinet", 512, distance=0.1, strength=0.8)
     # The wide cabinet bakes alone in the same niche, with the standard case and its things hidden.
     first_case = case_objects + [skull, *bpy.data.objects["Props"].children_recursive]

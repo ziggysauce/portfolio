@@ -103,7 +103,7 @@ def srgb(hex_color):
 # Plaster: pale and matte with a broad satin sheen, a whisper of translucency at thin edges, and fine
 # tooth in the bump only (no grime: the light describes the form).
 plaster, n, l, b = node_material("BenchPlaster")
-b.inputs["Base Color"].default_value = srgb("#ede6d8")
+b.inputs["Base Color"].default_value = srgb("#ecdfca")  # warm ivory
 b.inputs["Roughness"].default_value = 0.52
 b.inputs["Specular IOR Level"].default_value = 0.35
 b.inputs["Subsurface Weight"].default_value = 0.12

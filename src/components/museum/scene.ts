@@ -44,7 +44,7 @@ const TONES: Record<string, Tone> = {
   Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
   Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
   // Plaster with a broad satin sheen, so the key light describes the cast's curvature (benchmark, 2026-11-12).
-  SkullPlaster: { color: "#e3dacb", roughness: 0.58, env: 0.8 },
+  SkullPlaster: { color: "#e6dac5", roughness: 0.58, env: 0.8 }, // Warm ivory.
   Rug: { color: "#f4ece0", roughness: 1, env: 0.45 },
   Paper: { color: "#efe6d2", roughness: 0.9, env: 0.5 },
   NotePaper: { color: "#ffffff", roughness: 0.9, env: 0.5 },
@@ -668,7 +668,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         set.fill.color.set("#ffd3a0");
         // The benchmark bay (case 1) gets a stronger bounce: the linen deck's warm light lifting the
         // underside of the cranium, the sockets and the shadowed cheek, as it does in the reference.
-        set.fill.userData.full = bay === 0 ? 0.09 : isStop ? 0.03 : 0;
+        set.fill.userData.full = bay === 0 ? 0.06 : isStop ? 0.03 : 0;
         set.fill.distance = 0.5;
       }
     });
