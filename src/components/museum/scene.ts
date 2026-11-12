@@ -598,6 +598,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         drawer,
         anchor: new THREE.Vector3(centre, DRAWER.y0 + 0.016, DRAWER.front - 0.088),
         specimen,
+        compact: () => width / height < 0.8,
       });
     }
     // A caption pinned to the specimen (006's plaque, 003's bump bar), fixed in the world once placed.

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Discovery } from "@/content/exhibits";
 import styles from "./museum.module.css";
 
@@ -140,8 +141,44 @@ export function DrawerContents({ drawer, step, onAct, busy = false, id }: Props)
     }
 
     case "books":
-      return <p className={styles.drawerHeading}>{drawer.caption}</p>;
+      return <ReadingList drawer={drawer} step={step} onAct={onAct} busy={busy} />;
   }
+}
+
+const BOOKS = [3, 5, 7, 8, 9];
+const SPINES = ["#56646e", "#a4573f", "#cdbf9f", "#3f6466", "#c19a45", "#7b7a52"];
+
+/** 006's reading list. In the hall the books are 3D and the scene follows the step; without WebGL it's a
+ *  row of spines that grows, then spills, with the same words and the same one button. */
+function ReadingList({ drawer, step, onAct, busy }: { drawer: Extract<Discovery, { kind: "books" }>; step: number; onAct?: () => void; busy: boolean }) {
+  const [own, setOwn] = useState(0); // The static page's own step.
+  const [used, setUsed] = useState(false); // Announce only what the visitor caused.
+  const stage = onAct ? step : own;
+  const spilled = stage >= BOOKS.length - 1;
+  const act = () => {
+    if (busy) return;
+    setUsed(true);
+    if (onAct) onAct();
+    else setOwn((n) => (n >= BOOKS.length - 1 ? 0 : n + 1));
+  };
+  return (
+    <>
+      <p className={styles.drawerHeading}>{spilled ? drawer.spilled : drawer.caption}</p>
+      {onAct ? null : (
+        <p className={`${styles.spines} ${spilled ? styles.spilled : ""}`} aria-hidden="true">
+          {Array.from({ length: BOOKS[stage] }, (_, n) => (
+            <span key={n} style={{ background: SPINES[n % SPINES.length] }} />
+          ))}
+        </p>
+      )}
+      <button type="button" className={styles.drawerAction} aria-disabled={busy} onClick={act}>
+        {spilled ? drawer.makeRoom : drawer.more}
+      </button>
+      <p className="sr-only" aria-live="polite">
+        {busy || !used ? "" : drawer.stages[stage]}
+      </p>
+    </>
+  );
 }
 
 /** How many steps a discovery has (0 for one that only reveals itself). */
@@ -149,5 +186,6 @@ export function stepsFor(drawer: Discovery) {
   if (drawer.kind === "bell") return drawer.tickets.length;
   if (drawer.kind === "stamp") return drawer.cards.length - 1;
   if (drawer.kind === "card") return 1;
+  if (drawer.kind === "books") return BOOKS.length - 1;
   return 0;
 }

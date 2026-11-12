@@ -1133,31 +1133,77 @@ def on_tray(n, props, half_w, half_d, mats):
     return parent([lift, column], f"Discovery{n}")
 
 
-def build_tooth(mats):
-    """001: a tiny, smoothly sculpted molar on an ivory cushion, with a small paper tag."""
-    props = [rbox("Cushion", -0.05, 0.05, -0.038, 0.038, 0, 0.016, 0.0075, 4, mat=mats["velvet"])]
-    parts = [ellipsoid((0, 0, 0.038), (0.0205, 0.017, 0.0155), 40, 24, "Crown")]
+def molar():
+    """A cute, stylized molar sculpted as one piece: a broad, softly squared crown with four rounded
+    cusps worked into its top, a shallow groove across the chewing surface, and two distinct roots that
+    taper and splay a little. Volumes are merged by a voxel remesh, carved, then smoothed."""
+    parts = []
+    # The crown: a superellipsoid (squarish in plan, rounded at every edge).
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=1, location=(0, 0, 0))
+    crown = bpy.context.active_object
+    for v in crown.data.vertices:
+        x, y, z = v.co
+        v.co = (math.copysign(abs(x) ** 0.6, x) * 0.0225, math.copysign(abs(y) ** 0.6, y) * 0.019, math.copysign(abs(z) ** 0.75, z) * 0.0135 + 0.036)
+    parts.append(crown)
+    # Four cusps, mostly sunk into the crown so only soft domes rise from its top.
     for sx in (-1, 1):
-        parts.append(ellipsoid((sx * 0.0095, 0, 0.024), (0.0085, 0.0095, 0.0125), 24, 16, "Root"))
-        parts.append(ellipsoid((sx * 0.009, 0, 0.0515), (0.0085, 0.0085, 0.0045), 20, 12, "Cusp"))
+        for sy in (-1, 1):
+            parts.append(ellipsoid((sx * 0.0088, sy * 0.0072, 0.0458), (0.0105, 0.0092, 0.0046), 24, 16, "Cusp"))
+    # Two roots: long, tapering, splayed apart so the gap between them reads.
+    for sx in (-1, 1):
+        root = ellipsoid((0, 0, 0), (0.0082, 0.009, 0.019), 24, 16, "Root")
+        for v in root.data.vertices:
+            x, y, z = v.co
+            taper = 0.68 + 0.32 * (z / 0.019 + 1) / 2  # Narrower toward a rounded tip.
+            v.co = (x * taper, y * taper, z)
+        root.location = (sx * 0.0112, 0, 0.0195)
+        root.rotation_euler.y = math.radians(-13 * sx)
+        activate(root)
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
+        parts.append(root)
     tooth = join(parts, "Tooth")
     merge = tooth.modifiers.new("Merge", "REMESH")
     merge.mode = "VOXEL"
-    merge.voxel_size = 0.0011
+    merge.voxel_size = 0.0008
+    apply_modifiers(tooth)
+    # The chewing-surface groove: a shallow cross between the cusps.
+    for radii in ((0.02, 0.0019, 0.003), (0.0019, 0.017, 0.003)):
+        cutter = ellipsoid((0, 0, 0.0515), radii, 24, 12, "Groove")
+        carve = tooth.modifiers.new("Groove", "BOOLEAN")
+        carve.operation = "DIFFERENCE"
+        carve.object = cutter
+        carve.solver = "EXACT"
+        try:
+            apply_modifiers(tooth)
+        except RuntimeError:
+            tooth.modifiers.remove(carve)
+        bpy.data.objects.remove(cutter, do_unlink=True)
+    soften_mesh = tooth.modifiers.new("Soft", "REMESH")
+    soften_mesh.mode = "VOXEL"
+    soften_mesh.voxel_size = 0.0009
     smooth = tooth.modifiers.new("Smooth", "LAPLACIANSMOOTH")
-    smooth.iterations = 8
-    smooth.lambda_factor = 0.7
+    smooth.iterations = 5
+    smooth.lambda_factor = 0.6
     smooth.use_volume_preserve = True
     decimate = tooth.modifiers.new("Decimate", "DECIMATE")
-    decimate.ratio = 0.35
+    decimate.ratio = 0.3
     apply_modifiers(tooth)
     tooth.data.materials.clear()
-    tooth.data.materials.append(mats["enamel"])
     shade_smooth(tooth)
-    tooth.rotation_euler.z = math.radians(-14)
+    return tooth
+
+
+def build_tooth(mats):
+    """001: a small, smoothly sculpted molar standing on its roots on an ivory cushion, tipped a little
+    toward the visitor so its cusps and groove show from the gallery, with a small paper tag."""
+    props = [rbox("Cushion", -0.05, 0.05, -0.038, 0.038, 0, 0.016, 0.0075, 4, mat=mats["velvet"])]
+    tooth = molar()
+    tooth.data.materials.append(mats["enamel"])
+    tooth.location = (-0.004, 0.004, 0.0135)  # Root tips just into the velvet.
+    tooth.rotation_euler = (math.radians(16), 0, math.radians(-10))
     props.append(tooth)
     tag = rbox("ToothTag", -0.013, 0.013, -0.0075, 0.0075, 0, 0.0012, 0.0012, 2, mat=mats["sample_label"])
-    tag.location = (0.034, -0.026, 0.0162)
+    tag.location = (0.035, -0.027, 0.0162)
     tag.rotation_euler.z = math.radians(18)
     props.append(tag)
     return on_tray(1, props, 0.06, 0.046, mats)
@@ -1237,19 +1283,19 @@ def build_stamp_station(mats):
 
 
 def build_book_stack(mats):
-    """006: five chunky rounded books, stacked on the tray. The scene lifts three into view, pauses,
-    then the other two (more than the drawer could hold)."""
+    """006: nine chunky rounded books ("ListBook1" to "ListBook9"), each with its origin at its centre so
+    the scene can stack, add, wobble and spill them; it poses every one. A wider tray to hold the pile."""
     books = []
-    colors = (mats["book_slate"], mats["book_a"], mats["book_oat"], mats["book_b"], mats["book_c"])
-    t = 0.019
-    for n, mat in enumerate(colors):
-        w, l = 0.062 - (n % 2) * 0.004, 0.045 - (n % 3) * 0.002
-        cover = rbox("StackCover", -w, w, -l, l, n * t, (n + 1) * t - 0.0006, 0.0055, 4, mat=mat)
-        pages = rbox("StackPages", -w + 0.005, w + 0.0008, -l + 0.004, l - 0.004, n * t + 0.0035, (n + 1) * t - 0.004, 0.0012, 2, mat=mats["paper"])
-        book = pivot(parent([cover, pages], "StackBook"), (0, 0, n * t))
-        book.rotation_euler.z = math.radians((-7, 5, -3, 8, -5)[n])
+    colors = (mats["book_slate"], mats["book_a"], mats["book_oat"], mats["book_b"], mats["book_c"], mats["book_olive"])
+    t = 0.016
+    for n in range(9):
+        w, l = 0.06 - (n % 3) * 0.004, 0.044 - (n % 2) * 0.003
+        cover = rbox("ListCover", -w, w, -l, l, -t / 2, t / 2 - 0.0006, 0.005, 4, mat=colors[n % len(colors)])
+        pages = rbox("ListPages", -w + 0.005, w + 0.0008, -l + 0.004, l - 0.004, -t / 2 + 0.003, t / 2 - 0.0036, 0.0012, 2, mat=mats["paper"])
+        book = parent([cover, pages], f"ListBook{n + 1}")
+        book.location.z = t / 2 + n * t
         books.append(book)
-    return on_tray(6, books, 0.07, 0.052, mats)
+    return on_tray(6, books, 0.16, 0.058, mats)
 
 
 def build_discoveries(mats):

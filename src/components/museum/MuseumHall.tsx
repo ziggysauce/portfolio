@@ -435,10 +435,20 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       const drawer = exhibits[i]?.drawer;
       if (!drawer || openNote !== i || busy !== null) return;
       const current = steps[i];
-      const next = drawer.kind === "card" ? (current ? 0 : 1) : Math.min(stepsFor(drawer), current + 1);
+      const last = stepsFor(drawer);
+      // The card toggles; the reading list cycles back to the start after its spill; the rest only advance.
+      const next = drawer.kind === "card" ? (current ? 0 : 1) : drawer.kind === "books" && current >= last ? 0 : Math.min(last, current + 1);
       if (next === current) return;
       setSteps((prev) => prev.map((step, n) => (n === i ? next : step)));
-      const ms = reduced.current ? 120 : drawer.kind === "bell" ? STEP_MS.bell : drawer.kind === "stamp" ? STEP_MS.stamp : STEP_MS.card;
+      const ms = reduced.current
+        ? 120
+        : drawer.kind === "bell"
+          ? STEP_MS.bell
+          : drawer.kind === "stamp"
+            ? STEP_MS.stamp
+            : drawer.kind === "books"
+              ? STEP_MS.books[next]
+              : STEP_MS.card;
       setBusy(i);
       window.clearTimeout(busyTimer.current);
       busyTimer.current = window.setTimeout(() => setBusy(null), ms);

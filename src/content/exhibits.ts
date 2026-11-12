@@ -38,7 +38,16 @@ export type Discovery =
   | { kind: "bell"; reveal: string; tickets: string[][] }
   | { kind: "card"; cover: string; inside: string[] }
   | { kind: "stamp"; cards: string[] }
-  | { kind: "books"; caption: string };
+  | {
+      kind: "books";
+      caption: string;
+      /** After the spill. */
+      spilled: string;
+      more: string;
+      makeRoom: string;
+      /** What each stage announces once it settles (index 0: back to the start). */
+      stages: string[];
+    };
 
 export const hall = {
   name: "The Daniel Nguyen Hall of Natural History",
@@ -136,7 +145,20 @@ export const exhibits: Exhibit[] = [
     status: "on-view",
     specimen: "AfterHours",
     caption: "Running shoes",
-    drawer: { kind: "books", caption: "The reading list is under control." },
+    drawer: {
+      kind: "books",
+      caption: "The reading list is under control.",
+      spilled: "A minor shelving issue.",
+      more: "What else is on the list?",
+      makeRoom: "Make room for more.",
+      stages: [
+        "Three books. The reading list is under control.",
+        "Two more books.",
+        "Two more books. The stack leans.",
+        "One more book. The stack wobbles, then steadies.",
+        "One more book. The stack spills. A minor shelving issue.",
+      ],
+    },
   },
 ];
 

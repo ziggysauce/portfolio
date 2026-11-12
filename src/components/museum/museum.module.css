@@ -472,6 +472,34 @@
 .cardInside[hidden] {
   display: none;
 }
+/* Without WebGL: the reading list as a row of spines, which spills. */
+.spines {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 46px;
+}
+.spines span {
+  width: 9px;
+  height: 40px;
+  border-radius: 2px;
+  transition: rotate 300ms ease, translate 300ms ease;
+}
+.spines span:nth-child(3n + 2) {
+  height: 34px;
+}
+.spilled span:nth-child(n + 4) {
+  rotate: 72deg;
+  translate: 0 14px;
+}
+.spilled span:nth-child(2n + 5) {
+  rotate: -18deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spines span {
+    transition: none;
+  }
+}
 /* Without WebGL: the drawer's contents as a disclosure in the label. */
 .drawerStatic {
   margin-top: 8px;
