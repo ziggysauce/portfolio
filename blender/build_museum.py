@@ -6,7 +6,7 @@ Builds the museum's 3D assets from scratch: no downloaded models or textures.
 
 Writes:
     blender/museum.blend           editable source (open it in Blender to tweak)
-    blender/textures/*.png         generated textures: oak, plaster, evening sky, rug, the curator's note
+    blender/textures/*.png         generated textures: oak, plaster, evening sky, rug
     public/museum/museum.glb       web asset: "Bay", "Case" (with its "Drawer"), "Skull", "Fern", "Props", and from
                                    museum_exhibits.py the other specimens, "Desk" and the room's dressing
     public/museum/hall.jpg         still render, used as the no-WebGL fallback (with --render)
@@ -37,7 +37,7 @@ PLINTH_H = 0.78  # A squat cabinet: about as tall as it is wide.
 DECK_Z = PLINTH_H + 0.045
 # The cabinet runs wider on the right than the glass case, leaving a shelf for the curator's things.
 CAB_X0, CAB_X1, CAB_D = -0.30, 0.52, 0.25  # left side, right side, half depth
-# The drawer under the top, which holds the curator's note. The web scene slides the "Drawer" node.
+# The drawer under the top, which holds that case's discovery. The web scene slides the "Drawer" node.
 DRAWER_X0, DRAWER_X1, DRAWER_Z0, DRAWER_Z1, DRAWER_DEPTH = CAB_X0 + 0.055, CAB_X1 - 0.055, 0.555, 0.695, 0.3
 # 006's wider case (scene.ts WIDE): symmetric, no shelf, glass half as wide again.
 WIDE_X0, WIDE_X1, WIDE_HALF = -0.43, 0.43, 0.31
@@ -414,28 +414,6 @@ def rug_image(width=1024, height=512, seed=13):
     return save_image("rug", rgb)
 
 
-def note_image(width=256, height=320, seed=17):
-    """The curator's note card: cream paper with a few lines of quick, illegible handwriting."""
-    rng = np.random.default_rng(seed)
-    v, u = np.mgrid[0:height, 0:width].astype(np.float64)
-    rgb = np.ones((height, width, 3)) * np.array([0.93, 0.89, 0.80])
-    ink = np.zeros((height, width))
-    for row in range(5):
-        y = height * (0.78 - row * 0.13)
-        x0, x1 = width * 0.12, width * rng.uniform(0.62, 0.9)
-        # A wavering stroke with loops: handwriting at a glance, nothing readable up close.
-        path = y + 5 * np.sin(u * 0.32 + row) + 3 * np.sin(u * 0.11 + row * 2)
-        stroke = np.exp(-((v - path) ** 2) / 2.2) * ((u > x0) & (u < x1))
-        ink = np.maximum(ink, stroke * (0.55 + 0.45 * (np.sin(u * 0.9 + row) > -0.6)))
-    sig = np.exp(-((v - height * 0.12 - 6 * np.sin(u * 0.2)) ** 2) / 2.5) * ((u > width * 0.5) & (u < width * 0.86))
-    ink = np.maximum(ink, sig)
-    rgb = rgb * (1 - ink[..., None] * 0.7) + ink[..., None] * np.array([0.12, 0.16, 0.26]) * 0.7
-    return save_image("curator-note", rgb)
-
-
-# ---------------------------------------------------------------- the skull
-
-
 def build_skull(material):
     """An original, stylized skull: a charming sculpted museum collectible rather than an anatomy cast.
     No scan or downloaded model is involved.
@@ -537,9 +515,8 @@ def build_skull(material):
 
 
 def build_drawer(mats, front, x0=DRAWER_X0, x1=DRAWER_X1):
-    """The curator's drawer: an oak box behind a rounded front, a brass card holder and knob, and a
-    folded note lying inside. The web scene slides the "Drawer" node out and stands the note up on
-    its hinge ("DrawerNote", origin at its front edge)."""
+    """The cabinet's drawer: an oak box behind a rounded front, with a brass card holder and knob. The web
+    scene slides the "Drawer" node out and parents that case's discovery into it (museum_exhibits.py)."""
     z0, z1 = DRAWER_Z0, DRAWER_Z1
     mid = (x0 + x1) / 2
     oak = [box("DrawerFront", x0, x1, front - 0.024, front - 0.002, z0, z1, bevel=0.01, segments=4)]
@@ -564,34 +541,7 @@ def build_drawer(mats, front, x0=DRAWER_X0, x1=DRAWER_X1):
     card = box("DrawerCard", mid - 0.035, mid + 0.035, front - 0.0325, front - 0.029, 0.643, 0.673)
     card.data.materials.append(mats["paper"])
 
-    # The note: a card lying flat, hinged at its front edge so the web scene can stand it up.
-    hinge_y, floor_z = front + 0.03, bz0 + 0.0085
-    w, l = 0.13, 0.16
-    bm = bmesh.new()
-    corners = [(mid - w / 2, 0), (mid + w / 2, 0), (mid + w / 2, l), (mid - w / 2, l)]
-    verts = [bm.verts.new((x, hinge_y + y, floor_z)) for x, y in corners]
-    face = bm.faces.new(verts)
-    uv = bm.loops.layers.uv.new("UVMap")
-    for loop in face.loops:
-        x, y, _ = loop.vert.co
-        loop[uv].uv = ((x - (mid - w / 2)) / w, (y - hinge_y) / l)  # The far edge becomes the top once it stands.
-    if face.normal.z < 0:
-        face.normal_flip()
-    mesh = bpy.data.meshes.new("DrawerNote")
-    bm.to_mesh(mesh)
-    bm.free()
-    note = bpy.data.objects.new("DrawerNote", mesh)
-    bpy.context.scene.collection.objects.link(note)
-    solid = note.modifiers.new("Card", "SOLIDIFY")
-    solid.thickness = 0.0012
-    apply_modifiers(note)
-    note.data.materials.append(mats["note"])
-    activate(note)
-    bpy.context.scene.cursor.location = (mid, hinge_y, floor_z)
-    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")  # The hinge.
-    bpy.context.scene.cursor.location = (0, 0, 0)
-
-    return parent([drawer_oak, drawer_brass, card, note], "Drawer")
+    return parent([drawer_oak, drawer_brass, card], "Drawer")
 
 
 def build_case(mats, x0=CAB_X0, x1=CAB_X1, half_x=0.232):
@@ -1062,7 +1012,6 @@ def main():
     plaster = plaster_image()
     sky = sky_image()
     rug = rug_image()
-    note = note_image()
     mats = {
         # Base colors here are for the Blender still. The web scene sets its own tones by material name.
         "paint": principled("PaintTeal", srgb("#8fa59c"), 0.93, image=plaster),
@@ -1082,7 +1031,6 @@ def main():
         "shadow": principled("Shadow", srgb("#1d1712"), 1.0),
         "rug": principled("Rug", srgb("#ffffff"), 1.0, image=rug),
         "paper": principled("Paper", srgb("#efe6d2"), 0.9),
-        "note": principled("NotePaper", srgb("#ffffff"), 0.9, image=note),
         "kraft": principled("NotebookKraft", srgb("#a5835a"), 0.85),
         "sage": principled("NotebookSage", srgb("#6f8578"), 0.85),
         "pencil": principled("Pencil", srgb("#c9a04a"), 0.5),

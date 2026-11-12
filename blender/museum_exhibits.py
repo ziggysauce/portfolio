@@ -427,6 +427,16 @@ def add_materials(mats):
         "ceramic": principled("Ceramic", srgb("#ddd3c2"), 0.35),
         "lamp_lining": principled("LampLining", srgb("#f3e2c0"), 0.9),
         "ivory": principled("IvoryLining", srgb("#efe6d4"), 0.95),
+        # The drawer discoveries. "Canvas*" faces are drawn by the web scene (text, the chart, the stamp).
+        "enamel": principled("ToothEnamel", srgb("#f5efe3"), 0.35),
+        "velvet": principled("Velvet", srgb("#eadfca"), 1.0),
+        "kraft": principled("FolderKraft", srgb("#b08d62"), 0.85),
+        "rubber": principled("StampRubber", srgb("#8d3f33"), 0.8),
+        "canvas_chart": principled("CanvasChart", srgb("#ffffff"), 0.9),
+        "canvas_cover": principled("CanvasCardCover", srgb("#ffffff"), 0.9),
+        "canvas_inside": principled("CanvasCardInside", srgb("#ffffff"), 0.9),
+        "canvas_task": principled("CanvasTask", srgb("#ffffff"), 0.9),
+        "canvas_ticket": principled("CanvasTicket", srgb("#ffffff"), 0.9),
         "oak_prop": principled("OakProp", srgb("#c99f72"), 0.42, image=next(n.image for n in mats["grain"].node_tree.nodes if n.type == "TEX_IMAGE")),
         "leaf_dark": principled("LeafDark", srgb("#4f6b4a"), 0.55),
         "book_a": principled("BookTerracotta", srgb("#a4573f"), 0.8),
@@ -844,6 +854,16 @@ def build_kds(mats):
     plane_uv(glass, 0, 2)
     glass.data.materials.append(mats["screen"])
     screen.append(glass)
+    # Two blank ticket slots on the screen, for 003's drawer: the web scene draws a ticket into each when
+    # the bell rings, and hides them otherwise. Placed over the image's two empty columns.
+    def screen_xz(px, py):
+        return -w / 2 + 0.014 + px * (w - 0.028) / 512, h / 2 - 0.018 - py * (h - 0.032) / 320
+    for n, (px0, px1, py0, py1) in enumerate(((140, 248, 187, 298), (264, 372, 199, 298)), start=1):
+        (x0, z1), (x1, z0) = screen_xz(px0, py0), screen_xz(px1, py1)
+        ticket = box(f"KdsTicket{n}", x0, x1, -d / 2 - 0.0022, -d / 2 - 0.0016, z0, z1)
+        plane_uv(ticket, 0, 2)
+        ticket.data.materials.append(mats["canvas_ticket"])
+        screen.append(ticket)
     power = ellipsoid((0, -d / 2 - 0.0005, -h / 2 + 0.0085), (0.003, 0.0012, 0.003), 16, 8, "Power")
     shade_smooth(power)
     screen.append(with_mat(power, mats["key_accent"]))
@@ -1075,6 +1095,167 @@ def build_books(mats):
     return parent(books, "Books")
 
 
+# ---------------------------------------------------------------- the drawer discoveries
+#
+# One small set of props per cabinet drawer, each built around its own origin: the drawer's floor, 9 cm in
+# from its front, front toward -Y. The web scene parents each into its case's drawer and animates the named
+# nodes (lifts, hinges, the bell's plunger, the stamp, the task cards). Closed, everything stays below the
+# drawer's rim (10 cm); the lifts are hidden inside the drawer.
+
+
+def face(name, x0, x1, y0, y1, z, mat):
+    """A thin textured face lying in the XY plane, UVs across its bounds (read from -Y)."""
+    obj = box(name, x0, x1, y0, y1, z, z + 0.0004)
+    plane_uv(obj, 0, 1)
+    obj.data.materials.append(mat)
+    return obj
+
+
+TRAY_TOP = 0.02  # Where a discovery's tray top rests, above the drawer floor, with the drawer shut.
+
+
+def on_tray(n, props, half_w, half_d, mats):
+    """A discovery on its oak tray, over a short brass column. The scene lifts "DiscoveryLift" (the tray
+    and its props) clear of the drawer front, and stretches "DiscoveryColumn" up from the drawer floor
+    beneath it, so it rises out of the drawer like a little museum lift."""
+    tray = oak(rbox("DiscoveryTray", -half_w, half_w, -half_d, half_d, TRAY_TOP - 0.012, TRAY_TOP, 0.004), 380 + n, mats)
+    for prop in props:
+        prop.location.z += TRAY_TOP
+    lift = parent([tray] + props, "DiscoveryLift")
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.011, depth=TRAY_TOP - 0.012, location=(0, 0, (TRAY_TOP - 0.012) / 2))
+    column = bpy.context.active_object
+    column.name = "DiscoveryColumn"
+    activate(column)
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")  # Its foot, so the scene can stretch it upward.
+    shade_smooth(column)
+    column.data.materials.append(mats["bronze"])
+    return parent([lift, column], f"Discovery{n}")
+
+
+def build_tooth(mats):
+    """001: a tiny, smoothly sculpted molar on an ivory cushion, with a small paper tag."""
+    props = [rbox("Cushion", -0.05, 0.05, -0.038, 0.038, 0, 0.016, 0.0075, 4, mat=mats["velvet"])]
+    parts = [ellipsoid((0, 0, 0.038), (0.0205, 0.017, 0.0155), 40, 24, "Crown")]
+    for sx in (-1, 1):
+        parts.append(ellipsoid((sx * 0.0095, 0, 0.024), (0.0085, 0.0095, 0.0125), 24, 16, "Root"))
+        parts.append(ellipsoid((sx * 0.009, 0, 0.0515), (0.0085, 0.0085, 0.0045), 20, 12, "Cusp"))
+    tooth = join(parts, "Tooth")
+    merge = tooth.modifiers.new("Merge", "REMESH")
+    merge.mode = "VOXEL"
+    merge.voxel_size = 0.0011
+    smooth = tooth.modifiers.new("Smooth", "LAPLACIANSMOOTH")
+    smooth.iterations = 8
+    smooth.lambda_factor = 0.7
+    smooth.use_volume_preserve = True
+    decimate = tooth.modifiers.new("Decimate", "DECIMATE")
+    decimate.ratio = 0.35
+    apply_modifiers(tooth)
+    tooth.data.materials.clear()
+    tooth.data.materials.append(mats["enamel"])
+    shade_smooth(tooth)
+    tooth.rotation_euler.z = math.radians(-14)
+    props.append(tooth)
+    tag = rbox("ToothTag", -0.013, 0.013, -0.0075, 0.0075, 0, 0.0012, 0.0012, 2, mat=mats["sample_label"])
+    tag.location = (0.034, -0.026, 0.0162)
+    tag.rotation_euler.z = math.radians(18)
+    props.append(tag)
+    return on_tray(1, props, 0.06, 0.046, mats)
+
+
+def build_folder(mats):
+    """002: an archived-results folder lying flat on its tray; the scene stands it up and opens its cover
+    on the chart (drawn on "ChartPage")."""
+    fw, fl = 0.09, 0.066  # half width, half length
+    stand = [rbox("FolderBack", -fw, fw, -fl, fl, 0, 0.002, 0.0015, 2, mat=mats["kraft"])]
+    stand.append(face("ChartPage", -fw + 0.005, fw - 0.005, -fl + 0.005, fl - 0.005, 0.0021, mats["canvas_chart"]))
+    cover = [rbox("FolderCover", -fw, fw, -fl, fl, 0.0028, 0.0046, 0.0015, 2, mat=mats["kraft"])]
+    cover.append(rbox("FolderLabel", -0.04, 0.04, 0.026, 0.046, 0.0046, 0.0052, 0.001, 2, mat=mats["sample_label"]))
+    cover.append(rbox("FolderTab", 0.028, 0.072, fl, fl + 0.011, 0.0028, 0.0046, 0.002, 2, mat=mats["kraft"]))
+    hinge = pivot(parent(cover, "FolderHinge"), (-fw, 0, 0.0037))
+    stand.append(hinge)
+    folder = pivot(parent(stand, "FolderStand"), (0, -fl, 0))
+    return on_tray(2, [folder], 0.1, 0.04, mats)
+
+
+def build_drawer_bell(mats):
+    """003: a small brass service bell; its plunger ("BellPlunger") presses."""
+    props = [rcyl("DrawerBellBase", 0.031, 0.009, (0, 0, 0.0045), edge=0.003, vertices=48, mat=mats["bronze"])]
+    dome = ellipsoid((0, 0, 0.009), (0.026, 0.026, 0.023), 48, 24, "DrawerBellDome")
+    shade_smooth(dome)
+    props.append(with_mat(dome, mats["bronze"]))
+    plunger = [cyl("PlungerStem", 0.0022, 0.009, (0, 0, 0.0355), vertices=16, mat=mats["bronze"])]
+    button = ellipsoid((0, 0, 0.0412), (0.0055, 0.0055, 0.0038), 24, 12, "PlungerButton")
+    shade_smooth(button)
+    plunger.append(with_mat(button, mats["bronze"]))
+    props.append(parent(plunger, "BellPlunger"))
+    return on_tray(3, props, 0.045, 0.042, mats)
+
+
+def build_card(mats):
+    """004: a folded card lying flat; the scene stands it up, and opens its cover ("CardHinge") on request.
+    Its cover and inside faces are drawn by the scene."""
+    cw, cl = 0.06, 0.042
+    stand = [rbox("CardBack", -cw, cw, -cl, cl, 0, 0.0016, 0.001, 2, mat=mats["paper"])]
+    stand.append(face("CardInside", -cw + 0.004, cw - 0.004, -cl + 0.004, cl - 0.004, 0.0017, mats["canvas_inside"]))
+    cover = [rbox("CardCoverBoard", -cw, cw, -cl, cl, 0.0024, 0.004, 0.001, 2, mat=mats["paper"])]
+    cover.append(face("CardCoverFace", -cw + 0.003, cw - 0.003, -cl + 0.003, cl - 0.003, 0.0041, mats["canvas_cover"]))
+    hinge = pivot(parent(cover, "CardHinge"), (-cw, 0, 0.002))
+    stand.append(hinge)
+    card = pivot(parent(stand, "CardStand"), (0, -cl, 0))
+    card.location.x = 0.03  # Opens to the left, so it sits a little right of centre.
+    return on_tray(4, [card], 0.09, 0.03, mats)
+
+
+def build_stamp_station(mats):
+    """005: a small slanted oak board with a tray for finished cards (left), four task cards (centre)
+    and a rubber stamp (right). The scene moves the stamp and slides each stamped card to the tray."""
+    board = [oak(rbox("StampBoardTop", -0.135, 0.135, -0.05, 0.05, 0, 0.008, 0.004), 372, mats)]
+    lips = [
+        rbox("TrayLip", -0.128, -0.04, -0.046, -0.04, 0.008, 0.014, 0.002, 2),
+        rbox("TrayLip", -0.128, -0.04, 0.04, 0.046, 0.008, 0.014, 0.002, 2),
+        rbox("TrayLip", -0.128, -0.122, -0.046, 0.046, 0.008, 0.014, 0.002, 2),
+    ]
+    board.append(with_mat(join(lips, "TrayLips"), mats["bronze"]))
+    for n in range(4):
+        z = 0.008 + (3 - n) * 0.0016  # Card 1 on top.
+        card = [rbox(f"TaskCardBody{n + 1}", -0.032, 0.032, -0.022, 0.022, z, z + 0.0014, 0.0008, 2, mat=mats["paper"])]
+        card.append(face(f"TaskFace{n + 1}", -0.03, 0.03, -0.02, 0.02, z + 0.00145, mats["canvas_task"]))
+        board.append(parent(card, f"TaskCard{n + 1}"))
+    stamp = [rbox("StampPad", -0.017, 0.017, -0.013, 0.013, 0.008, 0.012, 0.0015, 2, mat=mats["rubber"])]
+    stamp.append(oak(rbox("StampBlock", -0.018, 0.018, -0.014, 0.014, 0.012, 0.024, 0.0035), 373, mats))
+    stamp.append(rcyl("StampNeck", 0.0058, 0.016, (0, 0, 0.031), edge=0.002, vertices=20, mat=mats["bronze"]))
+    knob = ellipsoid((0, 0, 0.044), (0.0115, 0.0115, 0.0095), 32, 16, "StampKnob")
+    shade_smooth(knob)
+    stamp.append(oak(knob, 374, mats))
+    for part in stamp:
+        part.location.x += 0.098
+    board.append(parent(stamp, "Stamp"))
+    tilt = pivot(parent(board, "StampBoard"), (0, -0.05, 0))
+    tilt.rotation_euler.x = math.radians(28)  # Leaning back, face up to the visitor.
+    return on_tray(5, [tilt], 0.14, 0.05, mats)
+
+
+def build_book_stack(mats):
+    """006: five chunky rounded books, stacked on the tray. The scene lifts three into view, pauses,
+    then the other two (more than the drawer could hold)."""
+    books = []
+    colors = (mats["book_slate"], mats["book_a"], mats["book_oat"], mats["book_b"], mats["book_c"])
+    t = 0.019
+    for n, mat in enumerate(colors):
+        w, l = 0.062 - (n % 2) * 0.004, 0.045 - (n % 3) * 0.002
+        cover = rbox("StackCover", -w, w, -l, l, n * t, (n + 1) * t - 0.0006, 0.0055, 4, mat=mat)
+        pages = rbox("StackPages", -w + 0.005, w + 0.0008, -l + 0.004, l - 0.004, n * t + 0.0035, (n + 1) * t - 0.004, 0.0012, 2, mat=mats["paper"])
+        book = pivot(parent([cover, pages], "StackBook"), (0, 0, n * t))
+        book.rotation_euler.z = math.radians((-7, 5, -3, 8, -5)[n])
+        books.append(book)
+    return on_tray(6, books, 0.07, 0.052, mats)
+
+
+def build_discoveries(mats):
+    return [build_tooth(mats), build_folder(mats), build_drawer_bell(mats), build_card(mats), build_stamp_station(mats), build_book_stack(mats)]
+
+
 def build_all(mats):
     """Builds every exhibit specimen, the desk, the plinth and the dressing. Returns them, so the
     caller can hide them from the Blender still (they all stand in the same spot there)."""
@@ -1090,4 +1271,5 @@ def build_all(mats):
         build_snake_plant(mats),
         build_pothos(mats),
         build_books(mats),
+        *build_discoveries(mats),
     ]

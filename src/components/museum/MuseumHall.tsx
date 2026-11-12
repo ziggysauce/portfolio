@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exhibit } from "@/content/exhibits";
 import type { LabelAnchor, MuseumScene, PlinthAnchor } from "./scene";
+import { STEP_MS } from "./discoveries";
+import { DrawerContents, stepsFor } from "./DrawerContents";
 import styles from "./museum.module.css";
 
 type Status = "loading" | "ready" | "fallback";
@@ -67,6 +69,21 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const captions = useRef<(HTMLElement | null)[]>([]);
   const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
   const [openNote, setOpenNote] = useState<number | null>(null);
+  // Each drawer discovery's progress (bell rings, stamped cards, the card opened), and which drawer is
+  // still animating its last step: input to it is ignored until then, never queued.
+  const [steps, setSteps] = useState<number[]>(() => exhibits.map(() => 0));
+  const [busy, setBusy] = useState<number | null>(null);
+  const busyTimer = useRef(0);
+  const openRef = useRef<number | null>(null); // openNote, readable from event handlers.
+  /** The one way a drawer opens or closes. Only one is ever open, and whichever closes starts over next
+   *  time (the scene resets its props once they're out of sight). */
+  const changeDrawer = useCallback((next: number | null) => {
+    openRef.current = next;
+    setOpenNote(next);
+    setSteps((prev) => (prev.every((step) => step === 0) ? prev : prev.map(() => 0)));
+    window.clearTimeout(busyTimer.current);
+    setBusy(null);
+  }, []);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const directoryToggle = useRef<HTMLButtonElement>(null);
   /** Folds the directory away. If focus was inside it, focus moves to its toggle instead of vanishing. */
@@ -251,7 +268,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         createMuseumScene({
           canvas: canvas.current!,
           exhibits: [
-            ...exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status, kind: "case" as const })),
+            ...exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status, kind: "case" as const, discovery: exhibit.drawer })),
             { status: "on-view", kind: "desk" as const },
           ],
           url: "/museum/museum.glb",
@@ -331,7 +348,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         }
         shown = nearest;
         setIndex(nearest);
-        setOpenNote((open) => (open === nearest ? open : null)); // The drawer shuts behind you.
+        if (openRef.current !== null && openRef.current !== nearest) changeDrawer(null); // The drawer shuts behind you.
         // If focus was in a note that just closed, it lands on the label of the case you walked to.
         if (notes.current.some((note, i) => i !== nearest && note?.contains(document.activeElement))) labels.current[nearest]?.focus();
       }
@@ -389,7 +406,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("keydown", onScrollKey);
     };
-  }, [status, count, offsetFor, caseHeight, go, stopGlide]);
+  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer]);
 
   // A click anywhere outside the open directory folds it away.
   useEffect(() => {
@@ -408,11 +425,31 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   useEffect(() => {
     exhibits.forEach((_, i) => scene.current?.setDrawer(i, openNote === i));
   }, [openNote, exhibits, status]);
+  useEffect(() => {
+    steps.forEach((step, i) => scene.current?.setDiscoveryStep(i, step));
+  }, [steps, status]);
+  useEffect(() => () => window.clearTimeout(busyTimer.current), []);
+  /** The open drawer's next step: ring, stamp, or open or close the card. */
+  const act = useCallback(
+    (i: number) => {
+      const drawer = exhibits[i]?.drawer;
+      if (!drawer || openNote !== i || busy !== null) return;
+      const current = steps[i];
+      const next = drawer.kind === "card" ? (current ? 0 : 1) : Math.min(stepsFor(drawer), current + 1);
+      if (next === current) return;
+      setSteps((prev) => prev.map((step, n) => (n === i ? next : step)));
+      const ms = reduced.current ? 120 : drawer.kind === "bell" ? STEP_MS.bell : drawer.kind === "stamp" ? STEP_MS.stamp : STEP_MS.card;
+      setBusy(i);
+      window.clearTimeout(busyTimer.current);
+      busyTimer.current = window.setTimeout(() => setBusy(null), ms);
+    },
+    [exhibits, openNote, busy, steps],
+  );
   const closeNote = useCallback((i: number) => {
-    setOpenNote(null);
+    changeDrawer(null);
     // Focus goes back to the control that opened it, if it was inside the note.
     if (notes.current[i]?.contains(document.activeElement)) noteToggles.current[i]?.focus();
-  }, []);
+  }, [changeDrawer]);
 
   // Left and right arrows walk the hall, unless you're typing somewhere. Escape closes the note.
   useEffect(() => {
@@ -457,10 +494,14 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     window.scrollBy({ top: event.deltaX * scale, behavior: "instant" });
   }
 
-  /** A drawer under this point that holds a note, on the case you're standing at. */
+  /** A drawer under this point with a discovery in it, on the case you're standing at. */
   function noteDrawerAt(clientX: number, clientY: number) {
     const drawer = scene.current?.pickDrawer(clientX, clientY);
-    return drawer === index && exhibits[index]?.note ? drawer : null;
+    return drawer === index && exhibits[index]?.drawer ? drawer : null;
+  }
+  /** The open drawer's bell or stamp under this point, on the case you're standing at. */
+  function propAt(clientX: number, clientY: number) {
+    return openNote === index && scene.current?.pickProp(clientX, clientY) === index;
   }
 
   // Hovering a case brightens its light and lifts the specimen a little.
@@ -469,13 +510,19 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const hit = scene.current.pick(event.clientX, event.clientY);
     scene.current.setHighlight(hit);
     const drawer = noteDrawerAt(event.clientX, event.clientY);
-    if (canvas.current) canvas.current.style.cursor = drawer !== null || (hit !== null && hit !== index) ? "pointer" : "";
+    const prop = propAt(event.clientX, event.clientY);
+    if (canvas.current) canvas.current.style.cursor = prop || drawer !== null || (hit !== null && hit !== index) ? "pointer" : "";
   }
   function onClick(event: React.MouseEvent) {
+    // The bell and the stamp work by clicking them too; their buttons beside the drawer do the same.
+    if (propAt(event.clientX, event.clientY)) {
+      act(index);
+      return;
+    }
     // The drawer itself opens too; the labelled button in the label does the same for keyboard and touch.
     const drawer = noteDrawerAt(event.clientX, event.clientY);
     if (drawer !== null) {
-      setOpenNote((open) => (open === drawer ? null : drawer));
+      changeDrawer(openRef.current === drawer ? null : drawer);
       return;
     }
     const hit = scene.current?.pick(event.clientX, event.clientY);
@@ -567,7 +614,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     ))}
                     {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
-                    {exhibit.note && !fallback ? (
+                    {exhibit.drawer && !fallback ? (
                       <button
                         ref={(node) => {
                           noteToggles.current[i] = node;
@@ -575,30 +622,33 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                         type="button"
                         className={styles.noteToggle}
                         aria-expanded={openNote === i}
-                        aria-controls={`${exhibit.id}-note`}
-                        onClick={() => (openNote === i ? closeNote(i) : setOpenNote(i))}
+                        aria-controls={`${exhibit.id}-drawer`}
+                        onClick={() => (openNote === i ? closeNote(i) : changeDrawer(i))}
                       >
                         <span aria-hidden="true" className={styles.drawerIcon} />
-                        Curator&rsquo;s note
+                        {openNote === i ? "Close drawer" : "Open drawer"}
+                        <span className="sr-only">: {exhibit.title}</span>
                       </button>
                     ) : null}
+                    {exhibit.drawer && fallback ? (
+                      // Without the 3D hall, every drawer's discovery as plain text.
+                      <details className={styles.drawerStatic}>
+                        <summary>Open drawer</summary>
+                        <DrawerContents drawer={exhibit.drawer} step={0} id={`${exhibit.id}-static`} />
+                      </details>
+                    ) : null}
                   </article>
-                  {exhibit.note && !fallback ? (
+                  {exhibit.drawer && !fallback ? (
                     <aside
-                      id={`${exhibit.id}-note`}
+                      id={`${exhibit.id}-drawer`}
                       hidden={openNote !== i}
                       ref={(node) => {
                         notes.current[i] = node;
                       }}
                       className={styles.note}
-                      aria-label="Curator’s note"
+                      aria-label={`Drawer: ${exhibit.title}`}
                     >
-                      {exhibit.note.map((line, n) => (
-                        <p key={line} className={n === 0 && exhibit.note!.length > 1 ? styles.noteHeading : undefined}>
-                          {line}
-                        </p>
-                      ))}
-                      <p className={styles.signature}>The Curator</p>
+                      <DrawerContents drawer={exhibit.drawer} step={steps[i]} busy={busy === i} onAct={() => act(i)} id={exhibit.id} />
                       <button type="button" className={styles.noteClose} onClick={() => closeNote(i)}>
                         Close the drawer
                       </button>

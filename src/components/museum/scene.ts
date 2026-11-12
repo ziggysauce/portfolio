@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { Discovery } from "@/content/exhibits";
+import { createDiscovery, type DrawerDiscovery } from "./discoveries";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -107,7 +109,7 @@ const TONES: Record<string, Tone> = {
 };
 
 /** A stop on the walk: a case with a specimen, or the Information desk at the end. */
-export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk" };
+export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk"; discovery?: Discovery };
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
 export type LabelAnchor = {
@@ -135,6 +137,10 @@ export type MuseumScene = {
   pickDrawer(clientX: number, clientY: number): number | null;
   /** Slides a case's drawer open or shut. The specimen reacts once when a visitor opens it. */
   setDrawer(index: number, open: boolean): void;
+  /** The visitor's progress through a drawer's discovery (bell rings, stamped cards, the card opened). */
+  setDiscoveryStep(index: number, step: number): void;
+  /** Which open drawer's interactive prop (the bell, the stamp) is under this point, if any. */
+  pickProp(clientX: number, clientY: number): number | null;
   resize(): void;
   dispose(): void;
 };
@@ -476,7 +482,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const dust: { points: THREE.Points; seeds: Float32Array; origin: THREE.Vector3 }[] = [];
   const specimens: (THREE.Object3D | null)[] = [];
   const captions: (THREE.Vector3 | null)[] = [];
-  type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
+  type Drawer = { node: THREE.Object3D | null; baseZ: number; discovery: DrawerDiscovery | null };
   const drawers: Drawer[] = [];
 
   exhibits.forEach((exhibit, i) => {
@@ -491,7 +497,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       contact(x, CASE_Z, 1.15, 0.002, 0.72);
       specimens.push(null);
       captions.push(null);
-      drawers.push({ node: null, baseZ: 0, note: null, noteBase: 0 });
+      drawers.push({ node: null, baseZ: 0, discovery: null });
       return;
     }
     const staging = stagingFor(exhibit);
@@ -533,8 +539,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     if (riser) riser.visible = staging.riser;
     const drawer = part(display, "Drawer") ?? null;
-    const note = drawer ? (part(drawer, "DrawerNote") ?? null) : null;
-    drawers.push({ node: drawer, baseZ: drawer?.position.z ?? 0, note, noteBase: note?.rotation.x ?? 0 });
+    const drawerEntry: Drawer = { node: drawer, baseZ: drawer?.position.z ?? 0, discovery: null };
+    drawers.push(drawerEntry);
     // The curator's things live in the first gallery only.
     if (i === 0 && propsTemplate) {
       const props = propsTemplate.clone(true);
@@ -580,6 +586,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       }
     }
     specimens.push(specimen);
+    // The drawer's discovery: on the drawer floor, centred, 9 cm in from its front.
+    const discoveryTemplate = source.getObjectByName(`Discovery${i + 1}`);
+    if (drawer && exhibit.discovery && discoveryTemplate) {
+      display.updateMatrixWorld(true); // Box3 and attach read world matrices; the case was just placed.
+      const oak = part(drawer, "DrawerOak");
+      const centre = oak ? new THREE.Box3().setFromObject(oak).getCenter(new THREE.Vector3()).x : x + (DRAWER.x0 + DRAWER.x1) / 2;
+      drawerEntry.discovery = createDiscovery({
+        spec: exhibit.discovery,
+        template: discoveryTemplate,
+        drawer,
+        anchor: new THREE.Vector3(centre, DRAWER.y0 + 0.016, DRAWER.front - 0.088),
+        specimen,
+      });
+    }
     // A caption pinned to the specimen (006's plaque, 003's bump bar), fixed in the world once placed.
     const markers: THREE.Object3D[] = [];
     specimen?.traverse((node) => {
@@ -930,11 +950,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         }
       }
       moving = lifting = true;
-      const { node, baseZ, note, noteBase } = drawers[i];
+      const { node, baseZ } = drawers[i];
       if (node) node.position.z = baseZ + DRAWER.travel * drawerOpen[i];
-      // The folded note stands up on its hinge once the drawer is mostly out, like a pop-up card.
-      const stand = THREE.MathUtils.smoothstep(drawerOpen[i], 0.45, 1);
-      if (note) note.rotation.x = noteBase + stand * 1.25;
+    });
+    // Each drawer's discovery: its reveal, the visitor's steps, and sinking back as the drawer shuts.
+    drawers.forEach(({ discovery }, i) => {
+      if (discovery?.update(dt, drawerOpen[i], drawerGoal[i] === 1, reduced)) moving = lifting = true;
     });
 
     // The specimen's one reaction when its drawer is opened: it leans in to look, then settles back.
@@ -1055,6 +1076,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       });
       return index === -1 ? null : index;
     },
+    setDiscoveryStep(index, step) {
+      drawers[index]?.discovery?.setStep(step);
+      kick();
+    },
+    pickProp(clientX, clientY) {
+      aim(clientX, clientY);
+      const index = drawers.findIndex(({ discovery }, i) => discovery && drawerGoal[i] === 1 && discovery.targets.length > 0 && raycaster.intersectObjects(discovery.targets, false).length > 0);
+      return index === -1 ? null : index;
+    },
     setDrawer(index, open) {
       if (index < 0 || index >= exhibits.length) return;
       const goal = open ? 1 : 0;
@@ -1077,6 +1107,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         material.dispose();
       });
       owned.forEach((item) => item.dispose());
+      drawers.forEach(({ discovery }) => discovery?.dispose());
       keys.forEach((key) => key.shadow.dispose()); // renderer.dispose() leaves shadow render targets alive.
       environment.dispose();
       pmrem.dispose();

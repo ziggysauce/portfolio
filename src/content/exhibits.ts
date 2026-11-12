@@ -21,12 +21,24 @@ export type Exhibit = {
   status: "on-view" | "in-preparation" | "planned";
   /** The glTF node to place in the case. */
   specimen?: string;
-  /** A clearly playful note in the cabinet's drawer: fictional curator jokes, never a fact. With more
-   *  than one line, the first is its heading. */
-  note?: string[];
+  /** What's in the cabinet's drawer: a small discovery (see Discovery). */
+  drawer?: Discovery;
   /** Words on the specimen itself (a plaque, a tag), pinned to it in the hall as crisp text. */
   caption?: string;
 };
+
+/**
+ * A drawer's discovery. Each has an automatic reveal when its drawer opens; the bell, the card and the
+ * stamp also have steps the visitor takes. Everything here is shown as readable text beside the drawer
+ * as well as on the props. The jokes are fictional; the 001 story and 004 card are Daniel's own words.
+ */
+export type Discovery =
+  | { kind: "tooth"; tag: string; story: string[] }
+  | { kind: "chart"; heading: string; xLabel: string; yLabel: string; footer: string; description: string }
+  | { kind: "bell"; reveal: string; tickets: string[][] }
+  | { kind: "card"; cover: string; inside: string[] }
+  | { kind: "stamp"; cards: string[] }
+  | { kind: "books"; caption: string };
 
 export const hall = {
   name: "The Daniel Nguyen Hall of Natural History",
@@ -42,11 +54,14 @@ export const exhibits: Exhibit[] = [
     quote: "Explains the existence of this museum.",
     status: "on-view",
     specimen: "Skull",
-    note: [
-      "To the night staff:",
-      "Specimen 001 prefers “The Origin Specimen.” Please stop calling it “the skull.”",
-      "We’re trying to run a respectable institution.",
-    ],
+    drawer: {
+      kind: "tooth",
+      tag: "An earlier career prospect.",
+      story: [
+        "I started college on a pre-dental track. An anatomy class got me interested in bones; evolutionary anthropology took that curiosity in another direction.",
+        "My favorite college class was primate anatomy.",
+      ],
+    },
   },
   {
     id: "research",
@@ -57,7 +72,14 @@ export const exhibits: Exhibit[] = [
     quote: "Samples carefully labeled. Career path less so.",
     status: "on-view",
     specimen: "Samples",
-    note: ["All samples accounted for. The career change was not in the protocol."],
+    drawer: {
+      kind: "chart",
+      heading: "Further research required.",
+      xLabel: "Questions answered",
+      yLabel: "More questions",
+      footer: "Illustrative nonsense. Not actual research data.",
+      description: "A chart with a rising curve: the more questions answered, the more questions there are.",
+    },
   },
   {
     id: "kds",
@@ -69,7 +91,11 @@ export const exhibits: Exhibit[] = [
     status: "on-view",
     specimen: "KDS",
     caption: "Bump bar",
-    note: ["An order has arrived. Fortunately, this is a museum."],
+    drawer: {
+      kind: "bell",
+      reveal: "You’re an expo now.",
+      tickets: [["1 soup", "1 coffee", "Hold the existential questions."], ["Please stop ringing the bell."]],
+    },
   },
   {
     id: "marker",
@@ -80,7 +106,14 @@ export const exhibits: Exhibit[] = [
     quote: "Still has one good diagram left in it.",
     status: "on-view",
     specimen: "Laptop",
-    note: ["Please replace the marker before the next meeting. This note has survived several meetings."],
+    drawer: {
+      kind: "card",
+      cover: "The best release wasn’t software.",
+      inside: [
+        "One of the most rewarding parts of management was seeing someone on my team get promoted.",
+        "Helping someone grow—and seeing that growth recognized—felt like work worth doing.",
+      ],
+    },
   },
   {
     id: "plans",
@@ -91,7 +124,7 @@ export const exhibits: Exhibit[] = [
     quote: "Some assembly—and several meetings—required.",
     status: "on-view",
     specimen: "Planning",
-    note: ["The calendar and the planning board have requested a meeting to align."],
+    drawer: { kind: "stamp", cards: ["Make a plan.", "Build the thing.", "One small follow-up.", "Enjoy this moment."] },
   },
   {
     id: "after-hours",
@@ -103,7 +136,7 @@ export const exhibits: Exhibit[] = [
     status: "on-view",
     specimen: "AfterHours",
     caption: "Running shoes",
-    note: ["The running shoes have not submitted an estimated return date."],
+    drawer: { kind: "books", caption: "The reading list is under control." },
   },
 ];
 

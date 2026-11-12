@@ -330,7 +330,7 @@
   top: 0;
   left: 0;
   z-index: 1;
-  width: 236px;
+  width: 264px;
   translate: 18px -40%;
   display: grid;
   gap: 6px;
@@ -356,12 +356,136 @@
   margin: 0;
   font: italic 400 17px/1.3 var(--serif);
 }
-.note .noteHeading {
-  font: 500 10px/1.6 var(--mono);
-  font-style: normal;
-  letter-spacing: 0.14em;
+/* ---- what each drawer holds: its words and controls, beside the drawer */
+.drawerTag {
+  justify-self: start;
+  padding: 3px 9px 4px;
+  background: #fbf6ea;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(150 116 70 / 0.4);
+  font: 500 10px/1.5 var(--mono) !important;
+  font-style: normal !important;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #4a5269;
+}
+.note .drawerStory {
+  font: 400 15px/1.45 var(--serif);
+  color: #27304a;
+}
+.note .drawerHeading {
+  font: italic 500 19px/1.25 var(--serif);
+}
+.note .drawerFine {
+  font: 400 12px/1.35 var(--serif);
+  color: #4a5269;
+}
+.drawerFigure {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.drawerFigure h3 {
+  margin: 0;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  color: #4a4038;
+  font: 500 10px var(--mono);
+}
+.chart text {
+  fill: currentColor;
+}
+.drawerAction {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgb(74 82 105 / 0.45);
+  border-radius: 999px;
+  background: #fbf6ea;
+  color: #27304a;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.drawerAction:hover {
+  background: #fffaf0;
+}
+.drawerAction[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+.drawerAction:focus-visible {
+  outline: 2px solid #4a5269;
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .drawerAction {
+    min-height: 44px;
+  }
+}
+.tickets,
+.taskCards {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tickets li {
+  display: grid;
+  padding: 6px 9px;
+  background: #e8e2d2;
+  border-top: 4px solid #79a08a;
+  font: 600 12px/1.35 var(--mono);
+  color: #2a2a28;
+}
+.tickets li + li {
+  border-top-color: #c96f55;
+}
+.taskCards li {
+  padding: 5px 9px;
+  background: #fbf6ea;
+  box-shadow: inset 0 0 0 1px rgb(150 116 70 / 0.3);
+  font: italic 400 15px/1.3 var(--serif);
+}
+.taskCards .taskDone {
+  color: #6b6158;
+}
+.taskDone span {
+  margin-left: 6px;
+  font: 700 10px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a33a2b;
+}
+.taskCurrent {
+  font-size: 17px !important;
+}
+.cardInside {
+  display: grid;
+  gap: 6px;
+}
+.cardInside[hidden] {
+  display: none;
+}
+/* Without WebGL: the drawer's contents as a disclosure in the label. */
+.drawerStatic {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(138 106 68 / 0.22);
+}
+.drawerStatic summary {
+  cursor: pointer;
+  font: 500 11px/2 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.drawerStatic > :not(summary) {
+  margin: 6px 0 0;
 }
 .signature {
   justify-self: end;
