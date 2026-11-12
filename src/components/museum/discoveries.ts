@@ -10,7 +10,7 @@ import type { Discovery } from "@/content/exhibits";
 // so nothing visibly snaps back.
 
 /** How long a step's animation takes, so the page can hold further input until it's done. */
-export const STEP_MS = { bell: 650, stamp: 1150, card: 700, books: [950, 900, 950, 2100, 2300] } as const;
+export const STEP_MS = { bell: 1800, stamp: 1150, card: 700, books: [1100, 900, 950, 2100, 2500] } as const;
 
 export type DrawerDiscovery = {
   root: THREE.Object3D;
@@ -34,6 +34,11 @@ const window01 = (t: number, start: number, length: number) => (t - start) / len
 
 /** How much larger than built each discovery is shown. */
 const SCALE: Record<Discovery["kind"], number> = { tooth: 1.5, chart: 1.15, bell: 1.4, card: 1.3, stamp: 1.15, books: 1.2 };
+
+/** How far left of the drawer's centre the reading list stands, in metres. */
+const BOOK_SHIFT = -0.17;
+/** How high a discovery's tray rises, in metres. */
+const RISE = 0.11;
 
 /** How far a hinged cover turns open, in radians (the sign opens it toward the visitor). */
 const COVER_OPEN = -3.08;
@@ -209,6 +214,35 @@ function drawTask(context: CanvasRenderingContext2D, text: string, stamped: bool
   context.restore();
 }
 
+/** A kitchen chit: warm white thermal paper, dark print, no names or numbers that could be real. */
+function drawChit(context: CanvasRenderingContext2D, lines: string[]) {
+  const W = 192;
+  const H = 320;
+  context.fillStyle = "#fbf6ea";
+  context.fillRect(0, 0, W, H);
+  context.fillStyle = "#24221f";
+  context.textAlign = "center";
+  context.font = `700 15px ${MONO}`;
+  context.fillText("KITCHEN", W / 2, 30);
+  context.fillRect(18, 44, W - 36, 2);
+  context.textAlign = "left";
+  context.font = `700 17px ${MONO}`;
+  let y = 76;
+  for (const line of lines) {
+    for (const part of wrap(context, line, W - 28)) {
+      context.fillText(part, 14, y);
+      y += 24;
+    }
+  }
+  context.setLineDash([6, 5]);
+  context.lineWidth = 2;
+  context.strokeStyle = "#24221f";
+  context.beginPath();
+  context.moveTo(14, y + 6);
+  context.lineTo(W - 14, y + 6);
+  context.stroke();
+}
+
 function drawTicket(context: CanvasRenderingContext2D, lines: string[], band: string) {
   const W = 224;
   const H = 220;
@@ -237,6 +271,8 @@ export function createDiscovery(options: {
   anchor: THREE.Vector3;
   /** The case's KDS screen display node, for 003's tickets. */
   specimen: THREE.Object3D | null;
+  /** How far the drawer slides out, in metres. */
+  travel?: number;
   /** Whether the screen is portrait (a tighter spill). */
   compact?: () => boolean;
 }): DrawerDiscovery {
@@ -246,6 +282,8 @@ export function createDiscovery(options: {
   // A little larger than built, so each reads at gallery distance; the lift below is in world terms.
   const scale = SCALE[spec.kind];
   root.scale.setScalar(scale);
+  // The reading list stands toward the drawer's left end, so its avalanche can reach the cabinet top.
+  if (spec.kind === "books") root.position.x += BOOK_SHIFT;
   drawer.updateMatrixWorld(true);
   drawer.attach(root);
   root.visible = false;
@@ -289,7 +327,6 @@ export function createDiscovery(options: {
   const tray = remember(node("DiscoveryLift"));
   const column = node("DiscoveryColumn");
   const COLUMN = 0.008; // The column's resting height.
-  const RISE = 0.11;
   const liftAt = (reduced: boolean) => {
     if (reduced) return RISE;
     return RISE * settle(window01(elapsed, 0.2, 0.75));
@@ -306,6 +343,7 @@ export function createDiscovery(options: {
   /** Called when the visitor's step changes (only the reading list needs to plan its moves). */
   let onStep: (stage: number, reduced: boolean) => void = () => {};
   let reducedNow = false;
+  let openingNow = false;
 
   switch (spec.kind) {
     case "tooth": {
@@ -340,7 +378,71 @@ export function createDiscovery(options: {
         }
         return { mesh, material: face.material as THREE.MeshBasicMaterial };
       });
-      resetVisuals = () => tickets.forEach(({ mesh }) => mesh && (mesh.visible = false));
+      // The kitchen printer: each accepted ring feeds one paper chit from the slot, its print emerging
+      // with the paper. The first is cut (a small jolt), then settles into the tray; the second stays out.
+      const slot = screen ? named(screen, "ChitSlot") : null;
+      const trayMark = screen ? named(screen, "ChitTrayAnchor") : null;
+      const LMAX = 0.07;
+      const W = 0.044;
+      const ROWS = 24;
+      const trayAt = new THREE.Vector3();
+      if (slot && trayMark) slot.worldToLocal(trayMark.getWorldPosition(trayAt));
+      const chits = spec.tickets.map((lines, n) => {
+        const face = canvasFace(192, 320, (c) => drawChit(c, lines));
+        owned.push(face.material, face.texture);
+        const material = face.material as THREE.MeshStandardMaterial;
+        material.side = THREE.DoubleSide;
+        material.color.set("#fbf6ea");
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(ROWS * 2 * 3);
+        const uvs = new Float32Array(ROWS * 2 * 2);
+        const index: number[] = [];
+        for (let r = 0; r < ROWS; r++) {
+          const v = r / (ROWS - 1); // 0 at the leading edge, which carries the top of the print.
+          uvs.set([0, v, 1, v], r * 4);
+          if (r < ROWS - 1) index.push(r * 2, r * 2 + 2, r * 2 + 1, r * 2 + 1, r * 2 + 2, r * 2 + 3);
+        }
+        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+        geometry.setIndex(index);
+        owned.push(geometry);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.visible = false;
+        mesh.frustumCulled = false; // Its vertices move every frame; the bounds would go stale.
+        slot?.add(mesh);
+        return { mesh, positions, geometry, n };
+      });
+      const point = new THREE.Vector3();
+      const flat = new THREE.Vector3();
+      /** Shapes a chit: `fed` metres out of the slot along a gentle curl toward the visitor, `jolt` the
+       *  cutter's nudge, `toTray` 0 to 1 from hanging at the slot to lying in the tray. */
+      const shapeChit = (chit: (typeof chits)[number], fed: number, jolt: number, toTray: number) => {
+        for (let r = 0; r < ROWS; r++) {
+          const p = (r / (ROWS - 1)) * LMAX; // From the leading edge.
+          const d = fed - p; // How far out of the slot this row is (negative: still inside the printer).
+          if (d <= 0) point.set(0, d - 0.001, 0);
+          else {
+            const a = 0.12;
+            const b = 9;
+            point.set(0, (Math.sin(a + b * d) - Math.sin(a)) / b + jolt, (Math.cos(a) - Math.cos(a + b * d)) / b);
+          }
+          if (toTray > 0) {
+            // In the tray: lying toward the visitor, its far end curling up a little.
+            const q = p / LMAX;
+            // Centred in the tray (its anchor marks the front lip, 33 mm ahead of the tray's middle).
+            flat.set(trayAt.x, trayAt.y + 0.0012 + 0.006 * q * q, trayAt.z - 0.033 - LMAX / 2 + p);
+            point.lerp(flat, toTray);
+            point.y += 0.012 * 4 * toTray * (1 - toTray);
+          }
+          for (let side = 0; side < 2; side++) chit.positions.set([(side - 0.5) * W, point.y, point.z], (r * 2 + side) * 3);
+        }
+        chit.geometry.attributes.position.needsUpdate = true;
+        chit.geometry.computeVertexNormals();
+      };
+      resetVisuals = () => {
+        tickets.forEach(({ mesh }) => mesh && (mesh.visible = false));
+        chits.forEach(({ mesh }) => (mesh.visible = false));
+      };
       pose = (reduced, sink) => {
         const press = reduced || shown === 0 ? 0 : Math.sin(Math.PI * THREE.MathUtils.clamp(stepTime / 0.32, 0, 1));
         if (plunger) plunger.position.y = at(plunger)!.position.y - 0.0035 * press;
@@ -351,7 +453,19 @@ export function createDiscovery(options: {
           material.opacity = arrived;
           mesh.position.y = at(mesh)!.position.y + 0.012 * (1 - arrived);
         });
-        return !reduced && (elapsed < 1.0 || (shown > 0 && stepTime < 0.6));
+        chits.forEach((chit, n) => {
+          chit.mesh.visible = n < shown && !!slot;
+          if (!chit.mesh.visible) return;
+          const t = n < shown - 1 || reduced ? 9 : stepTime;
+          if (n === 0) {
+            const fed = LMAX * ease(window01(t, 0.15, 0.85));
+            const cut = window01(t, 1.05, 0.14);
+            const jolt = cut > 0 && cut < 1 ? 0.0018 * Math.sin(Math.PI * cut) : 0;
+            const drop = settle(window01(t, 1.22, 0.5));
+            shapeChit(chit, fed, jolt, drop); // Cut where it is, then laid in the tray.
+          } else shapeChit(chit, LMAX * 0.72 * ease(window01(t, 0.15, 0.75)), 0, 0);
+        });
+        return !reduced && (elapsed < 1.0 || (shown > 0 && stepTime < 1.85));
       };
       break;
     }
@@ -422,58 +536,76 @@ export function createDiscovery(options: {
     }
     case "books": {
       // The reading list: nine books reused for every stage. 0: three stacked. 1: two more. 2: two more,
-      // drifting off-centre. 3: one more, a wobble, recovery. 4: one more, then a spill into a composed
-      // pile. Back to 0 tidies the extras away into the drawer. All authored, no physics.
-      const T = 0.016; // One book's thickness.
-      const X0 = -0.035; // The stack's centre.
+      // leaning left. 3: one more, a wobble, recovery. 4: one more, then an avalanche. The stack leans past
+      // its support and tips; the top books tumble over the drawer's left end onto the cabinet top beside
+      // the case (the floor is out of the resting camera's frame), one drapes over the drawer's side, one
+      // teeters on its front edge, the rest land askew on the tray. Back to 0 tidies them into the drawer.
+      // All authored, no physics. Poses are local to the tray; spill targets are given in world terms
+      // (relative to the cabinet) and converted, since some land outside the drawer.
+      const T = 0.016; // One book's thickness, as built.
+      const BASE = 0.02; // The tray's top, in its own units.
       const books = Array.from({ length: 9 }, (_, n) => node(`ListBook${n + 1}`));
       const COUNTS = [3, 5, 7, 8, 9];
       const YAW = [0.04, -0.06, 0.09, -0.03, 0.07, -0.08, 0.05, 0.12, -0.1];
       const DEPTH = [0, 0.003, -0.002, 0.004, -0.003, 0.002, 0.005, -0.004, 0.003];
-      const DRIFT = [0, 0, 0, 0, 0, 0.012, 0.024, 0.03, 0.036]; // From stage 2, the top leans right.
+      const DRIFT = [0, 0, 0, 0, 0, -0.012, -0.022, -0.03, -0.036]; // From stage 2, the top leans left.
       type Pose = { p: THREE.Vector3; q: THREE.Quaternion };
       const pose3 = (x: number, y: number, z: number, rx = 0, ry = 0, rz = 0): Pose => ({
         p: new THREE.Vector3(x, y, z),
         q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
       });
+      // The tray's origin, fully open and lifted, relative to the cabinet's centre (x) and absolute (y, z).
+      const O = { x: BOOK_SHIFT, y: anchor.y + RISE, z: anchor.z + (options.travel ?? 0.17) };
+      /** A pose given in world terms (x from the cabinet's centre), in the tray's local units. */
+      const world = (x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) =>
+        pose3((x - O.x) / scale, (y - O.y) / scale, (z - O.z) / scale, rx, ry, rz);
       const stacked = (n: number, stage: number) =>
-        pose3(X0 + (stage >= 2 ? DRIFT[n] : 0), T * (n + 0.5), DEPTH[n], 0, YAW[n], stage >= 2 && n >= 4 ? -0.03 : 0);
-      const hidden = (n: number) => pose3(X0 + (n % 3) * 0.02, -0.11, -0.075, 0, YAW[n], 0);
-      // The pile: on the tray, propped against the stack, one over the drawer front. Tighter on a phone.
-      const pile = (n: number, compact: boolean) => {
-        const k = compact ? 0.72 : 1;
-        const at = (x: number, y: number, z: number, rx: number, ry: number, rz: number) => pose3(X0 + (x - X0) * k, y, z, rx, ry, rz);
-        return [
-          at(X0, T * 0.5, 0, 0, 0.04, 0),
-          at(X0, T * 1.5, 0.003, 0, -0.06, 0),
-          at(X0 + 0.006, T * 2.5, -0.002, 0, 0.22, 0),
-          at(0.102, T * 0.5, 0.005, 0, -0.35, 0),
-          at(0.108, T * 1.5 + 0.002, -0.004, 0.05, 0.3, 0.06),
-          at(0.034, 0.058, 0.004, 0, 0.1, -1.05),
-          // Teetering on the drawer front's top edge, tipped a little toward the visitor.
-          at(-0.005, 0.0028, 0.085, 0.25, 0.12, 0),
-          at(X0 + 0.004, T * 3.5 + 0.002, 0, 0.08, 0.7, -0.05),
-          at(X0 - 0.083, 0.03, 0.01, 0, -0.3, 1.0),
+        pose3(stage >= 2 ? DRIFT[n] : 0, BASE + T * (n + 0.5), DEPTH[n], 0, YAW[n], stage >= 2 && n >= 4 ? 0.03 : 0);
+      const hidden = (n: number) => pose3((n % 3) * 0.02 - 0.02, -0.11, -0.075, 0, YAW[n], 0);
+      const CAB_TOP = 0.78;
+      const TRAY_TOP = O.y + BASE * scale; // In world terms.
+      const half = (T * scale) / 2;
+      // The avalanche's end state, world terms. The top three books go over the drawer's left side and land
+      // in a heap on the cabinet top beside the case: one flat, one askew on it, one caught half over the
+      // cabinet's edge. (The floor in front of the cabinet is below the resting camera's frame on a
+      // desktop and under the drawer's panel on a phone, so the heap lands where it can be seen.) On a
+      // phone the heap sits a little further forward, nearer the frame's centre.
+      const pile = (n: number, compact: boolean): Pose =>
+        [
+          stacked(0, 0),
+          stacked(1, 0),
+          world(BOOK_SHIFT + 0.006, TRAY_TOP + 2.5 * T * scale, O.z, 0, 0.32, 0.04),
+          world(-0.12, 0.695 + half + 0.004, 0.235, 0.28, 0.1, 0), // Teetering on the front edge.
+          world(-0.07, TRAY_TOP + half, O.z + 0.01, 0, -0.45, 0.05),
+          world(-0.358, 0.673 + half + 0.012, 0.13, 0, 0.15, 0.5), // Draped over the drawer's left side.
+          world(-0.432, CAB_TOP + half + 0.006, compact ? -0.12 : -0.2, 0, 1.75, 0.3), // Caught half over the edge.
+          world(-0.398, CAB_TOP + half * 3 + 0.002, compact ? 0.0 : -0.05, 0.04, 1.5, 0.12), // Askew on book 8.
+          world(-0.393, CAB_TOP + half, compact ? -0.05 : -0.1, 0, 1.62, 0), // Flat on the cabinet top.
         ][n];
-      };
-      /** Where an arriving book appears: just above its place, turned a little. */
-      const arrival = (n: number, stage = 3) => {
-        const to = stacked(n, stage);
-        return pose3(to.p.x, to.p.y + 0.08, to.p.z, 0, YAW[n] + 0.5, 0);
-      };
-      const PIVOT = new THREE.Vector3(X0 + 0.062, T * 3, 0); // The stack's right edge, above book 3.
+      /** The way each book travels in the avalanche (between where it tips from and where it lands). */
+      const route = (n: number): Pose[] =>
+        // Up and over the drawer's left side, past its end and in front of the cabinet, clear of the case.
+        n >= 6
+          ? [world(-0.43, 0.9 + (8 - n) * 0.02, 0.17, 0.3, 0.9 + (n - 6) * 0.2, 1.1)]
+          : n === 5
+            ? [world(-0.31, 0.79, 0.14, 0, 0.1, 0.25)] // Above the drawer's side wall, so it never cuts through it.
+            : [];
+      const PIVOT = new THREE.Vector3(-0.062, BASE + T * 3, 0); // The stack's left edge, above book 3.
       const Z = new THREE.Vector3(0, 0, 1);
       const turn = new THREE.Quaternion();
       const rotated = (pose: Pose, angle: number): Pose => {
         turn.setFromAxisAngle(Z, angle);
         return { p: pose.p.clone().sub(PIVOT).applyQuaternion(turn).add(PIVOT), q: turn.clone().multiply(pose.q) };
       };
-      // A move from one pose to another: delay, duration, an arc, and whether it's a fall (eases in) that
-      // lands with a soft bounce.
-      type Move = { from: Pose; to: Pose; delay: number; duration: number; arc: number; fall: boolean; hideAtEnd: boolean };
+      /** The stack's lean through stage 4: a slow lean past its support, a hold, then tipping. */
+      const leanAt = (t: number) => 0.14 * ease(window01(t, 0.45, 0.5)) + 0.42 * Math.pow(THREE.MathUtils.clamp(window01(t, 0.95, 0.3), 0, 1), 2);
+      // A move from one pose to another, optionally via a waypoint: delay, duration, an arc, and whether
+      // it's a fall (accelerating) that lands with a soft bounce.
+      type Move = { from: Pose; via?: Pose[]; to: Pose; delay: number; duration: number; arc: number; fall: boolean; hideAtEnd: boolean };
       let moves: (Move | null)[] = books.map(() => null);
       let effect: "none" | "wobble" | "spill" = "none";
       let compact = false;
+      const outside = new Set<number>(); // Books that can be outside the drawer: put away at once on closing.
       const current = (n: number): Pose => ({ p: books[n]!.position.clone(), q: books[n]!.quaternion.clone() });
       const place = (n: number, pose: Pose) => {
         const book = books[n];
@@ -482,14 +614,21 @@ export function createDiscovery(options: {
         book.quaternion.copy(pose.q);
       };
       const settleAt = (stage: number) => {
+        outside.clear();
         books.forEach((book, n) => {
           if (!book) return;
           const shownNow = n < COUNTS[Math.min(stage, 3)] || stage >= 4;
           book.visible = shownNow;
           place(n, stage >= 4 ? pile(n, compact) : shownNow ? stacked(n, stage) : hidden(n));
+          if (stage >= 4 && n >= 3) outside.add(n);
         });
       };
       settleAt(0);
+      /** Where an arriving book appears: just above its place, turned a little. */
+      const arrival = (n: number, stage = 3) => {
+        const to = stacked(n, stage);
+        return pose3(to.p.x, to.p.y + 0.08, to.p.z, 0, YAW[n] + 0.5, 0);
+      };
       const plan = (stage: number) => {
         compact = options.compact?.() ?? false;
         effect = stage === 3 ? "wobble" : stage === 4 ? "spill" : "none";
@@ -497,22 +636,30 @@ export function createDiscovery(options: {
           if (!book) return null;
           const from = current(n);
           if (stage === 0) {
-            // Make room: the extras lift a touch, back over the tray, and down into the drawer.
+            // Make room: the extras go back over the tray and down into the drawer; the two on the cabinet
+            // top come back the way they went.
             if (n < 3) return { from, to: stacked(n, 0), delay: 0, duration: 0.45, arc: 0.004, fall: false, hideAtEnd: false };
             if (!book.visible) return null;
-            return { from, to: hidden(n), delay: (8 - n) * 0.04, duration: 0.55, arc: 0.03, fall: false, hideAtEnd: true };
+            const away = (8 - n) * 0.05;
+            const back = route(n).reverse();
+            if (back.length && outside.has(n)) return { from, via: back, to: hidden(n), delay: away, duration: 0.5 + 0.3 * back.length, arc: 0.02, fall: false, hideAtEnd: true };
+            return { from, to: hidden(n), delay: away, duration: 0.55, arc: 0.035, fall: false, hideAtEnd: true };
           }
           const before = COUNTS[stage - 1];
           const after = COUNTS[stage];
           if (stage === 4 && n >= 3) {
-            // The last book drops on, the stack tips, and everything above book 3 tumbles into the pile.
+            outside.add(n);
             if (n === 8) {
               book.visible = true;
               place(n, arrival(8));
             }
-            const tipped = rotated(stacked(n, 3), -0.5);
-            return { from: tipped, to: pile(n, compact), delay: 1.0 + (8 - n) * 0.07, duration: 0.5 + (n % 3) * 0.05, arc: 0.022, fall: true, hideAtEnd: false };
+            const delay = 1.15 + (8 - n) * 0.06;
+            const tipped = rotated(stacked(n, 3), leanAt(delay)); // Exactly where the lean has it when it goes.
+            const via = route(n);
+            if (via.length) return { from: tipped, via, to: pile(n, compact), delay, duration: 0.5 + 0.28 * via.length, arc: 0.012, fall: true, hideAtEnd: false };
+            return { from: tipped, to: pile(n, compact), delay, duration: 0.5 + (n % 3) * 0.06, arc: 0.03, fall: true, hideAtEnd: false };
           }
+          if (stage === 4 && n === 2) return { from, to: pile(2, compact), delay: 1.4, duration: 0.32, arc: 0.006, fall: false, hideAtEnd: false };
           if (n >= before && n < after) {
             // A new arrival: dropped in from just above, landing softly.
             const to = stacked(n, stage);
@@ -521,7 +668,6 @@ export function createDiscovery(options: {
             place(n, drop);
             return { from: drop, to, delay: (n - before) * 0.18, duration: 0.42, arc: 0, fall: true, hideAtEnd: false };
           }
-          if (stage === 4 && n === 2) return { from, to: pile(2, compact), delay: 1.15, duration: 0.3, arc: 0, fall: false, hideAtEnd: false };
           if (n < before) return { from, to: stacked(n, stage), delay: 0, duration: 0.5, arc: 0, fall: false, hideAtEnd: false };
           // Not part of this stage (say, still on its way back into the drawer from an earlier reset): put
           // it away at once, so no book is ever left frozen mid-move.
@@ -532,15 +678,38 @@ export function createDiscovery(options: {
       };
       const BOUNCE = 0.16;
       const tmp: Pose = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
+      const leg = (a: Pose, b: Pose, u: number, fall: boolean, arc: number) => {
+        const k = fall ? u * u : ease(u);
+        tmp.p.lerpVectors(a.p, b.p, k);
+        tmp.p.y += arc * 4 * u * (1 - u);
+        tmp.q.slerpQuaternions(a.q, b.q, ease(u));
+      };
       const along = (move: Move, t: number) => {
         const u = THREE.MathUtils.clamp((t - move.delay) / move.duration, 0, 1);
-        const k = move.fall ? u * u : ease(u);
-        tmp.p.lerpVectors(move.from.p, move.to.p, k);
-        tmp.p.y += move.arc * 4 * u * (1 - u);
-        // A soft landing: a small rebound that settles.
+        if (move.via?.length) {
+          // Off the stack and out over an edge (decelerating), then falling (accelerating), leg by leg.
+          const points = [move.from, ...move.via, move.to];
+          const first = 1 / (points.length - 1);
+          if (u < first) {
+            const v = u / first;
+            tmp.p.lerpVectors(points[0].p, points[1].p, 1 - (1 - v) * (1 - v));
+            tmp.q.slerpQuaternions(points[0].q, points[1].q, v);
+          } else {
+            // The rest is one continuous fall along the route, accelerating the whole way.
+            const w = (u - first) / (1 - first);
+            const lengths = points.slice(2).map((q, k) => q.p.distanceTo(points[k + 1].p));
+            const total = lengths.reduce((a, b) => a + b, 0) || 1;
+            let d = (move.fall ? w * w : ease(w)) * total;
+            let k = 0;
+            while (k < lengths.length - 1 && d > lengths[k]) d -= lengths[k++];
+            const f = lengths[k] ? Math.min(1, d / lengths[k]) : 1;
+            tmp.p.lerpVectors(points[k + 1].p, points[k + 2].p, f);
+            tmp.q.slerpQuaternions(points[k + 1].q, points[k + 2].q, f);
+          }
+        } else leg(move.from, move.to, u, move.fall, move.arc);
+        // A restrained landing: a small rebound that settles.
         const after = t - move.delay - move.duration;
-        if (move.fall && after > 0 && after < BOUNCE) tmp.p.y += 0.0035 * Math.sin((Math.PI * after) / BOUNCE);
-        tmp.q.slerpQuaternions(move.from.q, move.to.q, k);
+        if (move.fall && after > 0 && after < BOUNCE) tmp.p.y += 0.003 * Math.sin((Math.PI * after) / BOUNCE);
         return { u, landed: after >= BOUNCE || !move.fall };
       };
       resetVisuals = () => {
@@ -557,31 +726,41 @@ export function createDiscovery(options: {
         } else plan(stage);
       };
       pose = (reduced) => {
+        // Closing: anything that could be outside the drawer is put away at once, never dragged in.
+        if (!openingNow && outside.size) {
+          outside.forEach((n) => {
+            if (books[n]) books[n]!.visible = false;
+            moves[n] = null;
+          });
+          outside.clear();
+        }
         if (reduced) return false;
         const t = stepTime;
         let busy = false;
         moves.forEach((move, n) => {
           if (!move || !books[n]) return;
-          // Before a spilling book's own flight: it tips over with the stack.
+          // Before a spilling book's own flight: it rides the stack's lean.
           if (effect === "spill" && n >= 3 && t < move.delay) {
-            const tip = -0.5 * Math.pow(THREE.MathUtils.clamp((t - 0.65) / 0.35, 0, 1), 2);
-            if (n === 8 && t < 0.6) {
-              // The last book's arrival, before the tip.
-              const u = THREE.MathUtils.clamp(t / 0.42, 0, 1);
+            if (n === 8 && t < 0.45) {
+              // The last book's arrival, before the lean.
+              const u = THREE.MathUtils.clamp(t / 0.36, 0, 1);
               const from = arrival(8);
               const to = stacked(8, 3);
               tmp.p.lerpVectors(from.p, to.p, u * u);
-              if (t > 0.42) tmp.p.y += 0.0035 * Math.sin((Math.PI * (t - 0.42)) / 0.18);
+              if (t > 0.36) tmp.p.y += 0.003 * Math.sin((Math.PI * (t - 0.36)) / 0.09);
               tmp.q.slerpQuaternions(from.q, to.q, u * u);
               place(n, tmp);
-            } else place(n, rotated(stacked(n, 3), tip));
+            } else place(n, rotated(stacked(n, 3), leanAt(t)));
             busy = true;
             return;
           }
           const { u, landed } = along(move, t);
           place(n, tmp);
           if (u >= 1 && landed) {
-            if (move.hideAtEnd) books[n]!.visible = false;
+            if (move.hideAtEnd) {
+              books[n]!.visible = false;
+              outside.delete(n);
+            }
             moves[n] = null;
           } else busy = true;
         });
@@ -617,6 +796,7 @@ export function createDiscovery(options: {
     },
     update(dt, open, opening, reduced) {
       reducedNow = reduced;
+      openingNow = opening;
       if (opening) {
         if (wasShut) elapsed = 0;
         wasShut = false;

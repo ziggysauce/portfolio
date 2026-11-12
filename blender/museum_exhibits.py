@@ -426,6 +426,8 @@ def add_materials(mats):
         "leaflet_c": principled("LeafletRose", srgb("#d6a88f"), 0.9),
         "ceramic": principled("Ceramic", srgb("#ddd3c2"), 0.35),
         "lamp_lining": principled("LampLining", srgb("#f3e2c0"), 0.9),
+        "printer_slot": principled("PrinterSlot", srgb("#0d0e0f"), 0.8),
+        "printer_light": principled("PrinterLight", srgb("#7fd39a"), 0.4),
         "ivory": principled("IvoryLining", srgb("#efe6d4"), 0.95),
         # The drawer discoveries. "Canvas*" faces are drawn by the web scene (text, the chart, the stamp).
         "enamel": principled("ToothEnamel", srgb("#f5efe3"), 0.35),
@@ -902,7 +904,25 @@ def build_kds(mats):
     bump.location = (0.0, cy - 0.1475, z)
     bump.rotation_euler.z = math.radians(-3)
 
-    return parent([display] + stand + [bump], "KDS")
+    # A small thermal kitchen printer at the front right, clear of the bump bar: a rounded dark casing,
+    # a paper slot on top, a small status light and an output tray in front. The web scene feeds the
+    # chits from "ChitSlot" and lays the torn first chit at "ChitTrayAnchor".
+    printer = [rbox("PrinterBody", -0.032, 0.032, -0.03, 0.03, 0, 0.044, 0.01, 5, mat=mats["bezel"])]
+    printer.append(rbox("PrinterSlot", -0.026, 0.026, -0.016, -0.009, 0.041, 0.0448, 0.0025, 2, mat=mats["printer_slot"]))
+    printer.append(rbox("PrinterLid", -0.028, 0.028, -0.006, 0.026, 0.043, 0.0465, 0.006, 3, mat=mats["bezel"]))
+    light = ellipsoid((0.02, -0.0302, 0.03), (0.0026, 0.0012, 0.0026), 16, 8, "PrinterLight")
+    shade_smooth(light)
+    printer.append(with_mat(light, mats["printer_light"]))
+    printer.append(anchor("ChitSlot", (0, -0.0125, 0.0448)))
+    printer.append(rbox("ChitTray", -0.03, 0.03, -0.112, -0.03, 0, 0.004, 0.002, 2, mat=mats["bezel"]))
+    printer.append(rbox("ChitTrayLip", -0.03, 0.03, -0.114, -0.108, 0.003, 0.009, 0.002, 2, mat=mats["bezel"]))
+    printer.append(anchor("ChitTrayAnchor", (0, -0.104, 0.0045)))
+    kitchen = parent(printer, "ChitPrinter")
+    kitchen.scale = (1.25, 1.25, 1.25)  # Big enough for its chits to read at gallery distance.
+    kitchen.location = (0.152, cy - 0.055, z)
+    kitchen.rotation_euler.z = math.radians(-8)
+
+    return parent([display] + stand + [bump, kitchen], "KDS")
 
 
 # ---------------------------------------------------------------- the information desk
@@ -1134,42 +1154,50 @@ def on_tray(n, props, half_w, half_d, mats):
 
 
 def molar():
-    """A cute, stylized molar sculpted as one piece: a broad, softly squared crown with four rounded
-    cusps worked into its top, a shallow groove across the chewing surface, and two distinct roots that
-    taper and splay a little. Volumes are merged by a voxel remesh, carved, then smoothed."""
+    """A cute, stylized molar as one continuous form: a softly squared crown with four cusps worked into
+    its top and a shallow cross groove, a gentle waist below the crown, and two long roots that flow out of
+    it, taper to rounded tips and part around a clear central split. Volumes are fused by a voxel remesh and
+    smoothed well, so there's no seam between crown and roots; the split and groove are carved."""
     parts = []
-    # The crown: a superellipsoid (squarish in plan, rounded at every edge).
+    # The crown: a superellipsoid, squarish in plan and softly rounded.
     bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=1, location=(0, 0, 0))
     crown = bpy.context.active_object
     for v in crown.data.vertices:
         x, y, z = v.co
-        v.co = (math.copysign(abs(x) ** 0.6, x) * 0.0225, math.copysign(abs(y) ** 0.6, y) * 0.019, math.copysign(abs(z) ** 0.75, z) * 0.0135 + 0.036)
+        # Squared top, rounder underside, so it flows into the waist instead of sitting on it like a lid.
+        zz = math.copysign(abs(z) ** 0.8, z) if z > 0 else z
+        v.co = (math.copysign(abs(x) ** 0.62, x) * 0.0215, math.copysign(abs(y) ** 0.62, y) * 0.0175, zz * 0.0135 + 0.05)
     parts.append(crown)
-    # Four cusps, mostly sunk into the crown so only soft domes rise from its top.
     for sx in (-1, 1):
         for sy in (-1, 1):
-            parts.append(ellipsoid((sx * 0.0088, sy * 0.0072, 0.0458), (0.0105, 0.0092, 0.0046), 24, 16, "Cusp"))
-    # Two roots: long, tapering, splayed apart so the gap between them reads.
+            parts.append(ellipsoid((sx * 0.0088, sy * 0.0068, 0.0598), (0.0102, 0.0088, 0.0042), 24, 16, "Cusp"))
+    # The waist: narrower than the crown, carrying it down into the roots.
+    parts.append(ellipsoid((0, 0, 0.04), (0.0178, 0.0148, 0.0125), 32, 20, "Waist"))
+    # Two roots, each one tapered, gently bent form from inside the waist to a rounded tip.
     for sx in (-1, 1):
-        root = ellipsoid((0, 0, 0), (0.0082, 0.009, 0.019), 24, 16, "Root")
+        root = ellipsoid((0, 0, 0), (0.0088, 0.0094, 0.0215), 32, 24, "Root")
         for v in root.data.vertices:
             x, y, z = v.co
-            taper = 0.68 + 0.32 * (z / 0.019 + 1) / 2  # Narrower toward a rounded tip.
-            v.co = (x * taper, y * taper, z)
-        root.location = (sx * 0.0112, 0, 0.0195)
-        root.rotation_euler.y = math.radians(-13 * sx)
+            u = (0.0215 - z) / 0.043  # 0 at the top, 1 at the tip.
+            taper = 1.0 - 0.34 * u
+            v.co = (x * taper + sx * 0.0075 * u * u, y * taper, z)
+        root.location = (sx * 0.0098, 0, 0.0215)
         activate(root)
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
+        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
         parts.append(root)
     tooth = join(parts, "Tooth")
     merge = tooth.modifiers.new("Merge", "REMESH")
     merge.mode = "VOXEL"
-    merge.voxel_size = 0.0008
+    merge.voxel_size = 0.0007
     apply_modifiers(tooth)
-    # The chewing-surface groove: a shallow cross between the cusps.
-    for radii in ((0.02, 0.0019, 0.003), (0.0019, 0.017, 0.003)):
-        cutter = ellipsoid((0, 0, 0.0515), radii, 24, 12, "Groove")
-        carve = tooth.modifiers.new("Groove", "BOOLEAN")
+    # The central split between the roots, and the chewing groove: carved.
+    cutters = [
+        ellipsoid((0, 0, 0.004), (0.0046, 0.03, 0.022), 24, 16, "Split"),
+        ellipsoid((0, 0, 0.0655), (0.019, 0.0018, 0.0028), 24, 12, "Groove"),
+        ellipsoid((0, 0, 0.0655), (0.0018, 0.015, 0.0028), 24, 12, "Groove"),
+    ]
+    for cutter in cutters:
+        carve = tooth.modifiers.new("Carve", "BOOLEAN")
         carve.operation = "DIFFERENCE"
         carve.object = cutter
         carve.solver = "EXACT"
@@ -1178,12 +1206,12 @@ def molar():
         except RuntimeError:
             tooth.modifiers.remove(carve)
         bpy.data.objects.remove(cutter, do_unlink=True)
-    soften_mesh = tooth.modifiers.new("Soft", "REMESH")
-    soften_mesh.mode = "VOXEL"
-    soften_mesh.voxel_size = 0.0009
+    soft = tooth.modifiers.new("Soft", "REMESH")
+    soft.mode = "VOXEL"
+    soft.voxel_size = 0.0008
     smooth = tooth.modifiers.new("Smooth", "LAPLACIANSMOOTH")
-    smooth.iterations = 5
-    smooth.lambda_factor = 0.6
+    smooth.iterations = 18
+    smooth.lambda_factor = 0.8
     smooth.use_volume_preserve = True
     decimate = tooth.modifiers.new("Decimate", "DECIMATE")
     decimate.ratio = 0.3
@@ -1194,13 +1222,13 @@ def molar():
 
 
 def build_tooth(mats):
-    """001: a small, smoothly sculpted molar standing on its roots on an ivory cushion, tipped a little
-    toward the visitor so its cusps and groove show from the gallery, with a small paper tag."""
+    """001: a small, smoothly sculpted molar standing upright on its roots on an ivory cushion, turned so
+    its crown-and-roots silhouette faces the gallery, with a small paper tag."""
     props = [rbox("Cushion", -0.05, 0.05, -0.038, 0.038, 0, 0.016, 0.0075, 4, mat=mats["velvet"])]
     tooth = molar()
     tooth.data.materials.append(mats["enamel"])
-    tooth.location = (-0.004, 0.004, 0.0135)  # Root tips just into the velvet.
-    tooth.rotation_euler = (math.radians(16), 0, math.radians(-10))
+    tooth.location = (-0.004, 0.004, 0.0145)  # Root tips just into the velvet.
+    tooth.rotation_euler = (math.radians(3), 0, math.radians(-6))  # Upright, its silhouette to the visitor.
     props.append(tooth)
     tag = rbox("ToothTag", -0.013, 0.013, -0.0075, 0.0075, 0, 0.0012, 0.0012, 2, mat=mats["sample_label"])
     tag.location = (0.035, -0.027, 0.0162)
@@ -1295,7 +1323,7 @@ def build_book_stack(mats):
         book = parent([cover, pages], f"ListBook{n + 1}")
         book.location.z = t / 2 + n * t
         books.append(book)
-    return on_tray(6, books, 0.16, 0.058, mats)
+    return on_tray(6, books, 0.11, 0.058, mats)
 
 
 def build_discoveries(mats):

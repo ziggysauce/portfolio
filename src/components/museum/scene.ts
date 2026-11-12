@@ -329,6 +329,13 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       node.material = shade;
       return;
     }
+    if (node.name === "PrinterLight") {
+      // The kitchen printer's small status light: lit, restrained.
+      const light = new THREE.MeshBasicMaterial({ name: "PrinterLight", color: "#8fdcaa", toneMapped: false });
+      owned.push(light);
+      node.material = light;
+      return;
+    }
     if (node.name === "LampLining") {
       // Its opal lining, lit by the bulb: the warm glow under the shade.
       const lining = new THREE.MeshBasicMaterial({ name: "LampLining", color: "#f7ddb0", toneMapped: false, side: THREE.DoubleSide });
@@ -599,6 +606,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         anchor: new THREE.Vector3(centre, DRAWER.y0 + 0.016, DRAWER.front - 0.088),
         specimen,
         compact: () => width / height < 0.8,
+        travel: DRAWER.travel,
       });
     }
     // A caption pinned to the specimen (006's plaque, 003's bump bar), fixed in the world once placed.
