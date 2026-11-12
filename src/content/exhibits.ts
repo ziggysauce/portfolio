@@ -99,7 +99,6 @@ export const exhibits: Exhibit[] = [
     quote: "Please don’t tap the glass during the dinner rush.",
     status: "on-view",
     specimen: "KDS",
-    caption: "Bump bar",
     drawer: {
       kind: "bell",
       reveal: "You’re an expo now.",
@@ -165,7 +164,12 @@ export const exhibits: Exhibit[] = [
 export const onView = exhibits.filter((exhibit) => exhibit.status !== "planned");
 
 /** A small unnumbered display between the last case and the desk. Not a stop on the walk. */
-export const fatherhood = { title: "Fatherhood", note: "Exhibit in progress." };
+export const fatherhood = {
+  title: "Fatherhood",
+  note: "Exhibit in progress.",
+  /** What's on the plinth, for screen readers (the label above is all that's shown). */
+  setting: "On the plinth, mid-installation: a wooden stacking-ring toy, partly assembled, two rings beside it, a dust cloth and a pencil on a checklist. Choose specimen: done. Finish installation: not yet.",
+};
 
 /** The Information desk, the walk's last stop. */
 export const desk = {

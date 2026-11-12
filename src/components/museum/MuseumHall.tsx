@@ -18,7 +18,7 @@ type Props = {
   links: { about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
   desk: { summary: string; farewell: string };
   /** The small unnumbered display between the last case and the desk: a card, not a stop. */
-  fatherhood: { title: string; note: string };
+  fatherhood: { title: string; note: string; setting: string };
 };
 
 /**
@@ -665,7 +665,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     </aside>
                   ) : null}
                   {exhibit.caption && !fallback ? (
-                    // Words on the object itself (006's plaque, 003's bump bar), pinned to it as crisp text.
+                    // Words on the object itself (006's plaque), pinned to it as crisp text.
                     <p
                       ref={(node) => {
                         captions.current[i] = node;
@@ -686,6 +686,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   <p className={styles.plinthNote}>
                     <em>{fatherhood.note}</em>
                   </p>
+                  <p className="sr-only">{fatherhood.setting}</p>
                 </div>
               </li>
               <li key="desk">

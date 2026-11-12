@@ -134,7 +134,7 @@ def rod(name, p0, p1, radius, mat, vertices=10):
     return obj
 
 
-def text_mesh(name, body, size, mat, extrude=0.00025):
+def text_mesh(name, body, size, mat, extrude=0.00025, resolution=12):
     """Flat lettering in Blender's built-in font, lying in the XY plane, centred, read from -Y."""
     bpy.ops.object.text_add(location=(0, 0, 0))
     obj = bpy.context.active_object
@@ -143,6 +143,7 @@ def text_mesh(name, body, size, mat, extrude=0.00025):
     obj.data.align_x = "CENTER"
     obj.data.align_y = "CENTER"
     obj.data.extrude = extrude
+    obj.data.resolution_u = resolution  # Curve smoothness; tiny print needs very little.
     bpy.ops.object.convert(target="MESH")
     obj = bpy.context.active_object
     obj.name = name
@@ -837,15 +838,94 @@ def build_plinth(mats):
     lining = box("PlinthLining", -0.111, 0.111, -0.111, 0.111, 0.6455, 0.6475, bevel=0.0105, segments=4)
     lining.data.materials.append(mats["ivory"])
     shade_smooth(lining)
-    return parent([body, lining], "Plinth")
+    vignette = build_plinth_vignette(mats, 0.6475)
+    return parent([body, lining, vignette], "Plinth")
+
+
+def build_plinth_vignette(mats, top):
+    """The exhibit being prepared, as if the curator just stepped away: a small wooden stacking-ring toy,
+    partly assembled, two rings still beside it, a folded dust cloth over one corner of the plinth, and a
+    pencil on a short checklist. A few things, neatly placed; nothing else."""
+    parts = []
+    # The toy: a round oak base, a peg, three rings on (largest at the bottom), muted colours.
+    base = rcyl("ToyBase", 0.034, 0.012, (0, 0, top + 0.006), edge=0.004, vertices=48)
+    parts.append(oak(base, 390, mats))
+    peg = rcyl("ToyPeg", 0.0065, 0.07, (0, 0, top + 0.012 + 0.035), edge=0.003, vertices=24)
+    parts.append(oak(peg, 391, mats))
+    knob = ellipsoid((0, 0, top + 0.082 + 0.004), (0.009, 0.009, 0.008), 24, 12, "ToyKnob")
+    shade_smooth(knob)
+    parts.append(oak(knob, 392, mats))
+    rings = [(0.029, mats["book_b"]), (0.025, mats["book_c"]), (0.021, mats["book_a"])]
+    z = top + 0.012
+    for k, (r, mat) in enumerate(rings):
+        bpy.ops.mesh.primitive_torus_add(major_radius=r - 0.006, minor_radius=0.0085, major_segments=32, minor_segments=12, location=(0, 0, z + 0.0085))
+        ring = bpy.context.active_object
+        ring.name = f"ToyRing{k + 1}"
+        ring.scale.z = 0.95
+        shade_smooth(ring)
+        ring.data.materials.append(mat)
+        parts.append(ring)
+        z += 0.016
+    toy = parent(parts, "StackingToy")
+    toy.location = (0.03, 0.012, 0)
+    # The two rings still to go on, lying flat beside it.
+    loose = []
+    for k, (r, mat, x, y) in enumerate(((0.017, mats["book_slate"], -0.052, -0.038), (0.014, mats["book_olive"], -0.074, -0.004))):
+        bpy.ops.mesh.primitive_torus_add(major_radius=r - 0.005, minor_radius=0.0072, major_segments=28, minor_segments=12, location=(x, y, top + 0.0072))
+        ring = bpy.context.active_object
+        ring.name = f"LooseRing{k + 1}"
+        shade_smooth(ring)
+        ring.data.materials.append(mat)
+        loose.append(ring)
+    # The checklist: a small card, two lines, one ticked; a pencil across it.
+    card = [rbox("Checklist", -0.032, 0.032, -0.041, 0.041, 0, 0.0012, 0.0008, 2, mat=mats["paper"])]
+    for k, (label, done) in enumerate((("Choose specimen", True), ("Finish installation", False))):
+        y = 0.018 - k * 0.022
+        box_outline = [
+            box("Tick", -0.027, -0.019, y - 0.004, y - 0.0033, 0.0012, 0.0016),
+            box("Tick", -0.027, -0.019, y + 0.0033, y + 0.004, 0.0012, 0.0016),
+            box("Tick", -0.027, -0.0263, y - 0.004, y + 0.004, 0.0012, 0.0016),
+            box("Tick", -0.0197, -0.019, y - 0.004, y + 0.004, 0.0012, 0.0016),
+        ]
+        if done:
+            box_outline.append(rod("Tick", (-0.0262, y, 0.0015), (-0.0235, y - 0.003, 0.0015), 0.0006, None, vertices=6))
+            box_outline.append(rod("Tick", (-0.0235, y - 0.003, 0.0015), (-0.0185, y + 0.005, 0.0015), 0.0006, None, vertices=6))
+        mark = join(box_outline, "ChecklistMarks")
+        mark.data.materials.append(mats["ink"])
+        card.append(mark)
+        words = text_mesh("ChecklistText", label, 0.0042, mats["ink"], extrude=0.0, resolution=2)
+        words.location = (0.008, y, 0.0013)
+        card.append(words)
+    checklist = parent(card, "Checklist")
+    checklist.location = (-0.045, 0.06, top)
+    checklist.rotation_euler.z = math.radians(-14)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0034, depth=0.078, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    pencil_body = bpy.context.active_object
+    pencil_body.data.materials.append(mats["pencil"])
+    tip = cone("PencilTip", 0.0032, 0.0008, 0.014, (0.046, 0, 0), rotation=(0, math.radians(90), 0), vertices=12, mat=mats["cedar"])
+    end = rcyl("PencilEnd", 0.0034, 0.008, (-0.043, 0, 0), rotation=(0, math.radians(90), 0), edge=0.0012, vertices=12, mat=mats["bronze"])
+    pencil = parent([pencil_body, tip, end], "PlinthPencil")
+    pencil.location = (-0.04, 0.052, top + 0.0012 + 0.0034)
+    pencil.rotation_euler.z = math.radians(32)
+    # The dust cloth: folded, laid over the front-right corner of the cap, one end hanging down the side.
+    cloth = []
+    cloth.append(rbox("ClothFold", -0.035, 0.035, -0.028, 0.028, 0, 0.007, 0.003, 3, mat=mats["linen"]))
+    flap = rbox("ClothFlap", -0.035, 0.035, -0.003, 0.003, -0.05, 0.0, 0.0028, 3, mat=mats["linen"])
+    flap.location = (0, -0.029, 0.004)
+    flap.rotation_euler.x = math.radians(-8)
+    cloth.append(flap)
+    dust = parent(cloth, "DustCloth")
+    dust.location = (0.112, -0.128, 0.655)
+    dust.rotation_euler.z = math.radians(-35)
+    return parent([toy, checklist, pencil, dust] + loose, "Vignette")
 
 
 # ---------------------------------------------------------------- 003: the first KDS
 
 
 def build_kds(mats):
-    """An early kitchen display on an oak stand, mid-service, with its bump bar in front: chunky
-    restaurant hardware with a soft, rounded casing."""
+    """An early kitchen display on an oak stand, mid-service, with a small thermal chit printer beside it:
+    chunky restaurant hardware with a soft, rounded casing."""
     z, cy = DECK_Z, CASE_Y
     w, h, d = 0.25, 0.165, 0.024
     screen = []
@@ -883,30 +963,9 @@ def build_kds(mats):
     base.data.materials.append(mats["oak_prop"])
     stand.append(base)
 
-    # The bump bar: a chunky dark wedge whose cream keys slope toward the cook (and the visitor), the
-    # first key in sage. Tilted up on two rubber feet at the back, so its key face reads from the gallery.
-    bd = 0.026
-    bar = [rbox("BumpBar", -0.098, 0.098, -bd, bd, 0, 0.017, 0.0075, mat=mats["bezel"])]
-    keys = []
-    for i in range(10):
-        x = -0.0846 + i * 0.0188
-        keys.append(rbox("BumpKey", x - 0.0074, x + 0.0074, -0.0125, 0.0125, 0.012, 0.0235, 0.003, 3))
-    accent = keys.pop(0)
-    accent.data.materials.append(mats["key_accent"])
-    bump_keys = join(keys, "BumpKeys")
-    bump_keys.data.materials.append(mats["keycap"])
-    bar += [bump_keys, accent]
-    tilt = pivot(parent(bar, "BumpTilt"), (0.0, -bd, 0.0))
-    tilt.rotation_euler.x = math.radians(18)  # Key face toward the front.
-    feet = [rcyl("BumpFoot", 0.0058, 0.0128, (x, 0.012, 0.0064), edge=0.002, vertices=20, mat=mats["bezel"]) for x in (-0.078, 0.078)]
-    caption = anchor("CaptionAnchor", (0.0, -bd - 0.03, 0.0))  # On the deck in front: "Bump bar".
-    bump = parent([tilt, caption] + feet, "Bump")
-    bump.location = (0.0, cy - 0.1475, z)
-    bump.rotation_euler.z = math.radians(-3)
-
-    # A small thermal kitchen printer at the front right, clear of the bump bar: a rounded dark casing,
-    # a paper slot on top, a small status light and an output tray in front. The web scene feeds the
-    # chits from "ChitSlot" and lays the torn first chit at "ChitTrayAnchor".
+    # A small thermal kitchen printer at the front right of the deck: a rounded dark casing, a paper slot
+    # on top and a small status light. The web scene feeds the chits from "ChitSlot" and lays the cut
+    # first chit on the deck at "ChitRestAnchor", to the printer's left, in clear view.
     printer = [rbox("PrinterBody", -0.032, 0.032, -0.03, 0.03, 0, 0.044, 0.01, 5, mat=mats["bezel"])]
     printer.append(rbox("PrinterSlot", -0.026, 0.026, -0.016, -0.009, 0.041, 0.0448, 0.0025, 2, mat=mats["printer_slot"]))
     printer.append(rbox("PrinterLid", -0.028, 0.028, -0.006, 0.026, 0.043, 0.0465, 0.006, 3, mat=mats["bezel"]))
@@ -914,15 +973,13 @@ def build_kds(mats):
     shade_smooth(light)
     printer.append(with_mat(light, mats["printer_light"]))
     printer.append(anchor("ChitSlot", (0, -0.0125, 0.0448)))
-    printer.append(rbox("ChitTray", -0.03, 0.03, -0.112, -0.03, 0, 0.004, 0.002, 2, mat=mats["bezel"]))
-    printer.append(rbox("ChitTrayLip", -0.03, 0.03, -0.114, -0.108, 0.003, 0.009, 0.002, 2, mat=mats["bezel"]))
-    printer.append(anchor("ChitTrayAnchor", (0, -0.104, 0.0045)))
+    printer.append(anchor("ChitRestAnchor", (-0.105, -0.05, 0.0012)))
     kitchen = parent(printer, "ChitPrinter")
     kitchen.scale = (1.25, 1.25, 1.25)  # Big enough for its chits to read at gallery distance.
-    kitchen.location = (0.152, cy - 0.055, z)
+    kitchen.location = (0.1, cy - 0.075, z)
     kitchen.rotation_euler.z = math.radians(-8)
 
-    return parent([display] + stand + [bump, kitchen], "KDS")
+    return parent([display] + stand + [kitchen], "KDS")
 
 
 # ---------------------------------------------------------------- the information desk
@@ -1153,68 +1210,96 @@ def on_tray(n, props, half_w, half_d, mats):
     return parent([lift, column], f"Discovery{n}")
 
 
-def molar():
-    """A cute, stylized molar as one continuous form: a softly squared crown with four cusps worked into
-    its top and a shallow cross groove, a gentle waist below the crown, and two long roots that flow out of
-    it, taper to rounded tips and part around a clear central split. Volumes are fused by a voxel remesh and
-    smoothed well, so there's no seam between crown and roots; the split and groove are carved."""
-    parts = []
-    # The crown: a superellipsoid, squarish in plan and softly rounded.
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=1, location=(0, 0, 0))
-    crown = bpy.context.active_object
-    for v in crown.data.vertices:
-        x, y, z = v.co
-        # Squared top, rounder underside, so it flows into the waist instead of sitting on it like a lid.
-        zz = math.copysign(abs(z) ** 0.8, z) if z > 0 else z
-        v.co = (math.copysign(abs(x) ** 0.62, x) * 0.0215, math.copysign(abs(y) ** 0.62, y) * 0.0175, zz * 0.0135 + 0.05)
-    parts.append(crown)
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            parts.append(ellipsoid((sx * 0.0088, sy * 0.0068, 0.0598), (0.0102, 0.0088, 0.0042), 24, 16, "Cusp"))
-    # The waist: narrower than the crown, carrying it down into the roots.
-    parts.append(ellipsoid((0, 0, 0.04), (0.0178, 0.0148, 0.0125), 32, 20, "Waist"))
-    # Two roots, each one tapered, gently bent form from inside the waist to a rounded tip.
-    for sx in (-1, 1):
-        root = ellipsoid((0, 0, 0), (0.0088, 0.0094, 0.0215), 32, 24, "Root")
-        for v in root.data.vertices:
-            x, y, z = v.co
-            u = (0.0215 - z) / 0.043  # 0 at the top, 1 at the tip.
-            taper = 1.0 - 0.34 * u
-            v.co = (x * taper + sx * 0.0075 * u * u, y * taper, z)
-        root.location = (sx * 0.0098, 0, 0.0215)
-        activate(root)
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
-        parts.append(root)
-    tooth = join(parts, "Tooth")
-    merge = tooth.modifiers.new("Merge", "REMESH")
-    merge.mode = "VOXEL"
-    merge.voxel_size = 0.0007
-    apply_modifiers(tooth)
-    # The central split between the roots, and the chewing groove: carved.
-    cutters = [
-        ellipsoid((0, 0, 0.004), (0.0046, 0.03, 0.022), 24, 16, "Split"),
-        ellipsoid((0, 0, 0.0655), (0.019, 0.0018, 0.0028), 24, 12, "Groove"),
-        ellipsoid((0, 0, 0.0655), (0.0018, 0.015, 0.0028), 24, 12, "Groove"),
+def tooth_outline(samples=14):
+    """The tooth's front silhouette as one smooth closed curve (x across, z up, metres): a broad body with
+    two soft lobes and a gentle dip on top, full sides running straight down into two thick roots, and a
+    rounded inverted-U opening between them. Catmull-Rom through a few key points, mirrored."""
+    right = [
+        (0.0, 0.0555),  # the dip between the lobes
+        (0.0095, 0.0605),
+        (0.0185, 0.0608),  # the right lobe
+        (0.0245, 0.0565),
+        (0.0272, 0.048),
+        (0.0275, 0.036),  # full side, barely narrowing
+        (0.0262, 0.024),
+        (0.024, 0.012),
+        (0.021, 0.0035),  # the root's outer foot
+        (0.0165, 0.0),
+        (0.0115, 0.0012),  # its rounded tip
+        (0.0085, 0.0075),
+        (0.0072, 0.016),  # the root's inner side
+        (0.0055, 0.0225),
+        (0.0, 0.0255),  # the top of the inverted U
     ]
-    for cutter in cutters:
-        carve = tooth.modifiers.new("Carve", "BOOLEAN")
-        carve.operation = "DIFFERENCE"
-        carve.object = cutter
-        carve.solver = "EXACT"
-        try:
-            apply_modifiers(tooth)
-        except RuntimeError:
-            tooth.modifiers.remove(carve)
-        bpy.data.objects.remove(cutter, do_unlink=True)
-    soft = tooth.modifiers.new("Soft", "REMESH")
-    soft.mode = "VOXEL"
-    soft.voxel_size = 0.0008
-    smooth = tooth.modifiers.new("Smooth", "LAPLACIANSMOOTH")
-    smooth.iterations = 18
+    left = [(-x, z) for x, z in reversed(right[1:-1])]
+    points = right + left
+    n = len(points)
+    curve = []
+    for k in range(n):
+        p0, p1, p2, p3 = points[k - 1], points[k], points[(k + 1) % n], points[(k + 2) % n]
+        for step in range(samples):
+            t = step / samples
+            t2, t3 = t * t, t * t * t
+            curve.append(tuple(0.5 * (2 * p1[a] + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3) for a in (0, 1)))
+    return curve
+
+
+def molar():
+    """A cute tooth icon, original, modelled from its silhouette (tooth_outline): the outline is lofted
+    front to back, inset more toward each face so every edge curves fully round, then fused and smoothed
+    into one soft body. No collar or seam, and the roots stay thick nearly to their rounded ends."""
+    outline = tooth_outline()
+    n = len(outline)
+    area = sum(outline[k][0] * outline[(k + 1) % n][1] - outline[(k + 1) % n][0] * outline[k][1] for k in range(n))
+    inward = []
+    for k in range(n):
+        (x0, z0), (x1, z1) = outline[k - 1], outline[(k + 1) % n]
+        tx, tz = x1 - x0, z1 - z0
+        length = math.hypot(tx, tz) or 1
+        nx, nz = -tz / length, tx / length  # Left of the direction of travel.
+        if area < 0:
+            nx, nz = -nx, -nz
+        inward.append((nx, nz))
+    half, radius, rings = 0.0175, 0.0047, 12  # The inset stays under the roots' narrowest half-width.
+    bm = bmesh.new()
+    layers = []
+    for r in range(rings + 1):
+        theta = -math.pi / 2 + math.pi * r / rings
+        y = half * math.sin(theta)
+        inset = radius * (1 - math.cos(theta))
+        layers.append([bm.verts.new((x + nx * inset, y, z + nz * inset)) for (x, z), (nx, nz) in zip(outline, inward)])
+    for a, b in zip(layers, layers[1:]):
+        for k in range(n):
+            bm.faces.new((a[k], a[(k + 1) % n], b[(k + 1) % n], b[k]))
+    # The flat front and back: the outline is concave (the U between the roots), so fill each properly.
+    for ring in (layers[0], layers[-1]):
+        edges = [bm.edges.get((ring[k], ring[(k + 1) % n])) for k in range(n)]
+        bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=edges)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    mesh = bpy.data.meshes.new("Tooth")
+    bm.to_mesh(mesh)
+    bm.free()
+    tooth = bpy.data.objects.new("Tooth", mesh)
+    bpy.context.scene.collection.objects.link(tooth)
+    fuse = tooth.modifiers.new("Fuse", "REMESH")
+    fuse.mode = "VOXEL"
+    fuse.voxel_size = 0.0007
+    apply_modifiers(tooth)
+    # Puff the front and back softly: most in the body, a little down each root, none at the edges.
+    def bump(x, z, cx, cz, rx, rz):
+        return max(0.0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2) ** 2  # Smooth to zero at its edge.
+
+    for v in tooth.data.vertices:
+        x, y, z = v.co
+        parts = (bump(x, z, 0, 0.038, 0.034, 0.034), 0.75 * bump(x, z, -0.0155, 0.013, 0.012, 0.024), 0.75 * bump(x, z, 0.0155, 0.013, 0.012, 0.024))
+        w = 1 - (1 - parts[0]) * (1 - parts[1]) * (1 - parts[2])  # A soft union: no crease where they meet.
+        v.co.y = y * (1 + 0.55 * w)
+    smooth = tooth.modifiers.new("Soften", "LAPLACIANSMOOTH")
+    smooth.iterations = 22
     smooth.lambda_factor = 0.8
     smooth.use_volume_preserve = True
     decimate = tooth.modifiers.new("Decimate", "DECIMATE")
-    decimate.ratio = 0.3
+    decimate.ratio = 0.14
     apply_modifiers(tooth)
     tooth.data.materials.clear()
     shade_smooth(tooth)
@@ -1227,8 +1312,8 @@ def build_tooth(mats):
     props = [rbox("Cushion", -0.05, 0.05, -0.038, 0.038, 0, 0.016, 0.0075, 4, mat=mats["velvet"])]
     tooth = molar()
     tooth.data.materials.append(mats["enamel"])
-    tooth.location = (-0.004, 0.004, 0.0145)  # Root tips just into the velvet.
-    tooth.rotation_euler = (math.radians(3), 0, math.radians(-6))  # Upright, its silhouette to the visitor.
+    tooth.location = (0.0, 0.002, 0.0145)  # Root tips just into the velvet.
+    tooth.rotation_euler = (math.radians(-4), 0, math.radians(4))  # Upright, its outline square to the visitor.
     props.append(tooth)
     tag = rbox("ToothTag", -0.013, 0.013, -0.0075, 0.0075, 0, 0.0012, 0.0012, 2, mat=mats["sample_label"])
     tag.location = (0.035, -0.027, 0.0162)
@@ -1323,7 +1408,7 @@ def build_book_stack(mats):
         book = parent([cover, pages], f"ListBook{n + 1}")
         book.location.z = t / 2 + n * t
         books.append(book)
-    return on_tray(6, books, 0.11, 0.058, mats)
+    return on_tray(6, books, 0.24, 0.058, mats)  # Wide enough to catch the stack when it topples.
 
 
 def build_discoveries(mats):

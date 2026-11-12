@@ -606,10 +606,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         anchor: new THREE.Vector3(centre, DRAWER.y0 + 0.016, DRAWER.front - 0.088),
         specimen,
         compact: () => width / height < 0.8,
-        travel: DRAWER.travel,
       });
     }
-    // A caption pinned to the specimen (006's plaque, 003's bump bar), fixed in the world once placed.
+    // A caption pinned to the specimen (006's plaque), fixed in the world once placed.
     const markers: THREE.Object3D[] = [];
     specimen?.traverse((node) => {
       if (node.name.startsWith("CaptionAnchor")) markers.push(node);
