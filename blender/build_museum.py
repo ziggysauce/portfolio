@@ -452,11 +452,14 @@ def build_skull(material):
 
     add((0, 0.008, 0.122), (0.086, 0.088, 0.079), 56, 36)  # the cranium: broad, round, most of the head
     add((0, 0.036, 0.104), (0.072, 0.064, 0.062))  # the back of the head, so it sits full and round
-    add((0, -0.034, 0.078), (0.069, 0.056, 0.05))  # the face: short and wide
-    for s in (-1, 1):
-        add((s * 0.042, -0.046, 0.062), (0.026, 0.024, 0.022))  # rounded cheeks, sunk into the face
-    add((0, -0.04, 0.032), (0.05, 0.047, 0.03))  # a small rounded jaw
-    add((0, -0.076, 0.046), (0.031, 0.012, 0.0125))  # the row of front teeth, flush with the face
+    # The face: short and wide, with the cheeks as part of one soft mass rather than separate volumes
+    # (separate cheek balls read as stacked ridges down the sides).
+    add((0, -0.032, 0.077), (0.072, 0.056, 0.052))
+    add((0, -0.038, 0.034), (0.052, 0.047, 0.031))  # a small rounded jaw
+    # Four simple teeth, each its own soft volume, just overlapping: the merge leaves a gentle valley between
+    # neighbours instead of a carved groove (carved grooves this small came out as a dark slot or crumbs).
+    for x in (-0.0219, -0.0073, 0.0073, 0.0219):
+        add((x, -0.077, 0.0465), (0.0092, 0.0115, 0.0124), 24, 16)
 
     skull = join(parts, "Skull")
     activate(skull)
@@ -471,8 +474,6 @@ def build_skull(material):
         cutters.append(ellipsoid((s * 0.034, -0.084, 0.104), (0.027, 0.028, 0.026)))  # big round sockets, deep enough to read
     cutters.append(ellipsoid((0, -0.09, 0.07), (0.0075, 0.024, 0.0105)))  # a tiny nose
     cutters.append(ellipsoid((0, -0.09, 0.0355), (0.035, 0.026, 0.0032)))  # the bite, under the teeth
-    for x in (-0.0145, 0.0, 0.0145):  # three soft grooves: four simple teeth
-        cutters.append(ellipsoid((x, -0.088, 0.048), (0.003, 0.014, 0.0105), 12, 10))
     # One cutter at a time: overlapping cutters joined into one object confuse the exact solver.
     # A cut that collapses the mesh or fails (the exact solver occasionally does on a tiny cutter) is undone.
     for cutter in cutters:

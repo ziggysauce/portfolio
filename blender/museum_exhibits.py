@@ -58,12 +58,33 @@ def cone(name, r1, r2, depth, location, rotation=(0, 0, 0), vertices=20, mat=Non
 
 
 def soften(obj, width=0.002, segments=2):
+    """Rounds every hard edge. Hardened normals keep the flats flat, so a rounded edge reads as one
+    broad, clean highlight instead of a smeared gradient across the face."""
     mod = obj.modifiers.new("Soft", "BEVEL")
     mod.width = width
     mod.segments = segments
     mod.limit_method = "ANGLE"
-    apply_modifiers(obj)
+    mod.harden_normals = True
     shade_smooth(obj)
+    apply_modifiers(obj)
+    return obj
+
+
+def rbox(name, x0, x1, y0, y1, z0, z1, radius, segments=4, mat=None):
+    """A box with intentionally rounded edges: the collectibles' basic building block."""
+    radius = min(radius, 0.49 * min(x1 - x0, y1 - y0, z1 - z0))
+    obj = soften(box(name, x0, x1, y0, y1, z0, z1), radius, segments)
+    if mat is not None:
+        obj.data.materials.append(mat)
+    return obj
+
+
+def rcyl(name, radius, depth, location, rotation=(0, 0, 0), edge=0.002, vertices=40, mat=None):
+    """A cylinder with rounded rims."""
+    obj = cyl(name, radius, depth, location, rotation=rotation, vertices=vertices, smooth=False)
+    obj = soften(obj, min(edge, 0.45 * depth, 0.45 * radius), 3)
+    if mat is not None:
+        obj.data.materials.append(mat)
     return obj
 
 
@@ -73,9 +94,10 @@ def with_mat(obj, mat):
 
 
 def oak(obj, seed, mats):
-    """Grain-mapped oak, as on the cabinets."""
+    """Oak for props and the desk: the cabinets' grain, which the web scene renders quieter on these
+    small, near pieces (material "OakProp"), so the exhibits don't carry loud repeated stripes."""
     grain_uv(obj, seed=seed)
-    obj.data.materials.append(mats["grain"])
+    obj.data.materials.append(mats["oak_prop"])
     return obj
 
 
@@ -395,6 +417,8 @@ def add_materials(mats):
         "leaflet_b": principled("LeafletSage", srgb("#a9b9a2"), 0.9),
         "leaflet_c": principled("LeafletRose", srgb("#d6a88f"), 0.9),
         "ceramic": principled("Ceramic", srgb("#ddd3c2"), 0.35),
+        "lamp_lining": principled("LampLining", srgb("#f3e2c0"), 0.9),
+        "oak_prop": principled("OakProp", srgb("#c99f72"), 0.42, image=next(n.image for n in mats["grain"].node_tree.nodes if n.type == "TEX_IMAGE")),
         "leaf_dark": principled("LeafDark", srgb("#4f6b4a"), 0.55),
         "book_a": principled("BookTerracotta", srgb("#a4573f"), 0.8),
         "book_b": principled("BookTeal", srgb("#3f6466"), 0.8),
@@ -407,53 +431,62 @@ def add_materials(mats):
 
 
 def sample_tube(mats, x, fill, seed):
-    """A rounded-bottom sample tube: clear glass, a ruby sample, a cream label band and a stopper.
-    Built standing on z 0 at (x, 0)."""
-    r, length = 0.0085, 0.088
+    """A chubby, rounded-bottom sample tube: clear glass, a ruby sample, a cream label band and a
+    domed cork stopper. Built standing on z 0 at (x, 0)."""
+    r, length = 0.0105, 0.07
     parts = []
-    glass = join([ellipsoid((x, 0, r), (r, r, r), 20, 12, "TubeEnd"), cyl("TubeWall", r, length, (x, 0, r + length / 2), vertices=20)], "TubeGlass")
+    glass = join([ellipsoid((x, 0, r), (r, r, r), 28, 14, "TubeEnd"), cyl("TubeWall", r, length, (x, 0, r + length / 2), vertices=28)], "TubeGlass")
     shade_smooth(glass)
     parts.append(with_mat(glass, mats["tube_glass"]))
     s = r * 0.8
-    sample = join([ellipsoid((x, 0, r), (s, s, s), 16, 10, "SampleEnd"), cyl("SampleBody", s, fill, (x, 0, r + fill / 2), vertices=16)], "Sample")
+    sample = join([ellipsoid((x, 0, r), (s, s, s), 20, 12, "SampleEnd"), cyl("SampleBody", s, fill, (x, 0, r + fill / 2), vertices=20)], "Sample")
     shade_smooth(sample)
     parts.append(with_mat(sample, mats["ruby"]))
-    parts.append(cyl("TubeLabel", r * 1.03, 0.014, (x, 0, r + fill + 0.017), vertices=20, mat=mats["sample_label"]))
-    stopper = soften(cyl("Stopper", r * 1.18, 0.013, (x, 0, r + length + 0.004), vertices=20, smooth=False), 0.0025, 2)
+    parts.append(rcyl("TubeLabel", r * 1.04, 0.013, (x, 0, r + fill + 0.016), edge=0.0012, vertices=28, mat=mats["sample_label"]))
+    top = r + length
+    plug = rcyl("Stopper", r * 1.22, 0.011, (x, 0, top + 0.002), edge=0.0035, vertices=28)
+    dome = ellipsoid((x, 0, top + 0.0072), (r * 1.08, r * 1.08, 0.0052), 28, 12, "StopperDome")
+    stopper = join([plug, dome], "Stopper")
+    shade_smooth(stopper)
     parts.append(with_mat(stopper, mats["stopper"]))
     return parts
 
 
 def build_samples(mats):
-    """A small oak rack holding three rounded sample tubes, and two glass slides in a brass holder.
-    Warm, tidy, and nothing a squeamish visitor would mind."""
+    """One small composed grouping: a rounded oak rack holding three chubby sample tubes, and two glass
+    slides leaning in a brass holder tucked in front of it. Warm, tidy, nothing a squeamish visitor would mind."""
     z, cy = DECK_Z, CASE_Y
     rack = []
-    rack.append(oak(soften(box("RackBase", -0.072, 0.072, -0.024, 0.024, 0, 0.012), 0.003, 3), 340, mats))
-    for x in (-0.066, 0.066):
-        rack.append(oak(soften(box("RackPost", x - 0.006, x + 0.006, -0.012, 0.012, 0.012, 0.064), 0.002, 2), 341, mats))
-    rack.append(oak(soften(box("RackRail", -0.072, 0.072, -0.014, 0.014, 0.052, 0.062), 0.0025, 2), 342, mats))
-    for i, (x, fill) in enumerate(((-0.038, 0.034), (0.0, 0.044), (0.038, 0.028))):
+    rack.append(oak(rbox("RackBase", -0.076, 0.076, -0.027, 0.027, 0, 0.014, 0.006), 340, mats))
+    for x in (-0.068, 0.068):
+        rack.append(oak(rcyl("RackPost", 0.0068, 0.052, (x, 0, 0.04), edge=0.002, vertices=24), 341, mats))
+        finial = ellipsoid((x, 0, 0.068), (0.0088, 0.0088, 0.0078), 24, 12, "RackFinial")
+        shade_smooth(finial)
+        rack.append(oak(finial, 341, mats))
+    rack.append(oak(rbox("RackRail", -0.068, 0.068, -0.016, 0.016, 0.05, 0.062, 0.0055), 342, mats))
+    for i, (x, fill) in enumerate(((-0.038, 0.032), (0.0, 0.042), (0.038, 0.026))):
         rack += sample_tube(mats, x, fill, i)
     for part in rack:
-        part.location.z += 0.012 if part.name.startswith(("Tube", "Sample", "Stopper")) else 0
+        part.location.z += 0.014 if part.name.startswith(("Tube", "Sample", "Stopper")) else 0
     rack_group = parent(rack, "TubeRack")
-    rack_group.location = (-0.042, cy + 0.03, z)
+    rack_group.location = (-0.04, cy + 0.03, z)
     rack_group.rotation_euler.z = math.radians(7)
 
-    holder = [with_mat(soften(box("SlideHolder", -0.046, 0.046, -0.016, 0.016, 0, 0.012), 0.003, 3), mats["bronze"])]
+    holder = [rbox("SlideHolder", -0.05, 0.05, -0.018, 0.018, 0, 0.014, 0.006, mat=mats["bronze"])]
     for i, y in enumerate((-0.005, 0.006)):
         slide = []
-        slide.append(with_mat(box("SlideGlass", -0.038, 0.038, -0.0006, 0.0006, 0, 0.026), mats["slide_glass"]))
-        slide.append(with_mat(box("SlideLabel", -0.038, -0.018, -0.0009, 0.0009, 0.0005, 0.0255), mats["sample_label"]))
-        slide.append(with_mat(ellipsoid((0.008 - i * 0.006, -0.0008, 0.014), (0.012, 0.0004, 0.0055), 16, 8, "Smear"), mats["ruby"]))
+        slide.append(rbox("SlideGlass", -0.042, 0.042, -0.0008, 0.0008, 0, 0.03, 0.0007, 2, mat=mats["slide_glass"]))
+        slide.append(rbox("SlideLabel", -0.042, -0.02, -0.0011, 0.0011, 0.0006, 0.0294, 0.0007, 2, mat=mats["sample_label"]))
+        smear = ellipsoid((0.01 - i * 0.006, -0.001, 0.0155), (0.0145, 0.0005, 0.0068), 20, 8, "Smear")
+        shade_smooth(smear)
+        slide.append(with_mat(smear, mats["ruby"]))
         group = parent(slide, "Slide")
-        group.location = (i * 0.004, y, 0.006)
-        group.rotation_euler.x = math.radians(-12)  # Leaning back in its slot, face to the visitor.
+        group.location = (i * 0.004, y, 0.007)
+        group.rotation_euler.x = math.radians(-18)  # Leaning back in its slot, face up to the visitor.
         holder.append(group)
     holder_group = parent(holder, "SlideStand")
-    holder_group.location = (0.1, cy - 0.075, z)
-    holder_group.rotation_euler.z = math.radians(-14)
+    holder_group.location = (0.088, cy - 0.06, z)
+    holder_group.rotation_euler.z = math.radians(-16)
 
     return parent([rack_group, holder_group], "Samples")
 
@@ -462,70 +495,86 @@ def build_samples(mats):
 
 
 def build_laptop(mats):
-    """An open laptop with a code review on screen, the main object; a small whiteboard on an oak
-    foot behind it, the nearly dry marker resting in its tray, and the marker's cap on the deck."""
+    """An open laptop with a code review on screen, the main object: a little chunky, with soft edges
+    and a visible hinge. A small whiteboard on an oak foot behind it, and the nearly dry marker lying
+    uncapped on the deck in front, its cap beside it."""
     z, cy = DECK_Z, CASE_Y
-    w, d, t = 0.1, 0.0675, 0.007
-    base = [with_mat(soften(box("LaptopBase", -w, w, -d, d, 0, t), 0.003, 3), mats["alu"])]
+    w, d, t = 0.1, 0.0675, 0.011
+    base = [rbox("LaptopBase", -w, w, -d, d, 0, t, 0.0045, mat=mats["alu"])]
     keys = []
     for row in range(5):
         for col in range(12):
             x = -0.0825 + col * 0.015
-            y = 0.049 - row * 0.0125
-            keys.append(box("Key", x - 0.0058, x + 0.0058, y - 0.005, y + 0.005, t - 0.0004, t + 0.0007))
+            y = 0.047 - row * 0.0125
+            keys.append(rbox("Key", x - 0.0058, x + 0.0058, y - 0.005, y + 0.005, t - 0.0004, t + 0.0011, 0.0011, 1))
     base.append(with_mat(join(keys, "LaptopKeys"), mats["laptop_key"]))
-    base.append(with_mat(box("Trackpad", -0.036, 0.036, -0.06, -0.018, t - 0.0002, t + 0.0003), mats["trackpad"]))
-    lid = [with_mat(soften(box("LaptopLid", -w, w, 0, 0.005, 0, 0.13), 0.0025, 3), mats["alu"])]
-    lid.append(with_mat(box("LaptopBezel", -w + 0.003, w - 0.003, -0.0006, 0.0005, 0.003, 0.127), mats["bezel"]))
+    base.append(rbox("Trackpad", -0.036, 0.036, -0.061, -0.02, t - 0.0003, t + 0.0003, 0.0025, 3, mat=mats["trackpad"]))
+    # The hinge: a dark barrel along the back edge, the lid turning about it.
+    base.append(rcyl("Hinge", 0.0042, 2 * w - 0.05, (0, d - 0.0035, t + 0.0012), rotation=(0, math.radians(90), 0), edge=0.0015, vertices=24, mat=mats["bezel"]))
+    lid_t = 0.0065
+    lid = [rbox("LaptopLid", -w, w, 0, lid_t, 0, 0.13, 0.003, mat=mats["alu"])]
+    lid.append(rbox("LaptopBezel", -w + 0.003, w - 0.003, -0.0006, 0.0006, 0.003, 0.127, 0.0025, 3, mat=mats["bezel"]))
     display = box("LaptopScreen", -0.091, 0.091, -0.0012, -0.0002, 0.009, 0.12)
     plane_uv(display, 0, 2)
     lid.append(with_mat(display, mats["laptop_screen"]))
     lid_group = parent(lid, "Lid")
-    lid_group.location = (0, d - 0.003, t)
+    lid_group.location = (0, d - 0.004, t + 0.001)
     lid_group.rotation_euler.x = math.radians(-14)  # Opened a little past upright, as if mid-review.
     laptop = parent(base + [lid_group], "LaptopBody")
     laptop.location = (-0.045, cy - 0.02, z)
     laptop.rotation_euler.z = math.radians(6)
 
     # The whiteboard: a small framed board on an oak foot, a tray along its bottom edge.
-    bw, bh = 0.046, 0.068
+    bw, bh = 0.05, 0.072
     board = []
     face = box("Board", -bw, bw, -0.002, 0.002, 0, bh)
     plane_uv(face, 0, 2)
     board.append(with_mat(face, mats["board"]))
     rails = [
-        box("BoardRail", -bw - 0.004, bw + 0.004, -0.004, 0.004, bh - 0.002, bh + 0.004, bevel=0.0015, segments=2),
-        box("BoardRail", -bw - 0.004, -bw + 0.002, -0.004, 0.004, 0, bh),
-        box("BoardRail", bw - 0.002, bw + 0.004, -0.004, 0.004, 0, bh),
-        box("BoardTray", -bw - 0.004, bw + 0.004, -0.016, 0.004, -0.004, 0.002, bevel=0.0015, segments=2),
-        box("TrayLip", -bw - 0.004, bw + 0.004, -0.017, -0.014, 0.002, 0.006, bevel=0.001, segments=2),
+        rbox("BoardRail", -bw - 0.005, bw + 0.005, -0.0045, 0.0045, bh - 0.002, bh + 0.005, 0.0022, 3),
+        rbox("BoardRail", -bw - 0.005, -bw + 0.002, -0.0045, 0.0045, 0, bh, 0.0022, 3),
+        rbox("BoardRail", bw - 0.002, bw + 0.005, -0.0045, 0.0045, 0, bh, 0.0022, 3),
+        rbox("BoardTray", -bw - 0.005, bw + 0.005, -0.016, 0.0045, -0.005, 0.002, 0.0022, 3),
+        rbox("TrayLip", -bw - 0.005, bw + 0.005, -0.018, -0.0135, 0.0015, 0.0065, 0.0016, 2),
     ]
     board.append(with_mat(join(rails, "BoardFrame"), mats["alu"]))
-    # The marker in the tray: a short body, a coloured band at the back, a felt nib gone pale.
-    m = []
-    m.append(cyl("MarkerBody", 0.0052, 0.064, (0, 0, 0), rotation=(0, math.radians(90), 0), vertices=20, mat=mats["marker"]))
-    m.append(cyl("MarkerBand", 0.0054, 0.008, (-0.026, 0, 0), rotation=(0, math.radians(90), 0), vertices=20, mat=mats["marker_cap"]))
-    m.append(cone("MarkerTaper", 0.0052, 0.0028, 0.009, (0.0365, 0, 0), rotation=(0, math.radians(90), 0), mat=mats["marker"]))
-    m.append(with_mat(box("Nib", 0.041, 0.0455, -0.0018, 0.0018, -0.0012, 0.0012), mats["felt"]))
-    marker = parent(m, "MarkerPen")
-    marker.location = (0.004, -0.0095, 0.002 + 0.0052)
-    board.append(marker)
     board_group = parent(board, "MiniBoard")
     board_group.rotation_euler.x = math.radians(-10)  # Leaning back in its foot.
-    foot = [oak(soften(box("BoardFoot", -0.05, 0.05, -0.014, 0.014, 0, 0.012), 0.003, 3), 343, mats), board_group]
-    board_group.location = (0, 0.004, 0.012)
+    foot = [oak(rbox("BoardFoot", -0.054, 0.054, -0.015, 0.015, 0, 0.013, 0.005), 343, mats), board_group]
+    board_group.location = (0, 0.004, 0.013)
     stand = parent(foot, "BoardStand")
     stand.location = (0.118, cy + 0.11, z)
     stand.rotation_euler.z = math.radians(-12)
 
-    c = []
-    c.append(cyl("CapBody", 0.0064, 0.03, (0, 0, 0), rotation=(0, math.radians(90), 0), vertices=20, mat=mats["marker_cap"]))
-    c.append(with_mat(soften(box("Clip", -0.012, 0.01, -0.0018, 0.0018, 0.0058, 0.0084), 0.0008), mats["marker_cap"]))
-    cap = parent(c, "MarkerCap")
-    cap.location = (0.125, cy - 0.085, z + 0.0064)
-    cap.rotation_euler.z = math.radians(-32)
+    # The nearly dry marker, big enough to read at gallery distance: a cream barrel with a rounded end,
+    # a red band, a short taper and a pale felt nib. Lying on the deck, uncapped.
+    r = 0.0072
+    m = []
+    m.append(cyl("MarkerBody", r, 0.064, (0, 0, 0), rotation=(0, math.radians(90), 0), vertices=28, mat=mats["marker"]))
+    end = ellipsoid((-0.032, 0, 0), (0.006, r, r), 28, 14, "MarkerEnd")
+    shade_smooth(end)
+    m.append(with_mat(end, mats["marker"]))
+    m.append(rcyl("MarkerBand", r * 1.04, 0.009, (-0.024, 0, 0), rotation=(0, math.radians(90), 0), edge=0.0012, vertices=28, mat=mats["marker_cap"]))
+    m.append(cone("MarkerTaper", r, 0.0034, 0.011, (0.0375, 0, 0), rotation=(0, math.radians(90), 0), vertices=28, mat=mats["marker"]))
+    nib = ellipsoid((0.045, 0, 0), (0.0045, 0.0027, 0.0027), 16, 10, "Nib")
+    shade_smooth(nib)
+    m.append(with_mat(nib, mats["felt"]))
+    marker = parent(m, "MarkerPen")
+    marker.location = (0.112, cy - 0.08, z + r)
+    marker.rotation_euler.z = math.radians(-24)
 
-    return parent([laptop, stand, cap], "Laptop")
+    rc = 0.0088
+    c = []
+    c.append(cyl("CapBody", rc, 0.032, (0, 0, 0), rotation=(0, math.radians(90), 0), vertices=28, mat=mats["marker_cap"]))
+    cap_end = ellipsoid((0.016, 0, 0), (0.005, rc, rc), 28, 14, "CapEnd")
+    shade_smooth(cap_end)
+    c.append(with_mat(cap_end, mats["marker_cap"]))
+    c.append(rbox("Clip", -0.013, 0.012, -0.0022, 0.0022, rc - 0.0012, rc + 0.0024, 0.0011, 2, mat=mats["marker_cap"]))
+    cap = parent(c, "MarkerCap")
+    cap.location = (0.158, cy - 0.03, z + rc)
+    cap.rotation_euler.z = math.radians(-64)
+
+    return parent([laptop, stand, marker, cap], "Laptop")
 
 
 # ---------------------------------------------------------------- 005: plans & pull requests
@@ -541,11 +590,12 @@ def build_planning(mats):
     face = box("Cork", -bw, bw, 0, 0.008, 0, bh)
     plane_uv(face, 0, 2)
     board = [with_mat(face, mats["cork"])]
+    # A chunky rounded frame, like a well-handled school pinboard.
     frame = [
-        box("BoardFrame", -bw - 0.01, bw + 0.01, -0.004, 0.01, -0.01, 0.0, bevel=0.002, segments=2),
-        box("BoardFrame", -bw - 0.01, bw + 0.01, -0.004, 0.01, bh, bh + 0.01, bevel=0.002, segments=2),
-        box("BoardFrame", -bw - 0.01, -bw, -0.004, 0.01, 0, bh, bevel=0.002, segments=2),
-        box("BoardFrame", bw, bw + 0.01, -0.004, 0.01, 0, bh, bevel=0.002, segments=2),
+        rbox("BoardFrame", -bw - 0.011, bw + 0.011, -0.006, 0.011, -0.011, 0.001, 0.0045, 3),
+        rbox("BoardFrame", -bw - 0.011, bw + 0.011, -0.006, 0.011, bh - 0.001, bh + 0.011, 0.0045, 3),
+        rbox("BoardFrame", -bw - 0.011, -bw + 0.001, -0.006, 0.011, 0, bh, 0.0045, 3),
+        rbox("BoardFrame", bw - 0.001, bw + 0.011, -0.006, 0.011, 0, bh, 0.0045, 3),
     ]
     board.append(oak(join(frame, "CorkFrame"), 344, mats))
     # Cards: lanes top to bottom, columns left to right. (lane, column) -> material; the code change
@@ -576,45 +626,49 @@ def build_planning(mats):
     milestones = [(0, 1), (1, 2), (2, 3), (0, 3)]
     for key in milestones:
         x, y, zc = pins[key]
-        board.append(with_mat(ellipsoid((x, y - 0.002, zc), (0.0034, 0.0034, 0.0034), 12, 8, "PinHead"), mats["bronze"]))
+        pin = ellipsoid((x, y - 0.002, zc), (0.0038, 0.0038, 0.0038), 16, 10, "PinHead")
+        shade_smooth(pin)
+        board.append(with_mat(pin, mats["bronze"]))
     for a, b in (((0, 1), (1, 2)), ((1, 2), (2, 3)), ((0, 3), (1, 2))):
         pa, pb = pins[a], pins[b]
         board.append(rod("Thread", (pa[0], pa[1] - 0.003, pa[2]), (pb[0], pb[1] - 0.003, pb[2]), 0.0007, mats["thread"], vertices=6))
     # The easel: two front legs behind the board, a ledge it stands on, a back leg.
     for x in (-0.08, 0.08):
-        board.append(oak(box("EaselLeg", x - 0.0055, x + 0.0055, 0.008, 0.018, -0.045, bh + 0.035), 345, mats))
-    board.append(oak(soften(box("EaselLedge", -bw - 0.014, bw + 0.014, -0.016, 0.012, -0.022, -0.01), 0.002), 346, mats))
+        leg = rcyl("EaselLeg", 0.0062, bh + 0.08, (x, 0.013, (bh + 0.035 - 0.045) / 2), edge=0.003, vertices=20)
+        board.append(oak(leg, 345, mats))
+    board.append(oak(rbox("EaselLedge", -bw - 0.016, bw + 0.016, -0.018, 0.012, -0.024, -0.01, 0.005), 346, mats))
     easel = pivot(parent(board, "Easel"), (0, 0.013, -0.045))
     easel.location = (0, 0.013, 0)  # Legs on the deck.
     easel.rotation_euler.x = math.radians(-11)
     top = (0, 0.013 + (bh + 0.08) * math.sin(math.radians(11)), (bh + 0.08) * math.cos(math.radians(11)) - 0.005)
-    back_leg = oak(rod("EaselBack", top, (0, 0.13, 0.0), 0.0045, None, vertices=8), 347, mats)
+    back_leg = oak(rod("EaselBack", top, (0, 0.13, 0.0), 0.0052, None, vertices=16), 347, mats)
     easel_group = parent([easel, back_leg], "PlanningBoard")
     easel_group.location = (-0.045, cy + 0.035, z)
 
     # The flip calendar: an A-frame of two boards meeting under brass rings; the front carries the
     # pages, with three muted tabs along their edge.
     ch, cw, splay = 0.072, 0.043, math.radians(17)
-    front = [with_mat(soften(box("CalBack", -cw, cw, 0, 0.003, 0, ch), 0.0012), mats["calendar_board"])]
-    front.append(with_mat(box("CalPages", -cw + 0.002, cw - 0.002, -0.004, 0.0, 0.002, ch - 0.004), mats["paper"]))
-    page = box("CalPage", -cw + 0.002, cw - 0.002, -0.0045, -0.0039, 0.002, ch - 0.004)
+    front = [rbox("CalBack", -cw, cw, 0, 0.0035, 0, ch, 0.0016, 3, mat=mats["calendar_board"])]
+    front.append(rbox("CalPages", -cw + 0.002, cw - 0.002, -0.0045, 0.0, 0.002, ch - 0.004, 0.0012, 2, mat=mats["paper"]))
+    page = box("CalPage", -cw + 0.0025, cw - 0.0025, -0.0052, -0.0046, 0.0025, ch - 0.0045)  # Proud of the page block, so they never z-fight.
     plane_uv(page, 0, 2)
     front.append(with_mat(page, mats["calendar_page"]))
     for i, mat in enumerate(tabs):
-        front.append(with_mat(box("CalTab", cw - 0.002, cw + 0.006, -0.0038, -0.001, 0.012 + i * 0.016, 0.022 + i * 0.016), mat))
+        front.append(rbox("CalTab", cw - 0.002, cw + 0.0065, -0.0038, -0.001, 0.012 + i * 0.016, 0.0225 + i * 0.016, 0.0012, 2, mat=mat))
     front_group = parent(front, "CalFront")
     front_group.location = (0, -ch * math.sin(splay), 0)
     front_group.rotation_euler.x = -splay
-    back = [with_mat(soften(box("CalRear", -cw, cw, 0, 0.003, 0, ch), 0.0012), mats["calendar_board"])]
+    back = [rbox("CalRear", -cw, cw, 0, 0.0035, 0, ch, 0.0016, 3, mat=mats["calendar_board"])]
     back_group = parent(back, "CalRearGroup")
     back_group.location = (0, ch * math.sin(splay) + 0.003, 0)
     back_group.rotation_euler.x = splay
     rings = []
     apex = ch * math.cos(splay)
     for x in np.linspace(-cw + 0.008, cw - 0.008, 5):
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.0042, minor_radius=0.0007, major_segments=16, minor_segments=6, location=(x, 0.0015, apex - 0.001), rotation=(0, math.radians(90), 0))
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.0044, minor_radius=0.0009, major_segments=24, minor_segments=8, location=(x, 0.0015, apex - 0.001), rotation=(0, math.radians(90), 0))
         rings.append(bpy.context.active_object)
     ring_obj = with_mat(join(rings, "CalRings"), mats["bronze"])
+    shade_smooth(ring_obj)
     calendar = parent([front_group, back_group, ring_obj], "FlipCalendar")
     calendar.location = (0.128, cy - 0.085, z)
     calendar.rotation_euler.z = math.radians(-20)
@@ -633,9 +687,10 @@ def build_after_hours(mats):
     books = []
     zb = 0.0
     for mat, w, l, t, turn in ((mats["book_slate"], 0.13, 0.17, 0.026, 3), (mats["book_oat"], 0.12, 0.16, 0.02, -5), (mats["book_olive"], 0.105, 0.15, 0.022, 9)):
-        cover = soften(box("BookCover", -w / 2, w / 2, -l / 2, l / 2, 0, t), 0.0025, 2)
+        # Soft, pillowy cloth boards over a cream page block, with a rounded spine on the left.
+        cover = rbox("BookCover", -w / 2, w / 2, -l / 2, l / 2, 0, t, 0.0055, 4)
         cover.data.materials.append(mat)
-        pages = box("BookPages", -w / 2 + 0.004, w / 2 + 0.0005, -l / 2 + 0.004, l / 2 - 0.004, 0.003, t - 0.003)
+        pages = rbox("BookPages", -w / 2 + 0.006, w / 2 + 0.0008, -l / 2 + 0.005, l / 2 - 0.005, 0.0035, t - 0.0035, 0.0012, 2)
         pages.data.materials.append(mats["paper"])
         book = parent([cover, pages], "Book")
         book.location = (0, 0, zb)
@@ -648,21 +703,21 @@ def build_after_hours(mats):
 
     # The record: its sleeve upright in an oak stand, the disc slid halfway out of the open side.
     sw = 0.085
-    sleeve = box("Sleeve", -sw, sw, -0.002, 0.002, 0, 2 * sw)
+    sleeve = rbox("Sleeve", -sw, sw, -0.0024, 0.0024, 0, 2 * sw, 0.0016, 3)
     plane_uv(sleeve, 0, 2)
     rec = [with_mat(sleeve, mats["sleeve"])]
-    disc = cyl("Disc", 0.08, 0.0014, (0.07, 0, sw), rotation=(math.radians(90), 0, 0), vertices=48, smooth=False)
+    disc = soften(cyl("Disc", 0.08, 0.0018, (0.07, 0, sw), rotation=(math.radians(90), 0, 0), vertices=72, smooth=False), 0.0007, 2)
     plane_uv(disc, 0, 2)
     rec.append(with_mat(disc, mats["vinyl"]))
     record = parent(rec, "Record")
     record.location = (0, 0, 0.008)
     record.rotation_euler.x = math.radians(-8)
-    stand = parent([oak(soften(box("RecordStand", -0.095, 0.095, -0.016, 0.016, 0, 0.014), 0.003, 3), 348, mats), record], "RecordStand")
+    stand = parent([oak(rbox("RecordStand", -0.095, 0.095, -0.017, 0.017, 0, 0.015, 0.006), 348, mats), record], "RecordStand")
     stand.location = (-0.035, cy + 0.12, z)
     stand.rotation_euler.z = math.radians(4)
 
     # The pan: a small cast-iron skillet, hollow, with a long handle and a helper lip.
-    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=0.066, depth=0.024, location=(0, 0, 0.012))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.066, depth=0.024, location=(0, 0, 0.012))
     skillet = bpy.context.active_object
     bm = bmesh.new()
     bm.from_mesh(skillet.data)
@@ -673,8 +728,8 @@ def build_after_hours(mats):
     wall.thickness = 0.0045
     wall.offset = -1
     apply_modifiers(skillet)
-    skillet = soften(skillet, 0.0016, 2)
-    handle = soften(box("PanHandle", 0.06, 0.135, -0.0075, 0.0075, 0.014, 0.024), 0.004, 3)
+    skillet = soften(skillet, 0.0021, 3)  # A rolled rim and a soft base edge.
+    handle = soften(box("PanHandle", 0.06, 0.135, -0.0078, 0.0078, 0.0135, 0.0245), 0.0045, 3)
     hole = ellipsoid((0.124, 0, 0.019), (0.009, 0.004, 0.02), 12, 8, "HandleHole")
     cut = handle.modifiers.new("Hole", "BOOLEAN")
     cut.operation = "DIFFERENCE"
@@ -682,7 +737,7 @@ def build_after_hours(mats):
     cut.solver = "EXACT"
     apply_modifiers(handle)
     bpy.data.objects.remove(hole, do_unlink=True)
-    lip = ellipsoid((-0.07, 0, 0.02), (0.012, 0.016, 0.004), 14, 8, "HelperLip")
+    lip = ellipsoid((-0.07, 0, 0.02), (0.012, 0.016, 0.0042), 20, 10, "HelperLip")
     pan = join([skillet, handle, lip], "Skillet")
     shade_smooth(pan)
     pan.data.materials.append(mats["cast_iron"])
@@ -692,24 +747,28 @@ def build_after_hours(mats):
 
     # The camera: a compact rangefinder shape, leatherette body under a satin top plate. No maker's marks.
     cam = []
-    cam.append(with_mat(soften(box("CameraBody", -0.05, 0.05, -0.015, 0.015, 0, 0.04), 0.004, 3), mats["leatherette"]))
-    cam.append(with_mat(soften(box("TopPlate", -0.05, 0.05, -0.015, 0.015, 0.04, 0.055), 0.004, 3), mats["alu"]))
+    # A chubby little rangefinder: soft corners, a satin top plate, a short rounded lens.
+    cam.append(rbox("CameraBody", -0.05, 0.05, -0.016, 0.016, 0, 0.041, 0.0085, 4, mat=mats["leatherette"]))
+    cam.append(rbox("TopPlate", -0.05, 0.05, -0.016, 0.016, 0.039, 0.056, 0.0072, 4, mat=mats["alu"]))
     lx, lz = 0.008, 0.026
-    cam.append(cyl("LensMount", 0.019, 0.006, (lx, -0.018, lz), rotation=(math.radians(90), 0, 0), vertices=28, mat=mats["alu"]))
-    cam.append(cyl("LensBarrel", 0.017, 0.022, (lx, -0.032, lz), rotation=(math.radians(90), 0, 0), vertices=28, mat=mats["leatherette"]))
-    cam.append(cyl("FocusRing", 0.0175, 0.004, (lx, -0.04, lz), rotation=(math.radians(90), 0, 0), vertices=28, mat=mats["alu"]))
-    cam.append(cyl("LensGlass", 0.012, 0.001, (lx, -0.0435, lz), rotation=(math.radians(90), 0, 0), vertices=24, mat=mats["lens_glass"]))
-    cam.append(with_mat(box("Viewfinder", -0.042, -0.028, -0.0158, -0.0148, 0.044, 0.051), mats["lens_glass"]))
-    cam.append(with_mat(box("Rangefinder", 0.03, 0.04, -0.0158, -0.0148, 0.044, 0.051), mats["lens_glass"]))
-    cam.append(cyl("Shutter", 0.0042, 0.005, (0.032, 0, 0.0575), vertices=16, mat=mats["alu"]))
-    cam.append(cyl("Dial", 0.0085, 0.005, (-0.03, 0, 0.0575), vertices=24, mat=mats["alu"]))
+    rx = (math.radians(90), 0, 0)
+    cam.append(rcyl("LensMount", 0.0195, 0.007, (lx, -0.019, lz), rotation=rx, edge=0.0018, mat=mats["alu"]))
+    cam.append(rcyl("LensBarrel", 0.017, 0.02, (lx, -0.032, lz), rotation=rx, edge=0.002, mat=mats["leatherette"]))
+    cam.append(rcyl("FocusRing", 0.018, 0.005, (lx, -0.04, lz), rotation=rx, edge=0.0016, mat=mats["alu"]))
+    lens = ellipsoid((lx, -0.0425, lz), (0.0125, 0.0022, 0.0125), 28, 12, "LensGlass")
+    shade_smooth(lens)
+    cam.append(with_mat(lens, mats["lens_glass"]))
+    cam.append(rbox("Viewfinder", -0.042, -0.027, -0.0168, -0.0152, 0.0435, 0.0515, 0.0012, 2, mat=mats["lens_glass"]))
+    cam.append(rbox("Rangefinder", 0.03, 0.041, -0.0168, -0.0152, 0.0435, 0.0515, 0.0012, 2, mat=mats["lens_glass"]))
+    cam.append(rcyl("Shutter", 0.0045, 0.006, (0.032, 0, 0.0585), edge=0.0016, vertices=24, mat=mats["alu"]))
+    cam.append(rcyl("Dial", 0.009, 0.006, (-0.03, 0, 0.0585), edge=0.0018, mat=mats["alu"]))
     camera = parent(cam, "Camera")
     camera.location = (0.19, cy + 0.02, z)
     camera.rotation_euler.z = math.radians(-14)
 
     # The empty spot: a low oak block where the shoes would stand, and a small brass plaque.
-    spot = [oak(soften(box("ShoeBlock", -0.055, 0.055, -0.032, 0.032, 0, 0.01), 0.0025, 2), 349, mats)]
-    plate = [with_mat(soften(box("Plaque", -0.032, 0.032, -0.0095, 0.0095, 0, 0.002), 0.0008), mats["bronze"])]
+    spot = [oak(rbox("ShoeBlock", -0.055, 0.055, -0.032, 0.032, 0, 0.01, 0.004, 3), 349, mats)]
+    plate = [rbox("Plaque", -0.032, 0.032, -0.0095, 0.0095, 0, 0.002, 0.0009, 2, mat=mats["bronze"])]
     lettering = text_mesh("PlaqueText", "Running shoes", 0.0082, mats["ink"])
     lettering.location = (0, 0, 0.0021)
     plate.append(lettering)
@@ -749,33 +808,41 @@ def build_plinth(mats):
 
 
 def build_kds(mats):
-    """An early kitchen display on an oak stand, mid-service, with its bump bar in front."""
+    """An early kitchen display on an oak stand, mid-service, with its bump bar in front: chunky
+    restaurant hardware with a soft, rounded casing."""
     z, cy = DECK_Z, CASE_Y
-    w, h, d = 0.25, 0.165, 0.02
+    w, h, d = 0.25, 0.165, 0.024
     screen = []
-    screen.append(with_mat(soften(box("Bezel", -w / 2, w / 2, -d / 2, d / 2, -h / 2, h / 2), 0.006, 3), mats["bezel"]))
-    glass = box("Screen", -w / 2 + 0.012, w / 2 - 0.012, -d / 2 - 0.0012, -d / 2 + 0.001, -h / 2 + 0.012, h / 2 - 0.016)
+    screen.append(rbox("Bezel", -w / 2, w / 2, -d / 2, d / 2, -h / 2, h / 2, 0.012, 5, mat=mats["bezel"]))
+    # The rear housing: a smaller rounded block, so the display has some body behind the bezel.
+    screen.append(rbox("Housing", -w / 2 + 0.03, w / 2 - 0.03, d / 2 - 0.004, d / 2 + 0.018, -h / 2 + 0.025, h / 2 - 0.03, 0.009, 4, mat=mats["bezel"]))
+    glass = box("Screen", -w / 2 + 0.014, w / 2 - 0.014, -d / 2 - 0.0012, -d / 2 + 0.001, -h / 2 + 0.014, h / 2 - 0.018)
     plane_uv(glass, 0, 2)
     glass.data.materials.append(mats["screen"])
     screen.append(glass)
-    screen.append(with_mat(ellipsoid((0, -d / 2 - 0.0005, -h / 2 + 0.008), (0.0025, 0.001, 0.0025), 10, 6, "Power"), mats["key_accent"]))
+    power = ellipsoid((0, -d / 2 - 0.0005, -h / 2 + 0.0085), (0.003, 0.0012, 0.003), 16, 8, "Power")
+    shade_smooth(power)
+    screen.append(with_mat(power, mats["key_accent"]))
     display = parent(screen, "Display")
     display.location = (0.0, cy + 0.03, z + 0.165)
     display.rotation_euler.x = math.radians(-14)  # Tilted back, as if for a cook to read.
 
     stand = []
-    stand.append(with_mat(soften(box("StandArm", -0.012, 0.012, cy + 0.035, cy + 0.06, z + 0.01, z + 0.11), 0.003), mats["bronze"]))
-    base = soften(box("StandBase", -0.07, 0.07, cy - 0.01, cy + 0.09, z, z + 0.014), 0.004, 3)
+    stand.append(rcyl("StandArm", 0.0125, 0.1, (0, cy + 0.05, z + 0.062), edge=0.003, vertices=32, mat=mats["bronze"]))
+    collar = ellipsoid((0, cy + 0.05, z + 0.016), (0.019, 0.019, 0.007), 32, 12, "StandCollar")
+    shade_smooth(collar)
+    stand.append(with_mat(collar, mats["bronze"]))
+    base = rbox("StandBase", -0.072, 0.072, cy - 0.012, cy + 0.092, z, z + 0.014, 0.0065)
     grain_uv(base, seed=301)
-    base.data.materials.append(mats["grain"])
+    base.data.materials.append(mats["oak_prop"])
     stand.append(base)
 
-    # The bump bar: a dark strip of square keys, angled a little toward the visitor.
-    bar = [with_mat(soften(box("BumpBar", -0.095, 0.095, cy - 0.17, cy - 0.125, z, z + 0.014), 0.004), mats["bezel"])]
+    # The bump bar: a dark rounded strip of soft cream keys, angled a little toward the visitor.
+    bar = [rbox("BumpBar", -0.097, 0.097, cy - 0.172, cy - 0.123, z, z + 0.016, 0.0075, mat=mats["bezel"])]
     keys = []
     for i in range(10):
         x = -0.084 + i * 0.0187
-        keys.append(box("BumpKey", x - 0.007, x + 0.007, cy - 0.158, cy - 0.137, z + 0.014, z + 0.02))
+        keys.append(rbox("BumpKey", x - 0.0072, x + 0.0072, cy - 0.159, cy - 0.136, z + 0.014, z + 0.0225, 0.0028, 3))
     bump_keys = join(keys, "BumpKeys")
     bump_keys.data.materials.append(mats["keycap"])
     bar.append(bump_keys)
@@ -786,6 +853,25 @@ def build_kds(mats):
 
 
 # ---------------------------------------------------------------- the information desk
+
+
+def banker_hood(length=0.105, depth=0.047, height=0.046):
+    """The open surface of a banker's lamp shade: the top half of a superellipsoid, long along x, with
+    ends that are rounded but fuller than an egg's. Built at the origin with its rim on z 0."""
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=40, radius=1, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    hood = bpy.context.active_object
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)  # Poles at the ends, along x.
+    for v in hood.data.vertices:
+        x, y, z = v.co
+        v.co = (math.copysign(abs(x) ** 0.55, x) * length, y * depth, z * height)
+    bm = bmesh.new()
+    bm.from_mesh(hood.data)
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 0), plane_no=(0, 0, 1), clear_inner=True)
+    bm.to_mesh(hood.data)
+    bm.free()
+    hood.name = "LampHood"
+    shade_smooth(hood)
+    return hood
 
 
 def build_desk(mats):
@@ -803,26 +889,31 @@ def build_desk(mats):
     for i, part in enumerate(oak):
         grain_uv(part, seed=320 + i)
     desk = join(oak, "DeskOak")
-    desk.data.materials.append(mats["grain"])
+    desk.data.materials.append(mats["oak_prop"])  # Supporting furniture: the quieter oak.
     shade_smooth(desk)
     leather = box("DeskLeather", -0.43, 0.43, cy - 0.22, cy + 0.17, h, h + 0.003, bevel=0.002, segments=2)
     leather.data.materials.append(mats["leather"])
 
-    # Brass service bell: a dome on a round base with a little plunger.
+    # Brass service bell: a smooth dome on a rounded base with a little plunger. Dense and smooth-shaded,
+    # so its highlights are clean arcs rather than facets.
     bell = []
-    bell.append(cyl("BellBase", 0.038, 0.012, (0, 0, 0.006), mat=mats["bronze"]))
-    bell.append(with_mat(ellipsoid((0, 0, 0.014), (0.033, 0.033, 0.03), 28, 14, "BellDome"), mats["bronze"]))
-    bell.append(cyl("BellStem", 0.0025, 0.012, (0, 0, 0.048), mat=mats["bronze"]))
-    bell.append(with_mat(ellipsoid((0, 0, 0.056), (0.006, 0.006, 0.004), 12, 8, "BellButton"), mats["bronze"]))
+    bell.append(rcyl("BellBase", 0.039, 0.012, (0, 0, 0.006), edge=0.0035, vertices=64, mat=mats["bronze"]))
+    dome = ellipsoid((0, 0, 0.0135), (0.033, 0.033, 0.03), 48, 24, "BellDome")
+    shade_smooth(dome)
+    bell.append(with_mat(dome, mats["bronze"]))
+    bell.append(cyl("BellStem", 0.0026, 0.012, (0, 0, 0.048), vertices=16, mat=mats["bronze"]))
+    button = ellipsoid((0, 0, 0.056), (0.0065, 0.0065, 0.0045), 24, 12, "BellButton")
+    shade_smooth(button)
+    bell.append(with_mat(button, mats["bronze"]))
     bell_group = parent(bell, "Bell")
     bell_group.location = (-0.24, cy - 0.12, h + 0.003)
 
     # A tiered brochure stand with three stacks of leaflets in different papers.
     stand = []
     for tier in range(3):
-        step = soften(box("BrochureTier", -0.08, 0.08, -0.02 + tier * 0.035, 0.015 + tier * 0.035, 0, 0.03 + tier * 0.03), 0.003)
+        step = rbox("BrochureTier", -0.08, 0.08, -0.02 + tier * 0.035, 0.015 + tier * 0.035, 0, 0.03 + tier * 0.03, 0.004, 3)
         grain_uv(step, seed=330 + tier)
-        step.data.materials.append(mats["grain"])
+        step.data.materials.append(mats["oak_prop"])
         stand.append(step)
     for tier, mat in enumerate((mats["leaflet_a"], mats["leaflet_b"], mats["leaflet_c"])):
         leaf = box("Leaflets", -0.06, 0.06, -0.014 + tier * 0.035, -0.006 + tier * 0.035, 0.03 + tier * 0.03, 0.105 + tier * 0.03)
@@ -833,29 +924,38 @@ def build_desk(mats):
     brochures.location = (0.27, cy + 0.02, h + 0.003)
     brochures.rotation_euler.z = math.radians(-10)
 
-    # A banker's lamp: brass foot and stem, a green glass shade (the web scene makes it glow).
+    # A banker's lamp: a domed brass foot and stem, and a proper banker's shade: a long, softly domed
+    # green glass hood with rounded ends and a rolled rim, lined in warm opal glass. (The web scene lights
+    # the lining from the bulb and gives the green glass gloss and a faint glow.)
     lamp = []
-    lamp.append(soften(cyl("LampFoot", 0.05, 0.016, (0, 0, 0.008), smooth=False, mat=mats["bronze"]), 0.004))
-    lamp.append(cyl("LampStem", 0.006, 0.2, (0, 0.02, 0.11), mat=mats["bronze"]))
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.06, depth=0.2, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
-    shade = bpy.context.active_object
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)  # Axis along x before the cut.
-    bm = bmesh.new()
-    bm.from_mesh(shade.data)
-    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 0.0), plane_no=(0, 0, 1), clear_inner=True)
-    bm.to_mesh(shade.data)
-    bm.free()
-    solid = shade.modifiers.new("Glass", "SOLIDIFY")
-    solid.thickness = 0.004
-    apply_modifiers(shade)
-    shade.name = "LampShade"
-    shade.scale = (1, 0.75, 0.55)
-    activate(shade)
+    lamp.append(rcyl("LampFoot", 0.05, 0.014, (0, 0, 0.007), edge=0.005, vertices=64, mat=mats["bronze"]))
+    foot_dome = ellipsoid((0, 0, 0.014), (0.034, 0.034, 0.012), 48, 16, "LampFootDome")
+    shade_smooth(foot_dome)
+    lamp.append(with_mat(foot_dome, mats["bronze"]))
+    lamp.append(cyl("LampStem", 0.0062, 0.19, (0, 0.02, 0.105), vertices=24, mat=mats["bronze"]))
+    hood = banker_hood()
+    lining = hood.copy()
+    lining.data = hood.data.copy()
+    bpy.context.scene.collection.objects.link(lining)
+    lining.name = "LampLining"
+    lining.scale = (0.96, 0.92, 0.9)  # Clear of the glass, which is solidified 2.8 mm inward.
+    activate(lining)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    shade_smooth(shade)
-    shade.data.materials.append(mats["lamp_glass"])
-    shade.location = (0, -0.005, 0.21)
-    lamp.append(shade)
+    lining.data.materials.append(mats["lamp_lining"])
+    # The glass: given thickness inward, then its rim rolled.
+    glass = hood.modifiers.new("Glass", "SOLIDIFY")
+    glass.thickness = 0.0028
+    glass.offset = -1
+    apply_modifiers(hood)
+    hood = soften(hood, 0.0011, 2)
+    hood.name = "LampShade"
+    hood.data.materials.append(mats["lamp_glass"])
+    for part in (hood, lining):
+        part.location = (0, -0.004, 0.193)
+        lamp.append(part)
+    finial = ellipsoid((0, -0.004, 0.193 + 0.046), (0.0062, 0.0062, 0.005), 24, 12, "LampFinial")
+    shade_smooth(finial)
+    lamp.append(with_mat(finial, mats["bronze"]))
     lamp_group = parent(lamp, "BankersLamp")
     lamp_group.location = (0.02, cy + 0.08, h + 0.003)
 

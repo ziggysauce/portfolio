@@ -32,7 +32,7 @@ const LIFT = 0.012; // How far a specimen rises on hover, in meters: enough to n
 // matte plaster. Keys are base material names; baked copies (such as "OakGrain.cabinet") share them.
 // `env` scales the room's reflected and ambient light (ENV_INTENSITY): under 1 for matte surfaces, which
 // deepens the room around the lit exhibit; over 1 for brass and glass, which should catch it.
-type Tone = { color: string; roughness?: number; metalness?: number; env?: number; grainRoughness?: boolean };
+type Tone = { color: string; roughness?: number; metalness?: number; env?: number; grainRoughness?: boolean; quiet?: boolean };
 const TONES: Record<string, Tone> = {
   PaintTeal: { color: "#86a097", roughness: 1, env: 0.5 },
   PaintCream: { color: "#e2d2b6", roughness: 1, env: 0.5 },
@@ -41,6 +41,9 @@ const TONES: Record<string, Tone> = {
   OakGrain: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
   Oak: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
   FloorOak: { color: "#a48d75", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  // Props and the desk: the same oak with its grain turned down and a satin finish, so small near pieces
+  // read as one soft, waxed surface instead of carrying loud repeated stripes.
+  OakProp: { color: "#b0957c", roughness: 1, grainRoughness: true, quiet: true, env: 0.85 },
   Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
   Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
   // Plaster with a broad satin sheen, so the key light describes the cast's curvature (benchmark, 2026-11-12).
@@ -166,6 +169,16 @@ function satinOak(shader: { fragmentShader: string }) {
   );
 }
 
+/** Prop oak: satinOak's finish, with the grain's contrast in color pulled halfway toward its own average
+ *  (the texture's smallest mip), so the wood stays warm and varied but quiet. */
+function quietOak(shader: { fragmentShader: string }) {
+  satinOak(shader);
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <map_fragment>",
+    "#include <map_fragment>\n\tdiffuseColor.rgb = mix(diffuse * textureLod(map, vMapUv, 12.0).rgb, diffuseColor.rgb, 0.45);",
+  );
+}
+
 /** Keeps waxed oak from going glossy where its grain map is darkest. */
 function floorRoughness(shader: { fragmentShader: string }) {
   shader.fragmentShader = shader.fragmentShader.replace(
@@ -248,6 +261,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
 
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
   const glass = new THREE.MeshStandardMaterial({
+    name: "CaseGlass",
     color: "#ffffff",
     transparent: true,
     opacity: 0.03,
@@ -279,7 +293,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     if (node.name === "WindowGlass") {
       // The evening sky, unlit: it reads as light coming in, not paint.
-      const sky = new THREE.MeshBasicMaterial({ map: material.map, fog: false, toneMapped: false, side: THREE.DoubleSide });
+      const sky = new THREE.MeshBasicMaterial({ name: "EveningSky", map: material.map, fog: false, toneMapped: false, side: THREE.DoubleSide });
       owned.push(sky);
       node.material = sky;
       return;
@@ -287,23 +301,33 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     if (name === "Screen" || name === "LaptopScreen") {
       // The first KDS mid-service, and 004's code review: a screen gives its own light, a little dimmer
       // than paper under the lamp.
-      const screen = new THREE.MeshBasicMaterial({ map: material.map, color: "#d9d9d9" });
+      const screen = new THREE.MeshBasicMaterial({ name: material.name, map: material.map, color: "#d9d9d9" });
       owned.push(screen);
       node.material = screen;
       return;
     }
     if (node.name === "LampShade") {
-      // The banker's lamp's green glass, lit from inside.
-      const shade = new THREE.MeshBasicMaterial({ color: "#5f9b74", toneMapped: false, side: THREE.DoubleSide });
+      // The banker's lamp's green glass: glossy, so the room draws soft highlights along its dome, with a
+      // faint glow of the bulb coming through it.
+      const shade = new THREE.MeshStandardMaterial({ name: "LampGlass", color: "#245c40", roughness: 0.14, metalness: 0, emissive: "#1d4a33", emissiveIntensity: 0.35, side: THREE.DoubleSide });
+      reflect(shade, 2.2);
       owned.push(shade);
       node.material = shade;
+      return;
+    }
+    if (node.name === "LampLining") {
+      // Its opal lining, lit by the bulb: the warm glow under the shade.
+      const lining = new THREE.MeshBasicMaterial({ name: "LampLining", color: "#f7ddb0", toneMapped: false, side: THREE.DoubleSide });
+      owned.push(lining);
+      node.material = lining;
+      node.castShadow = false;
       return;
     }
     if (node.name === "SconceShade") {
       // A linen shade glowing from within: warmer and a step darker than the wall, so it reads as a lamp.
       // Parchment lit from inside. It's a light source, so it skips tone mapping: AgX desaturates bright
       // orange toward tan, and a glowing shade should land exactly as warm as chosen here.
-      const shade = new THREE.MeshBasicMaterial({ color: "#f6cf98", toneMapped: false, fog: false, side: THREE.DoubleSide });
+      const shade = new THREE.MeshBasicMaterial({ name: "SconceShade", color: "#f6cf98", toneMapped: false, fog: false, side: THREE.DoubleSide });
       owned.push(shade);
       node.material = shade;
       return;
@@ -325,7 +349,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       // Floored, so the darkest grain lines don't turn glossy and catch the window lights at a glance.
       if (tone.grainRoughness && material.map) {
         material.roughnessMap = material.map;
-        material.onBeforeCompile = floorRoughness;
+        material.onBeforeCompile = tone.quiet ? quietOak : floorRoughness;
       }
     }
   });
@@ -736,7 +760,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   let visible = true;
   let target = 0;
   let current = 0;
-  let velocity = 0;
+  let velocity = 0; // Cases per second.
+  const SPRING = 20; // The camera spring's natural frequency, per second.
   let time = 0;
   let highlightIndex: number | null = null;
   const glow = exhibits.map(() => 0); // 0 to 1 per case, eased toward the highlight.
@@ -822,15 +847,24 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   /** Advances everything by dt seconds. Returns true while the camera or a highlight is still moving. */
   function update(dt: number) {
     let moving = false;
-    const before = current;
     if (reduced) {
       current = target;
+      velocity = 0;
     } else {
-      // Exponential damping: the same feel at 30, 60 or 120 frames per second, and no overshoot.
-      current += (target - current) * (1 - Math.exp(-6 * dt));
-      if (Math.abs(target - current) < 0.0004) current = target;
+      // A critically damped spring on the scroll position, solved exactly, so it's the same at 30, 60 or
+      // 120 frames per second. Speed carries across input events instead of restarting from rest with each
+      // one, it never overshoots, and it's stiff: about 0.1 s behind steady scrolling, settled 0.3 s after
+      // you stop. The scroll position itself is already smooth (the browser's, or the hall's own glide).
+      const error = current - target;
+      const decay = Math.exp(-SPRING * dt);
+      const k = velocity + SPRING * error;
+      current = target + (error + k * dt) * decay;
+      velocity = (velocity - SPRING * k * dt) * decay;
+      if (Math.abs(target - current) < 0.0003 && Math.abs(velocity) < 0.003) {
+        current = target;
+        velocity = 0;
+      }
     }
-    velocity = dt > 0 ? (current - before) / dt : 0;
     if (current !== target) moving = true;
 
     let lifting = false;

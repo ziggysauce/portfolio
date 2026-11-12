@@ -20,15 +20,33 @@ type Props = {
 };
 
 /**
- * Scroll position to camera position. The camera rests at each case for the first and last 18% of
- * the scroll between two cases and glides through the middle, so ordinary scrolling never has to land
- * exactly on a case to frame it. No scroll snapping: the page always scrolls the way the browser does.
+ * Scroll position (in cases) to camera position. Every pixel of scroll moves the camera: a little slower
+ * near a case, so it stays framed while you read, and a little faster between cases. No dead zones and
+ * no plateaus, so fine input gives fine movement and steady scrolling gives steady travel.
  */
-const REST = 0.18;
+const HOLD = 0.3; // Camera speed is 1 - HOLD at a case and 1 + HOLD halfway between.
 function walk(progress: number) {
   const i = Math.floor(progress);
-  const t = Math.min(1, Math.max(0, (progress - i - REST) / (1 - 2 * REST)));
-  return i + t * t * (3 - 2 * t);
+  const t = progress - i;
+  return i + t - (HOLD * Math.sin(2 * Math.PI * t)) / (2 * Math.PI);
+}
+
+/** A stop between cases this close to one is left alone: it's a deliberate small adjustment. */
+const NEAR = 0.12;
+/** How long scrolling must have stopped before the walk finishes itself. Longer than the gap between two
+ *  trackpad strokes, so it never starts between strokes and gets interrupted by the next one. */
+const IDLE_MS = 450;
+
+/** A programmatic walk: a cubic from the current scroll position and speed to rest at the goal. */
+type Glide = { from: number; to: number; speed: number; start: number; duration: number; set: number; stop: number | null };
+function glideAt(glide: Glide, now: number) {
+  const s = Math.min(1, Math.max(0, (now - glide.start) / glide.duration));
+  const T = glide.duration;
+  const s2 = s * s;
+  const s3 = s2 * s;
+  const y = (2 * s3 - 3 * s2 + 1) * glide.from + (s3 - 2 * s2 + s) * T * glide.speed + (3 * s2 - 2 * s3) * glide.to;
+  const v = ((6 * s2 - 6 * s) * glide.from + (3 * s2 - 4 * s + 1) * T * glide.speed + (6 * s - 6 * s2) * glide.to) / T;
+  return { y, v, done: s >= 1 };
 }
 
 function supportsWebGL() {
@@ -85,16 +103,65 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     [caseHeight],
   );
 
+  // One movement system: the page's scroll position is the only source of truth for where you are, and
+  // the camera follows it on a spring (see scene.ts). Buttons, the directory, focus, keys and the finishing
+  // walk all move the scroll position with one interruptible glide; any input of your own ends it at once,
+  // and a new glide starts from the current position and speed, so nothing ever restarts from rest.
+  const glide = useRef<Glide | null>(null);
+  const glideFrame = useRef(0);
+  const stopGlide = useCallback(() => {
+    cancelAnimationFrame(glideFrame.current);
+    glideFrame.current = 0;
+    glide.current = null;
+  }, []);
+  const glideTo = useCallback((top: number, stop: number | null) => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const to = Math.max(0, Math.min(max, top));
+    const now = performance.now();
+    const running = glide.current;
+    // Start where the running glide is now (the page's scroll can be a frame behind it), carrying its
+    // speed if it's heading the same way; a reversal starts from rest, so it turns at once.
+    const state = running ? glideAt(running, now) : null;
+    const from = state ? state.y : window.scrollY;
+    const speed = state && Math.sign(state.v) === Math.sign(to - from) ? state.v : 0;
+    cancelAnimationFrame(glideFrame.current);
+    const cases = Math.abs(to - from) / Math.max(1, caseHeight());
+    if (cases < 0.002) {
+      glide.current = null;
+      return;
+    }
+    // Longer walks take longer, but not proportionally: about 0.65 s for one case, 1.1 s at most.
+    const duration = Math.min(1100, Math.max(420, 380 + 270 * Math.sqrt(cases)));
+    // `set` is where the page actually is: the takeover check in onScroll compares against it.
+    glide.current = { from, to, speed, start: now, duration, set: window.scrollY, stop };
+    const step = (time: number) => {
+      const current = glide.current;
+      if (!current) return;
+      const { y, done } = glideAt(current, time);
+      window.scrollTo({ top: Math.max(0, Math.min(max, y)), behavior: "instant" });
+      current.set = window.scrollY;
+      if (done) glide.current = null;
+      else glideFrame.current = requestAnimationFrame(step);
+    };
+    glideFrame.current = requestAnimationFrame(step);
+  }, [caseHeight]);
+
   const go = useCallback(
     (i: number) => {
       if (!ready.current) return; // The fallback and loading states have no hall to walk.
-      const top = offsetFor(Math.max(0, Math.min(count - 1, i)));
+      const stop = Math.max(0, Math.min(count - 1, i));
+      const top = offsetFor(stop);
       window.clearTimeout(idle.current);
       direction.current = Math.sign(top - window.scrollY);
-      window.scrollTo({ top, behavior: reduced.current ? "auto" : "smooth" });
+      if (reduced.current) {
+        stopGlide();
+        window.scrollTo({ top, behavior: "instant" });
+      } else glideTo(top, stop);
     },
-    [count, offsetFor],
+    [count, offsetFor, glideTo, stopGlide],
   );
+  /** The stop you're at or headed to: mid-glide that's the glide's goal, so Next, Next goes two cases. */
+  const heading = useCallback(() => glide.current?.stop ?? index, [index]);
 
   // The hall's own page settings, undone when you leave it.
   useEffect(() => {
@@ -178,6 +245,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
 
     const onMotion = () => {
       reduced.current = motion.matches;
+      if (motion.matches) stopGlide();
       scene.current?.setReducedMotion(motion.matches);
     };
     motion.addEventListener("change", onMotion);
@@ -187,7 +255,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [exhibits]);
+  }, [exhibits, stopGlide]);
 
   // Scrolling moves the camera. With reduced motion it cuts between cases instead of gliding.
   useEffect(() => {
@@ -195,28 +263,35 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const fade = canvas.current;
     let shown = -1;
     let lastY = window.scrollY;
-    // If you stop partway between two cases, finish the walk in the direction you were going.
-    // Never while a finger is still on the screen: that's a pause, not a stop.
+    // If you stop partway between two cases, the walk finishes itself: on to the next case if you'd come
+    // most of a third of the way, back otherwise. Not while a finger is on the screen (a pause, not a stop),
+    // and not when you've stopped just off a case on purpose.
     function settle() {
-      if (pressing.current) return;
+      if (pressing.current || glide.current) return;
       const progress = (window.scrollY - offsetFor(0)) / caseHeight();
       if (progress <= 0 || progress >= count - 1) return;
       const f = progress - Math.floor(progress);
-      if (f <= REST || f >= 1 - REST) return; // Already resting at a case.
-      go(direction.current >= 0 ? Math.ceil(progress) : Math.floor(progress));
+      if (f <= NEAR || f >= 1 - NEAR) return;
+      const forward = direction.current > 0 ? f > 0.3 : direction.current < 0 ? f > 0.7 : f > 0.5;
+      go(forward ? Math.ceil(progress) : Math.floor(progress));
     }
     function arm() {
       window.clearTimeout(idle.current);
-      idle.current = window.setTimeout(settle, 180);
+      idle.current = window.setTimeout(settle, IDLE_MS);
     }
     function onScroll() {
+      const running = glide.current;
+      // A scroll the glide didn't make (scrollbar, keys, a fling) means you've taken over.
+      if (running && Math.abs(window.scrollY - running.set) > 1) stopGlide();
       const top = offsetFor(0);
       const progress = Math.max(0, Math.min(count - 1, (window.scrollY - top) / caseHeight()));
       const position = walk(progress);
-      const nearest = Math.round(position);
-      if (window.scrollY !== lastY) direction.current = Math.sign(window.scrollY - lastY);
+      // The case you're "at" changes a little past halfway, so a pause right at the midpoint can't make the
+      // counter, the directory and the drawer flicker between two cases.
+      const nearest = shown === -1 || Math.abs(position - shown) > 0.58 ? Math.round(position) : shown;
+      if (window.scrollY !== lastY && !glide.current) direction.current = Math.sign(window.scrollY - lastY);
       lastY = window.scrollY;
-      arm();
+      if (!glide.current) arm();
       scene.current?.setTarget(reduced.current ? nearest : position);
       if (nearest !== shown) {
         if (reduced.current && shown !== -1 && fade) {
@@ -230,16 +305,31 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       }
     }
     function onResize() {
+      stopGlide(); // Its goal was measured for the old size; the walk finishes itself if you're between cases.
       scene.current?.resize();
       onScroll();
     }
-    function onPress(event: PointerEvent) {
-      if (event.pointerType !== "mouse") pressing.current = true;
+    // Your own input always wins over a glide, at once. A touch only counts once it moves: a tap on Next
+    // mid-walk should carry the walk on, not stop it dead first.
+    function onWheel() {
+      stopGlide();
     }
-    function onRelease() {
-      if (!pressing.current) return;
+    function onTouchStart() {
+      pressing.current = true;
+    }
+    function onTouchMove() {
+      stopGlide();
+    }
+    // Touch events, not pointer events, track the finger: the browser cancels the pointer as soon as it
+    // takes over a pan, while the finger is still down.
+    function onTouchEnd(event: TouchEvent) {
+      if (event.touches.length > 0 || !pressing.current) return;
       pressing.current = false;
       arm();
+    }
+    function onScrollKey(event: KeyboardEvent) {
+      const onButton = event.target instanceof Element && event.target.closest("button, a, summary");
+      if (/^(PageUp|PageDown|Home|End|ArrowUp|ArrowDown)$/.test(event.key) || (event.key === " " && !onButton)) stopGlide();
     }
     // The room's ambient motion pauses once the hall scrolls out of view.
     const watcher = new IntersectionObserver(([entry]) => scene.current?.setVisible(entry.isIntersecting));
@@ -247,20 +337,27 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
-    window.addEventListener("pointerdown", onPress, { passive: true });
-    window.addEventListener("pointerup", onRelease, { passive: true });
-    window.addEventListener("pointercancel", onRelease, { passive: true });
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    window.addEventListener("keydown", onScrollKey);
     const timer = idle;
     return () => {
       watcher.disconnect();
       window.clearTimeout(timer.current);
+      stopGlide();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("pointerdown", onPress);
-      window.removeEventListener("pointerup", onRelease);
-      window.removeEventListener("pointercancel", onRelease);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+      window.removeEventListener("keydown", onScrollKey);
     };
-  }, [status, count, offsetFor, caseHeight, go]);
+  }, [status, count, offsetFor, caseHeight, go, stopGlide]);
 
   // A click anywhere outside the open directory folds it away.
   useEffect(() => {
@@ -299,14 +396,14 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       }
       const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
       if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
-      if (event.key === "ArrowRight") go(index + 1);
-      else if (event.key === "ArrowLeft") go(index - 1);
+      if (event.key === "ArrowRight") go(heading() + 1);
+      else if (event.key === "ArrowLeft") go(heading() - 1);
       else return;
       event.preventDefault();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [status, index, go, openNote, closeNote, directoryOpen, closeDirectory]);
+  }, [status, heading, go, openNote, closeNote, directoryOpen, closeDirectory]);
 
   // A sideways swipe or trackpad gesture moves one case; vertical scrolling stays the browser's.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -319,10 +416,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     if (!start) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) go(index + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) go(heading() + (dx < 0 ? 1 : -1));
   }
+  // A sideways trackpad gesture walks the hall continuously, pixel for pixel, like vertical scrolling.
   function onWheel(event: React.WheelEvent) {
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.2) window.scrollBy({ top: event.deltaX, behavior: "instant" });
+    if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 1.2) return;
+    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+    window.scrollBy({ top: event.deltaX * scale, behavior: "instant" });
   }
 
   /** A drawer under this point that holds a note, on the case you're standing at. */
@@ -609,13 +709,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
 
             {fallback ? null : (
               <div className={styles.controls}>
-                <button type="button" onClick={() => go(index - 1)} disabled={index === 0}>
+                <button type="button" onClick={() => go(heading() - 1)} disabled={index === 0}>
                   <span aria-hidden="true">←</span> Previous
                 </button>
                 <p className={styles.counter} aria-live="polite">
                   {index === deskIndex ? "Information desk" : `Case ${index + 1} of ${exhibits.length}`}
                 </p>
-                <button type="button" onClick={() => go(index + 1)} disabled={index === count - 1}>
+                <button type="button" onClick={() => go(heading() + 1)} disabled={index === count - 1}>
                   Next <span aria-hidden="true">→</span>
                 </button>
               </div>
