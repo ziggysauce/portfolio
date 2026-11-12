@@ -88,6 +88,14 @@ def rcyl(name, radius, depth, location, rotation=(0, 0, 0), edge=0.002, vertices
     return obj
 
 
+def anchor(name, location):
+    """An empty marking where the web scene pins an HTML caption (exported as a glTF node)."""
+    empty = bpy.data.objects.new(name, None)
+    bpy.context.scene.collection.objects.link(empty)
+    empty.location = location
+    return empty
+
+
 def with_mat(obj, mat):
     obj.data.materials.append(mat)
     return obj
@@ -418,6 +426,7 @@ def add_materials(mats):
         "leaflet_c": principled("LeafletRose", srgb("#d6a88f"), 0.9),
         "ceramic": principled("Ceramic", srgb("#ddd3c2"), 0.35),
         "lamp_lining": principled("LampLining", srgb("#f3e2c0"), 0.9),
+        "ivory": principled("IvoryLining", srgb("#efe6d4"), 0.95),
         "oak_prop": principled("OakProp", srgb("#c99f72"), 0.42, image=next(n.image for n in mats["grain"].node_tree.nodes if n.type == "TEX_IMAGE")),
         "leaf_dark": principled("LeafDark", srgb("#4f6b4a"), 0.55),
         "book_a": principled("BookTerracotta", srgb("#a4573f"), 0.8),
@@ -766,18 +775,20 @@ def build_after_hours(mats):
     camera.location = (0.19, cy + 0.02, z)
     camera.rotation_euler.z = math.radians(-14)
 
-    # The empty spot: a low oak block where the shoes would stand, and a small brass plaque.
-    spot = [oak(rbox("ShoeBlock", -0.055, 0.055, -0.032, 0.032, 0, 0.01, 0.004, 3), 349, mats)]
-    plate = [rbox("Plaque", -0.032, 0.032, -0.0095, 0.0095, 0, 0.002, 0.0009, 2, mat=mats["bronze"])]
-    lettering = text_mesh("PlaqueText", "Running shoes", 0.0082, mats["ink"])
-    lettering.location = (0, 0, 0.0021)
-    plate.append(lettering)
-    plaque = pivot(parent(plate, "PlaqueFace"), (0, -0.0095, 0))
-    plaque.rotation_euler.x = math.radians(34)  # Tilted up toward the visitor.
-    spot.append(plaque)
-    plaque.location = (0, -0.046, 0)  # Its back edge rests on the block's front edge.
+    # The empty spot: a low oak block where the shoes would stand, and at its front a larger brass plaque
+    # leaning back toward the visitor on a little rear leg. Its words are crisp HTML in the web scene,
+    # pinned to the plaque ("CaptionAnchor"), so they read at gallery distance on any screen.
+    spot = [oak(rbox("ShoeBlock", -0.068, 0.068, -0.045, 0.045, 0, 0.01, 0.004, 3), 349, mats)]
+    pw, ph = 0.064, 0.0165
+    plate = [rbox("Plaque", -pw, pw, -ph, ph, 0, 0.0028, 0.0012, 2, mat=mats["bronze"])]
+    plate.append(anchor("CaptionAnchor", (0, 0, 0.003)))
+    plaque = pivot(parent(plate, "PlaqueFace"), (0, -ph, 0))
+    plaque.rotation_euler.x = math.radians(52)  # Leaning back, face up to the visitor.
+    plaque.location = (0, -0.044, 0.01)  # Its front edge on the block's front edge.
+    leg = rod("PlaqueLeg", (0, -0.044 + 2 * ph * math.cos(math.radians(52)) - 0.002, 0.01), (0, -0.044 + 2 * ph * math.cos(math.radians(52)) - 0.002, 0.01 + 2 * ph * math.sin(math.radians(52)) - 0.001), 0.0022, mats["bronze"], vertices=12)
+    spot += [plaque, leg]
     empty = parent(spot, "EmptySpot")
-    empty.location = (0.07, cy - 0.085, z)
+    empty.location = (0.07, cy - 0.075, z)
     empty.rotation_euler.z = math.radians(3)
 
     return parent([stack, stand, pan_group, camera, empty], "AfterHours")
@@ -787,21 +798,34 @@ def build_after_hours(mats):
 
 
 def build_plinth(mats):
-    """A small oak plinth, finished like the cabinets, with a linen top. Kept empty on purpose: the
-    web scene gives it a warm pool of light and a card. Built at the origin, standing on z 0."""
+    """A small oak plinth, finished like the cabinets: softer and a little smaller than a cabinet, with a
+    shallow ivory-lined recess in its top, a space prepared for an exhibit still to come. Kept empty on
+    purpose; the web scene gives it a warm pool of light and its card. Built at the origin on z 0."""
     parts = []
-    parts.append(box("PlinthBase", -0.185, 0.185, -0.185, 0.185, 0, 0.07, bevel=0.02, segments=4))
-    parts.append(box("PlinthBody", -0.16, 0.16, -0.16, 0.16, 0.05, 0.72, bevel=0.028, segments=6))
-    parts.append(box("PlinthCap", -0.18, 0.18, -0.18, 0.18, 0.7, 0.74, bevel=0.013, segments=4))
-    parts.append(box("PlinthPanel", -0.112, 0.112, -0.172, -0.158, 0.14, 0.62, bevel=0.01, segments=3))
+    parts.append(box("PlinthBase", -0.165, 0.165, -0.165, 0.165, 0, 0.06, bevel=0.024, segments=5))
+    parts.append(box("PlinthBody", -0.135, 0.135, -0.135, 0.135, 0.045, 0.62, bevel=0.036, segments=8))
+    cap = box("PlinthCap", -0.157, 0.157, -0.157, 0.157, 0.605, 0.655, bevel=0.02, segments=6)
+    # The recess: a rounded tray sunk 9 mm into the cap, its rim softened.
+    cutter = box("RecessCutter", -0.112, 0.112, -0.112, 0.112, 0.646, 0.7, bevel=0.012, segments=4)
+    carve = cap.modifiers.new("Recess", "BOOLEAN")
+    carve.operation = "DIFFERENCE"
+    carve.object = cutter
+    carve.solver = "EXACT"
+    apply_modifiers(cap)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    cap = soften(cap, 0.0025, 3)
+    parts.append(cap)
+    parts.append(box("PlinthPanel", -0.088, 0.088, -0.147, -0.133, 0.13, 0.53, bevel=0.012, segments=4))
     for i, part in enumerate(parts):
         grain_uv(part, seed=360 + i)
     body = join(parts, "PlinthOak")
+    body.data.materials.clear()
     body.data.materials.append(mats["grain"])
     shade_smooth(body)
-    top = box("PlinthTop", -0.152, 0.152, -0.152, 0.152, 0.74, 0.744, bevel=0.002, segments=2)
-    top.data.materials.append(mats["linen"])
-    return parent([body, top], "Plinth")
+    lining = box("PlinthLining", -0.111, 0.111, -0.111, 0.111, 0.6455, 0.6475, bevel=0.0105, segments=4)
+    lining.data.materials.append(mats["ivory"])
+    shade_smooth(lining)
+    return parent([body, lining], "Plinth")
 
 
 # ---------------------------------------------------------------- 003: the first KDS
@@ -837,16 +861,25 @@ def build_kds(mats):
     base.data.materials.append(mats["oak_prop"])
     stand.append(base)
 
-    # The bump bar: a dark rounded strip of soft cream keys, angled a little toward the visitor.
-    bar = [rbox("BumpBar", -0.097, 0.097, cy - 0.172, cy - 0.123, z, z + 0.016, 0.0075, mat=mats["bezel"])]
+    # The bump bar: a chunky dark wedge whose cream keys slope toward the cook (and the visitor), the
+    # first key in sage. Tilted up on two rubber feet at the back, so its key face reads from the gallery.
+    bd = 0.026
+    bar = [rbox("BumpBar", -0.098, 0.098, -bd, bd, 0, 0.017, 0.0075, mat=mats["bezel"])]
     keys = []
     for i in range(10):
-        x = -0.084 + i * 0.0187
-        keys.append(rbox("BumpKey", x - 0.0072, x + 0.0072, cy - 0.159, cy - 0.136, z + 0.014, z + 0.0225, 0.0028, 3))
+        x = -0.0846 + i * 0.0188
+        keys.append(rbox("BumpKey", x - 0.0074, x + 0.0074, -0.0125, 0.0125, 0.012, 0.0235, 0.003, 3))
+    accent = keys.pop(0)
+    accent.data.materials.append(mats["key_accent"])
     bump_keys = join(keys, "BumpKeys")
     bump_keys.data.materials.append(mats["keycap"])
-    bar.append(bump_keys)
-    bump = pivot(parent(bar, "Bump"), (0.0, cy - 0.1475, z))
+    bar += [bump_keys, accent]
+    tilt = pivot(parent(bar, "BumpTilt"), (0.0, -bd, 0.0))
+    tilt.rotation_euler.x = math.radians(18)  # Key face toward the front.
+    feet = [rcyl("BumpFoot", 0.0058, 0.0128, (x, 0.012, 0.0064), edge=0.002, vertices=20, mat=mats["bezel"]) for x in (-0.078, 0.078)]
+    caption = anchor("CaptionAnchor", (0.0, -bd - 0.03, 0.0))  # On the deck in front: "Bump bar".
+    bump = parent([tilt, caption] + feet, "Bump")
+    bump.location = (0.0, cy - 0.1475, z)
     bump.rotation_euler.z = math.radians(-3)
 
     return parent([display] + stand + [bump], "KDS")
@@ -866,7 +899,11 @@ def banker_hood(length=0.105, depth=0.047, height=0.046):
         v.co = (math.copysign(abs(x) ** 0.55, x) * length, y * depth, z * height)
     bm = bmesh.new()
     bm.from_mesh(hood.data)
-    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 0), plane_no=(0, 0, 1), clear_inner=True)
+    # Cut a hair above the equator, not through it: the end poles lie on the equator, and a cut through
+    # them left a sliver hanging below the rim once the glass was given thickness.
+    cut = 0.03 * height
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, cut), plane_no=(0, 0, 1), clear_inner=True)
+    bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, 0, -cut))
     bm.to_mesh(hood.data)
     bm.free()
     hood.name = "LampHood"

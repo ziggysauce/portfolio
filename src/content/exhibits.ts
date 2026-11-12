@@ -21,8 +21,11 @@ export type Exhibit = {
   status: "on-view" | "in-preparation" | "planned";
   /** The glTF node to place in the case. */
   specimen?: string;
-  /** An optional, clearly playful note in the cabinet's drawer. Never the only place a fact appears. */
+  /** A clearly playful note in the cabinet's drawer: fictional curator jokes, never a fact. With more
+   *  than one line, the first is its heading. */
   note?: string[];
+  /** Words on the specimen itself (a plaque, a tag), pinned to it in the hall as crisp text. */
+  caption?: string;
 };
 
 export const hall = {
@@ -54,6 +57,7 @@ export const exhibits: Exhibit[] = [
     quote: "Samples carefully labeled. Career path less so.",
     status: "on-view",
     specimen: "Samples",
+    note: ["All samples accounted for. The career change was not in the protocol."],
   },
   {
     id: "kds",
@@ -64,6 +68,8 @@ export const exhibits: Exhibit[] = [
     quote: "Please don’t tap the glass during the dinner rush.",
     status: "on-view",
     specimen: "KDS",
+    caption: "Bump bar",
+    note: ["An order has arrived. Fortunately, this is a museum."],
   },
   {
     id: "marker",
@@ -74,6 +80,7 @@ export const exhibits: Exhibit[] = [
     quote: "Still has one good diagram left in it.",
     status: "on-view",
     specimen: "Laptop",
+    note: ["Please replace the marker before the next meeting. This note has survived several meetings."],
   },
   {
     id: "plans",
@@ -84,6 +91,7 @@ export const exhibits: Exhibit[] = [
     quote: "Some assembly—and several meetings—required.",
     status: "on-view",
     specimen: "Planning",
+    note: ["The calendar and the planning board have requested a meeting to align."],
   },
   {
     id: "after-hours",
@@ -94,6 +102,8 @@ export const exhibits: Exhibit[] = [
     quote: "Running shoes not pictured. They’re out on a run.",
     status: "on-view",
     specimen: "AfterHours",
+    caption: "Running shoes",
+    note: ["The running shoes have not submitted an estimated return date."],
   },
 ];
 

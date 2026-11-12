@@ -16,7 +16,7 @@ const CABINET = { x0: -0.32, x1: 0.54 };
 // 006's case is wider and symmetric (blender WIDE_X0/X1, plus the base moulding).
 const WIDE_CABINET = { x0: -0.45, x1: 0.45 };
 // The fatherhood plinth: under the desk bay's window, between case 006 and the desk.
-const PLINTH = { x: WINDOW.x, z: -0.765, top: 0.744 };
+const PLINTH = { x: WINDOW.x, z: -0.765, top: 0.655, recess: 0.6475, front: 0.135 }; // front: the body's half depth
 const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, travel: 0.17 };
 
 // The light: a broad warm key on the exhibit, a warm sconce, a cool evening window, a blue-green room.
@@ -46,6 +46,7 @@ const TONES: Record<string, Tone> = {
   OakProp: { color: "#b0957c", roughness: 1, grainRoughness: true, quiet: true, env: 0.85 },
   Bronze: { color: "#b09257", roughness: 0.36, metalness: 1, env: 1.6 }, // Brass: yellower than copper, softly polished.
   Linen: { color: "#d8caae", roughness: 1, env: 0.5 },
+  IvoryLining: { color: "#efe6d4", roughness: 0.95, env: 0.6 }, // The fatherhood plinth's recess.
   // Plaster with a broad satin sheen, so the key light describes the cast's curvature (benchmark, 2026-11-12).
   SkullPlaster: { color: "#e6dac5", roughness: 0.58, env: 0.8 }, // Warm ivory.
   Rug: { color: "#f4ece0", roughness: 1, env: 0.45 },
@@ -109,7 +110,14 @@ const TONES: Record<string, Tone> = {
 export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk" };
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
-export type LabelAnchor = { x: number; y: number; visible: boolean; drawer: { x: number; y: number } };
+export type LabelAnchor = {
+  x: number;
+  y: number;
+  visible: boolean;
+  drawer: { x: number; y: number };
+  /** Where the specimen's own caption (an HTML plaque or tag) is pinned, if it has one. */
+  caption: { x: number; y: number; visible: boolean } | null;
+};
 
 /** Where the fatherhood plinth's card goes, in CSS pixels, and how much of it shows (0 when out of view). */
 export type PlinthAnchor = { x: number; y: number; opacity: number };
@@ -467,6 +475,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   owned.push(dustTexture);
   const dust: { points: THREE.Points; seeds: Float32Array; origin: THREE.Vector3 }[] = [];
   const specimens: (THREE.Object3D | null)[] = [];
+  const captions: (THREE.Vector3 | null)[] = [];
   type Drawer = { node: THREE.Object3D | null; baseZ: number; note: THREE.Object3D | null; noteBase: number };
   const drawers: Drawer[] = [];
 
@@ -481,6 +490,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       }
       contact(x, CASE_Z, 1.15, 0.002, 0.72);
       specimens.push(null);
+      captions.push(null);
       drawers.push({ node: null, baseZ: 0, note: null, noteBase: 0 });
       return;
     }
@@ -570,6 +580,13 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       }
     }
     specimens.push(specimen);
+    // A caption pinned to the specimen (006's plaque, 003's bump bar), fixed in the world once placed.
+    const markers: THREE.Object3D[] = [];
+    specimen?.traverse((node) => {
+      if (node.name.startsWith("CaptionAnchor")) markers.push(node);
+    });
+    specimen?.updateMatrixWorld(true);
+    captions.push(markers[0] ? markers[0].getWorldPosition(new THREE.Vector3()) : null);
 
     // Sparse dust drifting in the exhibit's beam: a few dozen motes, visible only where the light catches them.
     const count = 28;
@@ -625,8 +642,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       scene.add(glow);
     };
     glowAt(floorPool, plinthX, 0.004, PLINTH.z + 0.12, 1.1, 0.8, true);
-    glowAt(wallPool, plinthX, 0.95, WALL_Z + 0.045, 0.9, 1.5, false);
-    glowAt(topPool, plinthX, PLINTH.top + 0.002, PLINTH.z, 0.36, 0.36, true);
+    glowAt(wallPool, plinthX, 0.98, WALL_Z + 0.045, 0.8, 1.5, false);
+    glowAt(topPool, plinthX, PLINTH.recess + 0.0015, PLINTH.z, 0.3, 0.3, true); // Pooled in the ivory recess.
   }
 
   // ---------------------------------------------------------------- the light pool
@@ -813,6 +830,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
 
   const anchorPoint = new THREE.Vector3();
+  const toCamera = new THREE.Vector3();
   function toScreen(point: THREE.Vector3) {
     point.project(camera);
     return { x: (point.x * 0.5 + 0.5) * width, y: (-point.y * 0.5 + 0.5) * height, ndc: point.x };
@@ -828,7 +846,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         ? toScreen(anchorPoint.set(x + framing.lookX, desk ? 0.62 : 0.5, CASE_Z + 0.3))
         : toScreen(anchorPoint.set(x + (desk ? 0.55 : stagingFor(exhibit).wide ? 0.36 : 0.27), desk ? 1.22 : 1.2, CASE_Z));
       const front = toScreen(anchorPoint.set(x + DRAWER.x1, (DRAWER.y0 + DRAWER.y1) / 2, DRAWER.front + DRAWER.travel * drawerOpen[i]));
-      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y } };
+      const at = captions[i];
+      let caption: LabelAnchor["caption"] = null;
+      if (at) {
+        const inFront = toCamera.copy(at).applyMatrix4(camera.matrixWorldInverse).z < 0;
+        const point = toScreen(anchorPoint.copy(at));
+        caption = { x: point.x, y: point.y, visible: inFront && Math.abs(point.ndc) < 1.05 };
+      }
+      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y }, caption };
     });
   }
 
@@ -836,7 +861,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   /** The plinth card sits on the plinth's front face, below its top; it fades out toward the frame's edges. */
   function plinthAnchor(): PlinthAnchor {
     if (plinthX === null) return hidden;
-    anchorPoint.set(plinthX, PLINTH.top - 0.13, PLINTH.z + 0.19);
+    anchorPoint.set(plinthX, PLINTH.top - 0.15, PLINTH.z + PLINTH.front + 0.02);
     const behind = anchorPoint.clone().applyMatrix4(camera.matrixWorldInverse).z > 0;
     const point = toScreen(anchorPoint);
     if (behind) return hidden;
@@ -1035,7 +1060,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       const goal = open ? 1 : 0;
       if (drawerGoal[index] === goal) return;
       drawerGoal[index] = goal;
-      if (open && !reduced) nod[index] = 0;
+      if (open && !reduced && specimens[index]?.userData.lift) nod[index] = 0; // Only the skull leans in to look.
       kick();
     },
     resize,

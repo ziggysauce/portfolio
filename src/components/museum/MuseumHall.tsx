@@ -64,6 +64,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const labels = useRef<(HTMLElement | null)[]>([]);
   const plinthCard = useRef<HTMLDivElement>(null);
   const notes = useRef<(HTMLElement | null)[]>([]);
+  const captions = useRef<(HTMLElement | null)[]>([]);
   const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
   const [openNote, setOpenNote] = useState<number | null>(null);
   const [directoryOpen, setDirectoryOpen] = useState(false);
@@ -190,6 +191,25 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const frameLog: number[] = [];
     if (debug) (window as unknown as { __museumFrames: number[] }).__museumFrames = frameLog;
 
+    // On a portrait screen the labels and notes sit low, so they're kept above the directory and walking
+    // controls: their heights and that floor are measured on resize, not every frame.
+    const heights = new Map<Element, number>();
+    let floor = Infinity;
+    const measure = () => {
+      // Measured within the pinned viewport, where labels are placed, so it holds while the hall scrolls in.
+      const nav = document.querySelector('nav[aria-label="Gallery directory"]');
+      const layer = labels.current[0]?.closest("ol");
+      floor = nav && layer ? nav.getBoundingClientRect().top - layer.getBoundingClientRect().top - 12 : Infinity;
+      for (const node of [...labels.current, ...notes.current]) if (node) heights.set(node, node.offsetHeight);
+    };
+    const sizes = new ResizeObserver(measure);
+    const watchSizes = () => {
+      for (const node of [...labels.current, ...notes.current]) if (node) sizes.observe(node);
+      window.addEventListener("resize", measure);
+      measure();
+    };
+    const above = (node: Element, y: number) => Math.min(y, floor - (heights.get(node) ?? 0));
+
     function placeLabels(anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) {
       // The fatherhood card stays with its plinth and shows whenever the plinth is in view: a quiet
       // discovery on the way to the desk, never a stop, so nothing to tab to or click.
@@ -203,8 +223,18 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         const label = labels.current[i];
         if (!label) return;
         const distance = Math.abs(i - progress);
-        label.style.transform = `translate3d(${anchor.x.toFixed(1)}px, ${anchor.y.toFixed(1)}px, 0)`;
+        const portrait = window.innerWidth / window.innerHeight < 0.8;
+        const y = portrait ? above(label, anchor.y) : anchor.y;
+        label.style.transform = `translate3d(${anchor.x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
         const opacity = anchor.visible ? Math.max(0, 1 - distance * 1.8) : 0;
+        // The specimen's own caption, pinned to it: shown while its case is the one you're at.
+        const caption = captions.current[i];
+        if (caption) {
+          const shown = anchor.caption?.visible ? Math.max(0, 1 - distance * 2.4) : 0;
+          if (anchor.caption) caption.style.transform = `translate3d(${anchor.caption.x.toFixed(1)}px, ${anchor.caption.y.toFixed(1)}px, 0)`;
+          caption.style.opacity = shown.toFixed(3);
+          caption.style.visibility = shown > 0.01 ? "visible" : "hidden";
+        }
         label.style.opacity = String(opacity);
         // Faded, not hidden: every label stays readable to screen readers and reachable with Tab,
         // and tabbing to one walks the camera to its case.
@@ -212,8 +242,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         label.style.pointerEvents = opacity > 0.05 ? "auto" : "none";
         // The note comes out beside its drawer; on a portrait screen it lies over the label, from its top.
         const note = notes.current[i];
-        const portrait = window.innerWidth / window.innerHeight < 0.8;
-        if (note) note.style.transform = `translate3d(${(portrait ? window.innerWidth / 2 : anchor.drawer.x).toFixed(1)}px, ${(portrait ? anchor.y : anchor.drawer.y).toFixed(1)}px, 0)`;
+        if (note) note.style.transform = `translate3d(${(portrait ? window.innerWidth / 2 : anchor.drawer.x).toFixed(1)}px, ${(portrait ? above(note, y) : anchor.drawer.y).toFixed(1)}px, 0)`;
       });
     }
 
@@ -235,6 +264,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       .then((created) => {
         if (cancelled) return created.dispose();
         scene.current = created;
+        watchSizes();
         setStatus("ready");
         window.dispatchEvent(new Event("scroll")); // Pick up a restored scroll position.
       })
@@ -251,6 +281,8 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     motion.addEventListener("change", onMotion);
     return () => {
       cancelled = true;
+      sizes.disconnect();
+      window.removeEventListener("resize", measure);
       motion.removeEventListener("change", onMotion);
       scene.current?.dispose();
       scene.current = null;
@@ -561,14 +593,27 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                       className={styles.note}
                       aria-label="Curator’s note"
                     >
-                      {exhibit.note.map((line) => (
-                        <p key={line}>{line}</p>
+                      {exhibit.note.map((line, n) => (
+                        <p key={line} className={n === 0 && exhibit.note!.length > 1 ? styles.noteHeading : undefined}>
+                          {line}
+                        </p>
                       ))}
                       <p className={styles.signature}>The Curator</p>
                       <button type="button" className={styles.noteClose} onClick={() => closeNote(i)}>
                         Close the drawer
                       </button>
                     </aside>
+                  ) : null}
+                  {exhibit.caption && !fallback ? (
+                    // Words on the object itself (006's plaque, 003's bump bar), pinned to it as crisp text.
+                    <p
+                      ref={(node) => {
+                        captions.current[i] = node;
+                      }}
+                      className={`${styles.caption} ${exhibit.specimen === "AfterHours" ? styles.plaque : ""}`}
+                    >
+                      {exhibit.caption}
+                    </p>
                   ) : null}
                 </li>
               ))}
