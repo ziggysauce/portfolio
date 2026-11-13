@@ -1,0 +1,1012 @@
+/* The museum after hours: warm dark hall, cream labels, bronze details.
+   The 3D scene supplies oak, plaster and amber light; these tokens match it. */
+.root {
+  --dusk: #222a29;
+  --text: #f1e6d2;
+  --text-dim: #cdbfa6;
+  --cream: #f3ead6;
+  --cream-edge: #e6d8bb;
+  --ink: #2a2117;
+  --ink-soft: #66573f;
+  /* Paper tooth for the labels: a whisper of fibre, not a texture you notice. */
+  --paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.28 0 0 0 0 0.18 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --bronze: #c9a066;
+  --focus: #f0cd8e;
+  --serif: var(--font-instrument), "Iowan Old Style", Georgia, serif;
+  --mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  background: var(--dusk);
+  color: var(--text);
+  min-height: 100svh;
+}
+
+.root :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ---------------------------------------------------------------- sign and navigation */
+
+.top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) max(20px, env(safe-area-inset-right, 0px)) 0 max(20px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.top > * {
+  pointer-events: auto;
+}
+.sign {
+  display: grid;
+  gap: 2px;
+}
+.hallName {
+  margin: 0;
+  font: 500 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.subtitle {
+  margin: 0;
+  font: italic 400 clamp(36px, 5.2vw, 64px) / 1 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.nav {
+  display: flex;
+  gap: 4px;
+}
+/* The welcome: a small admission stub, notched at both ends, tucked under the hall's name. */
+.ticket {
+  justify-self: start;
+  display: grid;
+  gap: 1px;
+  margin: 10px 0 0;
+  padding: 7px 18px 8px;
+  background:
+    var(--paper),
+    linear-gradient(var(--cream), var(--cream-edge));
+  color: var(--ink);
+  border-radius: 3px;
+  rotate: -1.5deg;
+  box-shadow: 0 6px 16px rgb(10 14 13 / 0.3);
+  -webkit-mask:
+    radial-gradient(circle at 0 50%, transparent 5px, #000 5.5px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 5px, #000 5.5px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 50%, transparent 5px, #000 5.5px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 5px, #000 5.5px) right / 51% 100% no-repeat;
+  animation: ticket-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 300ms both;
+}
+.admission {
+  font: 500 10px/1.3 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.guest {
+  font: italic 400 19px/1.1 var(--serif);
+}
+@keyframes ticket-in {
+  from {
+    opacity: 0;
+    translate: 0 -8px;
+    rotate: -5deg;
+  }
+}
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-radius: 999px;
+}
+.nav a:hover {
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------- the stage */
+
+.stage {
+  position: relative;
+  height: calc(var(--cases) * 100svh);
+  touch-action: pan-y; /* Vertical scrolling stays the browser's; sideways swipes come to us. */
+}
+.viewport {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+/* Shade behind the sign and the controls, so text stays readable over lit plaster. */
+.viewport::before,
+.viewport::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.viewport::before {
+  top: 0;
+  height: 180px;
+  background: linear-gradient(rgb(26 32 31 / 0.72), rgb(26 32 31 / 0));
+}
+.viewport::after {
+  bottom: 0;
+  height: 110px;
+  background: linear-gradient(rgb(26 32 31 / 0), rgb(26 32 31 / 0.45));
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------- labels */
+
+.labels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(220px, 16.5vw, 262px);
+  translate: 0 -50%;
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px 16px;
+  /* Aged ivory: a touch darker toward the edges, like card that has hung in a gallery for years. */
+  background:
+    var(--paper),
+    radial-gradient(120% 120% at 50% 40%, var(--cream) 62%, var(--cream-edge) 100%);
+  color: var(--ink);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgb(150 116 70 / 0.35),
+    0 1px 0 rgb(255 255 255 / 0.4) inset,
+    0 14px 30px rgb(10 14 13 / 0.32),
+    0 2px 4px rgb(10 14 13 / 0.18);
+  pointer-events: auto;
+  visibility: hidden; /* Until the scene places it. */
+  will-change: transform, opacity;
+  transition: box-shadow 200ms ease;
+}
+/* Two small bronze pins hold it to the wall. */
+.label::before,
+.label::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e3c38e, #8a6a44 60%, #5d4528);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
+}
+.label::before {
+  left: 10px;
+}
+.label::after {
+  right: 10px;
+}
+.label:hover {
+  box-shadow:
+    inset 0 0 0 1px rgb(150 116 70 / 0.5),
+    0 18px 36px rgb(10 14 13 / 0.36),
+    0 2px 4px rgb(10 14 13 / 0.2);
+}
+.label:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--dusk),
+    0 0 0 5px var(--focus),
+    0 18px 36px rgb(10 14 13 / 0.36);
+}
+.label p {
+  margin: 0;
+}
+.number {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 12px/1.2 var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+/* A hairline after the catalog number, like a register entry. */
+.number::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgb(138 106 68 / 0.35);
+}
+.title {
+  margin: 3px 0 6px;
+  font: 400 24px/1.04 var(--serif);
+  text-wrap: balance;
+}
+.line {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.line:first-of-type {
+  font-weight: 600;
+}
+/* The chapter in a sentence, under the role and dates. */
+.description {
+  margin-top: 6px !important;
+  font-size: 14px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.quote {
+  margin-top: 10px !important;
+  padding-top: 10px;
+  border-top: 1px solid rgb(138 106 68 / 0.22);
+  font: italic 400 17px/1.3 var(--serif);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------------- the curator's note */
+
+.noteToggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 8px 0 -4px -8px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+.noteToggle:hover {
+  background: rgb(138 106 68 / 0.12);
+  color: var(--ink);
+}
+.noteToggle:focus-visible {
+  outline: 2px solid #8a6a44;
+  outline-offset: 1px;
+}
+@media (pointer: coarse) {
+  .noteToggle {
+    min-height: 44px;
+  }
+}
+/* A tiny drawer with a knob; it slides open while the note is out. */
+.drawerIcon {
+  position: relative;
+  width: 14px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  transition: translate 300ms ease;
+}
+.drawerIcon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: currentColor;
+}
+.noteToggle[aria-expanded="true"] .drawerIcon {
+  translate: 0 3px;
+}
+.note {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 264px;
+  translate: 18px -40%;
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px 12px;
+  background:
+    var(--paper),
+    repeating-linear-gradient(transparent 0 21px, rgb(120 140 170 / 0.18) 21px 22px),
+    #f5eedd;
+  background-position: 0 0, 0 9px, 0 0;
+  color: #27304a; /* Fountain-pen blue-black. */
+  border-radius: 2px;
+  rotate: 1.5deg;
+  box-shadow:
+    inset 0 0 0 1px rgb(150 116 70 / 0.25),
+    0 14px 30px rgb(10 14 13 / 0.34);
+  pointer-events: auto;
+  animation: note-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
+}
+.note[hidden] {
+  display: none; /* Stays in the page (so the toggle's aria-controls resolves), out of sight and reach. */
+}
+.note p {
+  margin: 0;
+  font: italic 400 17px/1.3 var(--serif);
+}
+/* ---- what each drawer holds: its words and controls, beside the drawer */
+.drawerTag {
+  justify-self: start;
+  padding: 3px 9px 4px;
+  background: #fbf6ea;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(150 116 70 / 0.4);
+  font: 500 10px/1.5 var(--mono) !important;
+  font-style: normal !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4a5269;
+}
+.note .drawerStory {
+  font: 400 15px/1.45 var(--serif);
+  color: #27304a;
+}
+.note .drawerHeading {
+  font: italic 500 19px/1.25 var(--serif);
+}
+.note .drawerFine {
+  font: 400 12px/1.35 var(--serif);
+  color: #4a5269;
+}
+.drawerFigure {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.drawerFigure h3 {
+  margin: 0;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  color: #4a4038;
+  font: 500 10px var(--mono);
+}
+.chart text {
+  fill: currentColor;
+}
+.drawerAction {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgb(74 82 105 / 0.45);
+  border-radius: 999px;
+  background: #fbf6ea;
+  color: #27304a;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.drawerAction:hover {
+  background: #fffaf0;
+}
+.drawerAction[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+.drawerAction:focus-visible {
+  outline: 2px solid #4a5269;
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .drawerAction {
+    min-height: 44px;
+  }
+}
+.tickets,
+.taskCards {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tickets li {
+  display: grid;
+  padding: 6px 9px;
+  background: #e8e2d2;
+  border-top: 4px solid #79a08a;
+  font: 600 12px/1.35 var(--mono);
+  color: #2a2a28;
+}
+.tickets li + li {
+  border-top-color: #c96f55;
+}
+.taskCards li {
+  padding: 5px 9px;
+  background: #fbf6ea;
+  box-shadow: inset 0 0 0 1px rgb(150 116 70 / 0.3);
+  font: italic 400 15px/1.3 var(--serif);
+}
+.taskCards .taskDone {
+  color: #6b6158;
+}
+.taskDone span {
+  margin-left: 6px;
+  font: 700 10px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a33a2b;
+}
+.taskCurrent {
+  font-size: 17px !important;
+}
+.cardInside {
+  display: grid;
+  gap: 6px;
+}
+.cardInside[hidden] {
+  display: none;
+}
+/* Without WebGL: the reading list as a row of spines, which spills. */
+.spines {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 46px;
+}
+.spines span {
+  width: 9px;
+  height: 40px;
+  border-radius: 2px;
+  transition: rotate 300ms ease, translate 300ms ease;
+}
+.spines span:nth-child(3n + 2) {
+  height: 34px;
+}
+.spilled span:nth-child(n + 4) {
+  rotate: 72deg;
+  translate: 0 14px;
+}
+.spilled span:nth-child(2n + 5) {
+  rotate: -18deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spines span {
+    transition: none;
+  }
+}
+/* Without WebGL: the drawer's contents as a disclosure in the label. */
+.drawerStatic {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(138 106 68 / 0.22);
+}
+.drawerStatic summary {
+  cursor: pointer;
+  font: 500 11px/2 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.drawerStatic > :not(summary) {
+  margin: 6px 0 0;
+}
+.signature {
+  justify-self: end;
+}
+.signature::before {
+  content: "— ";
+}
+.noteClose {
+  justify-self: start;
+  min-height: 32px;
+  margin: 2px 0 0 -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #4a5269;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.noteClose:hover {
+  background: rgb(74 82 105 / 0.1);
+}
+.noteClose:focus-visible {
+  outline: 2px solid #4a5269;
+  outline-offset: 1px;
+}
+@media (pointer: coarse) {
+  .noteClose {
+    min-height: 44px;
+  }
+}
+@keyframes note-in {
+  from {
+    opacity: 0;
+    translate: 6px -34%;
+    rotate: 4deg;
+  }
+}
+
+/* ---------------------------------------------------------------- captions on the objects */
+
+/* Words that belong to an object in a case, pinned to it: a small cream tag on the deck (003's bump bar),
+   or 006's brass plaque itself, crisp at any distance. Centred on their anchor; nothing to press. */
+.caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  translate: -50% 0;
+  padding: 3px 8px 4px;
+  background: #f3ebd9;
+  color: var(--ink);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgb(150 116 70 / 0.35),
+    0 3px 8px rgb(10 14 13 / 0.3);
+  font: 500 10px/1.2 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden; /* Until the scene places it. */
+  will-change: transform, opacity;
+}
+/* The plaque: brushed brass, engraved dark letters, sized to the plate it sits on. */
+.plaque {
+  translate: -50% -50%;
+  padding: 4px 11px 5px;
+  background: linear-gradient(170deg, #e2c68e, #b8935a 55%, #a07c45);
+  color: #2b2116;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 240 200 / 0.6),
+    inset 0 -1px 0 rgb(80 56 24 / 0.45),
+    0 2px 5px rgb(10 14 13 / 0.35);
+  font: italic 500 13px/1.1 var(--serif);
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* ---------------------------------------------------------------- gallery directory */
+
+.directory {
+  position: absolute;
+  left: max(20px, env(safe-area-inset-left, 0px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 3;
+}
+.directoryToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 6px 0 16px;
+  border: 1px solid rgb(201 160 102 / 0.45);
+  border-radius: 999px;
+  background: rgb(30 36 35 / 0.62);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.directoryToggle:hover {
+  background: rgb(46 54 52 / 0.72);
+}
+@media (pointer: coarse) {
+  .directoryToggle {
+    min-height: 44px;
+  }
+}
+/* Where you are: a small brass plaque on the toggle, visible even with the directory folded away. */
+.dirCurrent {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--focus);
+  color: var(--ink);
+  letter-spacing: 0.1em;
+}
+.directoryList {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(320px, calc(100vw - 40px));
+  padding: 10px 6px 6px;
+  border: 1px solid rgb(201 160 102 / 0.35);
+  border-radius: 10px;
+  background: rgb(30 36 35 / 0.92);
+  backdrop-filter: blur(8px);
+}
+.directory[data-open] .directoryList {
+  display: block;
+}
+.directoryTitle {
+  margin: 0 8px 6px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.directory ol {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.directory li > * {
+  display: grid;
+  grid-template-columns: 30px auto auto;
+  align-items: baseline;
+  justify-content: start;
+  column-gap: 8px;
+  width: 100%;
+  min-height: 24px;
+  padding: 4px 10px 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: 400 12.5px/1.2 var(--font-onest), system-ui, sans-serif;
+}
+.directory button {
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+.directory button:hover {
+  background: rgb(201 160 102 / 0.16);
+}
+.directory button[aria-current] {
+  background: rgb(201 160 102 / 0.22);
+}
+.dirNumber {
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+.directory button[aria-current] .dirNumber {
+  color: var(--focus);
+}
+.here,
+.soon {
+  font: 500 9.5px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.here {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--focus);
+  color: var(--ink);
+}
+/* Not open yet: dimmer, and said in words, not only shown. */
+.directory .closed {
+  color: var(--text-dim);
+}
+.closed .dirTitle {
+  opacity: 0.75;
+}
+.soon {
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+@media (pointer: coarse) {
+  .directory button {
+    min-height: 44px;
+  }
+}
+.pending .title {
+  color: var(--ink-soft);
+}
+
+/* ---------------------------------------------------------------- controls and loading */
+
+.controls {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  translate: -50% 0;
+  border: 1px solid rgb(201 160 102 / 0.45);
+  border-radius: 999px;
+  background: rgb(30 36 35 / 0.62);
+  backdrop-filter: blur(8px);
+}
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: 500 13px/1 var(--font-onest), system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color 150ms, opacity 150ms;
+}
+.controls button:hover:not(:disabled) {
+  background: rgb(201 160 102 / 0.2);
+}
+/* Fingers get full 44px targets. */
+@media (pointer: coarse) {
+  .controls button {
+    min-height: 44px;
+  }
+}
+.controls button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.counter {
+  margin: 0;
+  padding: 0 6px;
+  white-space: nowrap;
+  text-align: center;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  justify-items: center;
+  background: var(--dusk);
+}
+.loader p {
+  margin: 0;
+  font: italic 400 24px/1 var(--serif);
+  color: var(--text-dim);
+}
+.bar {
+  display: block;
+  width: 160px;
+  height: 2px;
+  background: rgb(201 160 102 / 0.25);
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--bronze);
+  transform-origin: left;
+  transition: transform 200ms ease-out;
+}
+
+/* ---------------------------------------------------------------- information desk */
+
+.deskCard {
+  width: clamp(250px, 21vw, 312px);
+}
+.deskCard .line {
+  font-weight: 400 !important;
+}
+.farewell {
+  margin-top: 6px !important;
+  font: italic 400 17px/1.3 var(--serif);
+}
+
+/* ---------------------------------------------------------------- the fatherhood plinth's card */
+
+/* A small card on the empty plinth's front: read in order, never a stop, nothing to press. */
+.plinthCard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  min-width: 132px;
+  max-width: 180px;
+  translate: -50% -50%;
+  padding: 11px 18px 10px;
+  background:
+    var(--paper),
+    radial-gradient(120% 120% at 50% 40%, var(--cream) 62%, var(--cream-edge) 100%);
+  color: var(--ink);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgb(150 116 70 / 0.35),
+    0 8px 18px rgb(10 14 13 / 0.28),
+    0 1px 3px rgb(10 14 13 / 0.18);
+  text-align: center;
+  pointer-events: none;
+  visibility: hidden; /* Until the scene places it. */
+  will-change: transform, opacity;
+}
+/* Clear hierarchy: the title, a short hairline, then the note, quieter. */
+.plinthTitle {
+  margin: 0;
+  font: 400 20px/1.1 var(--serif);
+  letter-spacing: 0.01em;
+}
+.plinthTitle::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 1px;
+  margin: 7px auto 6px;
+  background: rgb(138 106 68 / 0.5);
+}
+.plinthNote {
+  margin: 0;
+  font: italic 400 14px/1.25 var(--serif);
+  color: var(--ink-soft);
+}
+.deskLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid rgb(138 106 68 / 0.22);
+  list-style: none;
+}
+.deskLinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--ink);
+  font-size: 14px;
+  text-underline-offset: 4px;
+}
+@media (pointer: coarse) {
+  .deskLinks a {
+    min-height: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------- phones and tall screens */
+
+@media (max-aspect-ratio: 4/5) {
+  .label {
+    width: min(88vw, 380px);
+    translate: -50% 0;
+    padding: 14px 18px 16px;
+  }
+  .title {
+    font-size: 27px;
+  }
+  /* Over the case's label while it's open, so the case, the drawer and the specimen stay in view. */
+  .note {
+    translate: -50% 0;
+  }
+  @keyframes note-in {
+    from {
+      opacity: 0;
+      translate: -50% 10px;
+      rotate: 4deg;
+    }
+  }
+}
+@media (max-width: 640px) {
+  .top {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .nav {
+    margin-left: -10px;
+  }
+  .subtitle {
+    font-size: 34px;
+  }
+  .controls {
+    gap: 8px;
+  }
+  .counter {
+    letter-spacing: 0.06em;
+  }
+  .controls button {
+    padding: 0 14px;
+  }
+}
+/* Narrow screens: the directory control sits just above the walking controls. */
+@media (max-width: 899px) {
+  .directory {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  }
+}
+
+/* ---------------------------------------------------------------- without WebGL */
+
+.static .stage {
+  height: auto;
+  touch-action: auto;
+}
+.static .viewport {
+  position: relative;
+  height: auto;
+  padding-top: 150px;
+}
+.static .viewport::after {
+  display: none;
+}
+.still {
+  display: block;
+  width: 100%;
+  max-height: 72svh;
+  object-fit: cover;
+}
+.static .labels {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  max-width: 1080px;
+  margin: 24px auto 0;
+  padding: 0 20px;
+}
+.static .caption {
+  display: none;
+}
+.static .plinthCard {
+  position: static;
+  justify-self: center;
+  align-self: center;
+  translate: none;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.static .label {
+  position: static;
+  width: auto;
+  translate: none;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar > span,
+  .controls button,
+  .noteToggle,
+  .drawerIcon,
+  .directory button {
+    transition: none;
+  }
+  .ticket,
+  .note {
+    animation: none;
+  }
+}

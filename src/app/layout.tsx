@@ -1,9 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Onest } from "next/font/google";
-import { BottomNav } from "@/components/BottomNav";
-import { AddedToast, CartDrawer } from "@/components/CartDrawer";
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
 import { site } from "@/content/site";
 import "./globals.css";
 
@@ -41,12 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="skip-link">
           Skip to content
         </a>
-        <Header />
-        <main id="main">{children}</main>
-        <Footer />
-        <AddedToast />
-        <BottomNav />
-        <CartDrawer />
+        {children}
       </body>
     </html>
   );
