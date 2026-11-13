@@ -428,6 +428,8 @@ def add_materials(mats):
         "ceramic": principled("Ceramic", srgb("#ddd3c2"), 0.35),
         "lamp_lining": principled("LampLining", srgb("#f3e2c0"), 0.9),
         "printer_slot": principled("PrinterSlot", srgb("#0d0e0f"), 0.8),
+        "checklist": principled("ChecklistCard", srgb("#e3d3b4"), 0.9),
+        "checklist_shadow": principled("ChecklistShadow", srgb("#b9aa8c"), 1.0),
         "printer_light": principled("PrinterLight", srgb("#7fd39a"), 0.4),
         "ivory": principled("IvoryLining", srgb("#efe6d4"), 0.95),
         # The drawer discoveries. "Canvas*" faces are drawn by the web scene (text, the chart, the stamp).
@@ -844,8 +846,8 @@ def build_plinth(mats):
 
 def build_plinth_vignette(mats, top):
     """The exhibit being prepared, as if the curator just stepped away: a small wooden stacking-ring toy,
-    partly assembled, two rings still beside it, a folded dust cloth over one corner of the plinth, and a
-    pencil on a short checklist. A few things, neatly placed; nothing else."""
+    partly assembled, two rings still beside it, and a pencil on a short checklist. A few things, neatly
+    placed on the lining; nothing else."""
     parts = []
     # The toy: a round oak base, a peg, three rings on (largest at the bottom), muted colours.
     base = rcyl("ToyBase", 0.034, 0.012, (0, 0, top + 0.006), edge=0.004, vertices=48)
@@ -877,47 +879,44 @@ def build_plinth_vignette(mats, top):
         shade_smooth(ring)
         ring.data.materials.append(mat)
         loose.append(ring)
-    # The checklist: a small card, two lines, one ticked; a pencil across it.
-    card = [rbox("Checklist", -0.032, 0.032, -0.041, 0.041, 0, 0.0012, 0.0008, 2, mat=mats["paper"])]
+    # The checklist: a small card with a little thickness, a warmer cream than the ivory lining so it reads
+    # against it, and a soft contact shadow; two lines, one ticked; a pencil resting on it. It lies wholly
+    # on the lining at the back left, clear of the rim, the toy and the loose rings.
+    cw, cl, ct = 0.03, 0.038, 0.002
+    card = [rbox("Checklist", -cw, cw, -cl, cl, 0, ct, 0.001, 2, mat=mats["checklist"])]
+    shadow = rbox("ChecklistShadow", -cw - 0.002, cw + 0.002, -cl - 0.002, cl + 0.002, -0.0004, 0.0003, 0.002, 2, mat=mats["checklist_shadow"])
+    shadow.location = (0.0015, 0.0015, 0)  # Offset away from the light, just under the card.
+    card.append(shadow)
     for k, (label, done) in enumerate((("Choose specimen", True), ("Finish installation", False))):
-        y = 0.018 - k * 0.022
+        y = 0.017 - k * 0.021
         box_outline = [
-            box("Tick", -0.027, -0.019, y - 0.004, y - 0.0033, 0.0012, 0.0016),
-            box("Tick", -0.027, -0.019, y + 0.0033, y + 0.004, 0.0012, 0.0016),
-            box("Tick", -0.027, -0.0263, y - 0.004, y + 0.004, 0.0012, 0.0016),
-            box("Tick", -0.0197, -0.019, y - 0.004, y + 0.004, 0.0012, 0.0016),
+            box("Tick", -0.026, -0.018, y - 0.004, y - 0.0033, ct, ct + 0.0004),
+            box("Tick", -0.026, -0.018, y + 0.0033, y + 0.004, ct, ct + 0.0004),
+            box("Tick", -0.026, -0.0253, y - 0.004, y + 0.004, ct, ct + 0.0004),
+            box("Tick", -0.0187, -0.018, y - 0.004, y + 0.004, ct, ct + 0.0004),
         ]
         if done:
-            box_outline.append(rod("Tick", (-0.0262, y, 0.0015), (-0.0235, y - 0.003, 0.0015), 0.0006, None, vertices=6))
-            box_outline.append(rod("Tick", (-0.0235, y - 0.003, 0.0015), (-0.0185, y + 0.005, 0.0015), 0.0006, None, vertices=6))
+            box_outline.append(rod("Tick", (-0.0252, y, ct + 0.0003), (-0.0225, y - 0.003, ct + 0.0003), 0.0006, None, vertices=6))
+            box_outline.append(rod("Tick", (-0.0225, y - 0.003, ct + 0.0003), (-0.0175, y + 0.005, ct + 0.0003), 0.0006, None, vertices=6))
         mark = join(box_outline, "ChecklistMarks")
         mark.data.materials.append(mats["ink"])
         card.append(mark)
-        words = text_mesh("ChecklistText", label, 0.0042, mats["ink"], extrude=0.0, resolution=2)
-        words.location = (0.008, y, 0.0013)
+        words = text_mesh("ChecklistText", label, 0.0038, mats["ink"], extrude=0.0, resolution=2)
+        words.location = (0.008, y, ct + 0.0001)
         card.append(words)
     checklist = parent(card, "Checklist")
-    checklist.location = (-0.045, 0.06, top)
-    checklist.rotation_euler.z = math.radians(-14)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0034, depth=0.078, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    checklist.location = (-0.05, 0.058, top)
+    checklist.rotation_euler.z = math.radians(-10)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0034, depth=0.07, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
     pencil_body = bpy.context.active_object
     pencil_body.data.materials.append(mats["pencil"])
-    tip = cone("PencilTip", 0.0032, 0.0008, 0.014, (0.046, 0, 0), rotation=(0, math.radians(90), 0), vertices=12, mat=mats["cedar"])
-    end = rcyl("PencilEnd", 0.0034, 0.008, (-0.043, 0, 0), rotation=(0, math.radians(90), 0), edge=0.0012, vertices=12, mat=mats["bronze"])
+    tip = cone("PencilTip", 0.0032, 0.0008, 0.012, (0.041, 0, 0), rotation=(0, math.radians(90), 0), vertices=12, mat=mats["cedar"])
+    end = rcyl("PencilEnd", 0.0034, 0.007, (-0.0385, 0, 0), rotation=(0, math.radians(90), 0), edge=0.0012, vertices=12, mat=mats["bronze"])
     pencil = parent([pencil_body, tip, end], "PlinthPencil")
-    pencil.location = (-0.04, 0.052, top + 0.0012 + 0.0034)
-    pencil.rotation_euler.z = math.radians(32)
-    # The dust cloth: folded, laid over the front-right corner of the cap, one end hanging down the side.
-    cloth = []
-    cloth.append(rbox("ClothFold", -0.035, 0.035, -0.028, 0.028, 0, 0.007, 0.003, 3, mat=mats["linen"]))
-    flap = rbox("ClothFlap", -0.035, 0.035, -0.003, 0.003, -0.05, 0.0, 0.0028, 3, mat=mats["linen"])
-    flap.location = (0, -0.029, 0.004)
-    flap.rotation_euler.x = math.radians(-8)
-    cloth.append(flap)
-    dust = parent(cloth, "DustCloth")
-    dust.location = (0.112, -0.128, 0.655)
-    dust.rotation_euler.z = math.radians(-35)
-    return parent([toy, checklist, pencil, dust] + loose, "Vignette")
+    # Lying along the card, on it (a hexagon this way up rests on a corner, 3.4 mm below its axis).
+    pencil.location = (-0.048, 0.052, top + ct + 0.0034)
+    pencil.rotation_euler.z = math.radians(70)
+    return parent([toy, checklist, pencil] + loose, "Vignette")
 
 
 # ---------------------------------------------------------------- 003: the first KDS

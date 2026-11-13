@@ -168,7 +168,7 @@ export const fatherhood = {
   title: "Fatherhood",
   note: "Exhibit in progress.",
   /** What's on the plinth, for screen readers (the label above is all that's shown). */
-  setting: "On the plinth, mid-installation: a wooden stacking-ring toy, partly assembled, two rings beside it, a dust cloth and a pencil on a checklist. Choose specimen: done. Finish installation: not yet.",
+  setting: "On the plinth, mid-installation: a wooden stacking-ring toy, partly assembled, two rings beside it, and a pencil on a checklist. Choose specimen: done. Finish installation: not yet.",
 };
 
 /** The Information desk, the walk's last stop. */
