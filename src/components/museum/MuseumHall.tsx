@@ -15,7 +15,9 @@ type Props = {
   exhibits: Exhibit[];
   /** Every exhibit, planned ones included, for the gallery directory. */
   directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
-  links: { about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
+  links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
+  /** Cases with a case study to read, keyed by exhibit id. */
+  studies: Record<string, { href: string; title: string }>;
   desk: { summary: string; farewell: string };
   /** The small unnumbered display between the last case and the desk: a card, not a stop. */
   fatherhood: { title: string; note: string; setting: string };
@@ -60,7 +62,19 @@ function supportsWebGL() {
   }
 }
 
-export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood }: Props) {
+/**
+ * Each stop's address in the URL: /museum#case-003, or #desk. A case study's "Return to museum" link uses
+ * it, and leaving the hall by one of its own links writes it, so Back lands on the same case. These are
+ * not element ids: the browser leaves them alone and the hall walks there itself, once.
+ */
+function stopFromHash(hash: string, exhibits: Pick<Exhibit, "number">[]) {
+  if (hash === "#desk") return exhibits.length;
+  const match = /^#case-(\d+)$/.exec(hash);
+  const at = match ? exhibits.findIndex((exhibit) => exhibit.number === match[1]) : -1;
+  return at === -1 ? null : at;
+}
+
+export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood, studies }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLElement | null)[]>([]);
@@ -101,6 +115,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const deskIndex = exhibits.length;
   const count = exhibits.length + 1;
   const ready = useRef(false);
+  const arrival = useRef<number | null>(null); // A stop named in the URL, to focus once the hall is ready.
   const idle = useRef(0); // The "finish the walk" timer.
   const direction = useRef(0); // Which way the visitor was last walking.
   const pressing = useRef(false); // A finger is on the screen.
@@ -282,6 +297,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         if (cancelled) return created.dispose();
         scene.current = created;
         watchSizes();
+        // Arriving at a named stop (from a case study, or Back to the hall): stand there, no walk. The
+        // camera also starts at any restored scroll position instead of walking to it from the first case.
+        const named = stopFromHash(window.location.hash, exhibits);
+        if (named !== null) window.scrollTo({ top: offsetFor(named), behavior: "instant" });
+        arrival.current = named;
+        const progress = Math.max(0, Math.min(count - 1, (window.scrollY - offsetFor(0)) / caseHeight()));
+        created.setTarget(motion.matches ? Math.round(walk(progress)) : walk(progress), true);
         setStatus("ready");
         window.dispatchEvent(new Event("scroll")); // Pick up a restored scroll position.
       })
@@ -304,7 +326,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [exhibits, stopGlide]);
+  }, [exhibits, stopGlide, offsetFor, caseHeight, count]);
 
   // Scrolling moves the camera. With reduced motion it cuts between cases instead of gliding.
   useEffect(() => {
@@ -348,6 +370,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         }
         shown = nearest;
         setIndex(nearest);
+        // A stop already named in the URL follows you, so a refresh doesn't send you back to the old one.
+        // (The hall never adds one on its own; links in and out of it do.)
+        const named = stopFromHash(window.location.hash, exhibits);
+        if (named !== null && named !== nearest) {
+          const hash = nearest === deskIndex ? "#desk" : `#case-${exhibits[nearest].number}`;
+          window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
+        }
         if (openRef.current !== null && openRef.current !== nearest) changeDrawer(null); // The drawer shuts behind you.
         // If focus was in a note that just closed, it lands on the label of the case you walked to.
         if (notes.current.some((note, i) => i !== nearest && note?.contains(document.activeElement))) labels.current[nearest]?.focus();
@@ -384,6 +413,12 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const watcher = new IntersectionObserver(([entry]) => scene.current?.setVisible(entry.isIntersecting));
     if (stage.current) watcher.observe(stage.current);
     onScroll();
+    // Keyboard focus lands on the case you came back to, not the top of the page. Focusing a label walks
+    // to it, and the hall is already there, so nothing moves.
+    if (arrival.current !== null) {
+      labels.current[arrival.current]?.focus({ preventScroll: true });
+      arrival.current = null;
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     window.addEventListener("wheel", onWheel, { passive: true });
@@ -406,7 +441,30 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("keydown", onScrollKey);
     };
-  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer]);
+  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer, exhibits, deskIndex]);
+
+  // Without the 3D hall, a stop named in the URL just brings its label into view, with focus on it.
+  useEffect(() => {
+    if (status !== "fallback") return;
+    const named = stopFromHash(window.location.hash, exhibits);
+    const label = named === null ? null : labels.current[named];
+    if (!label) return;
+    label.scrollIntoView({ block: "center" });
+    label.focus({ preventScroll: true });
+  }, [status, exhibits]);
+
+  /** Leaving by one of the hall's own links writes the stop into this page's URL, so Back returns to it. */
+  function rememberStop(event: React.MouseEvent) {
+    const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    if (!(link instanceof HTMLAnchorElement) || link.target === "_blank" || link.origin !== window.location.origin) return;
+    if (link.pathname === window.location.pathname) return;
+    // A link on a label belongs to that stop; the header's links, to wherever you're standing.
+    const holder = labels.current.findIndex((node) => node?.contains(link));
+    const stop = holder !== -1 ? holder : ready.current ? heading() : null;
+    if (stop === null) return;
+    const hash = stop === deskIndex ? "#desk" : `#case-${exhibits[stop].number}`;
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
+  }
 
   // A click anywhere outside the open directory folds it away.
   useEffect(() => {
@@ -542,7 +600,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const fallback = status === "fallback";
 
   return (
-    <div className={`${styles.root} ${fallback ? styles.static : ""}`}>
+    <div className={`${styles.root} ${fallback ? styles.static : ""}`} onClickCapture={rememberStop}>
       <main id="main">
         <section
           ref={stage}
@@ -567,6 +625,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   </p>
                 </div>
                 <nav aria-label="Main" className={styles.nav}>
+                  <Link href={links.work}>Selected work</Link>
                   <Link href={links.about}>About</Link>
                   <a href={links.resume} target="_blank" rel="noreferrer">
                     Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
@@ -579,6 +638,8 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
               <img
                 className={styles.still}
                 src="/museum/hall.jpg"
+                width={1600}
+                height={1000} // Reserves its space, so a label scrolled into view stays there as it loads.
                 alt="A plaster skull cast in a bronze-framed glass case on a squat oak cabinet with a drawer, a mug and field notebooks beside it, lit warmly in an arched plaster niche at dusk."
               />
             ) : (
@@ -624,6 +685,14 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     ))}
                     {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
+                    {studies[exhibit.id] ? (
+                      // The evidence behind the case, one click away: no drawer, bell or animation needed.
+                      <Link href={studies[exhibit.id].href} className={styles.studyLink}>
+                        Read the case study
+                        <span className="sr-only">: {studies[exhibit.id].title}</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    ) : null}
                     {exhibit.drawer && !fallback ? (
                       <button
                         ref={(node) => {
@@ -713,6 +782,9 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   <p className={styles.line}>{desk.summary}</p>
                   <p className={styles.farewell}>{desk.farewell}</p>
                   <ul className={styles.deskLinks}>
+                    <li>
+                      <Link href={links.work}>Browse selected work</Link>
+                    </li>
                     <li>
                       <a href={links.resume} target="_blank" rel="noreferrer">
                         Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
