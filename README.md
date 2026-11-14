@@ -138,8 +138,9 @@ Case studies behind the museum: the museum introduces the career, and these page
 - `"draft"` studies are listed, marked Draft and `noindex`.
 - `"planned"` ones get no page, card or link.
 
-**Museum links.** A study with `exhibit` set links both ways:
-- The case's label gets "Read the case study".
-- The study gets "Return to museum", which goes to `/museum#case-003`.
+**Museum links.**
+- `exhibit` is where a study's "Return to museum" goes, e.g. `/museum#case-003`.
+- `featuredOn` lists the cases whose labels link to the study. It defaults to `exhibit`; `[]` means none.
+- A label with one study shows "Read the case study". A label with several shows a short "Case studies" list of their `shortTitle`s.
 
 The hall reads that address on arrival: it stands at the case without walking there, and focuses its label. Leaving the hall by one of its own links writes the current stop into the URL, so Back returns to it.

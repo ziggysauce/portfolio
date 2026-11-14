@@ -297,6 +297,27 @@
     min-height: 44px;
   }
 }
+/* Two studies on one case: a small heading and a compact row of links. */
+.studyLinks {
+  margin-top: 6px;
+}
+.studyLinksTitle {
+  font: 500 10px/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.studyLinks ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.studyLinks .studyLink {
+  margin-top: 0;
+}
 
 /* ---------------------------------------------------------------- the curator's note */
 

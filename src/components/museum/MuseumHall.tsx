@@ -17,7 +17,7 @@ type Props = {
   directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
   links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
   /** Cases with a case study to read, keyed by exhibit id. */
-  studies: Record<string, { href: string; title: string }>;
+  studies: Record<string, { href: string; title: string; shortTitle: string }[]>;
   desk: { summary: string; farewell: string };
   /** The small unnumbered display between the last case and the desk: a card, not a stop. */
   fatherhood: { title: string; note: string; setting: string };
@@ -443,6 +443,18 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood,
     };
   }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer, exhibits, deskIndex]);
 
+  // A new stop typed or pasted into the address bar while the hall is open is a same-page navigation:
+  // walk there like the directory does. (The hall's own replaceState calls don't fire this.)
+  useEffect(() => {
+    if (status !== "ready") return;
+    function onHash() {
+      const named = stopFromHash(window.location.hash, exhibits);
+      if (named !== null) go(named);
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [status, exhibits, go]);
+
   // Without the 3D hall, a stop named in the URL just brings its label into view, with focus on it.
   useEffect(() => {
     if (status !== "fallback") return;
@@ -685,13 +697,30 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood,
                     ))}
                     {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
-                    {studies[exhibit.id] ? (
-                      // The evidence behind the case, one click away: no drawer, bell or animation needed.
-                      <Link href={studies[exhibit.id].href} className={styles.studyLink}>
+                    {/* The evidence behind the case, one click away: no drawer, bell or animation needed. */}
+                    {studies[exhibit.id]?.length === 1 ? (
+                      <Link href={studies[exhibit.id][0].href} className={styles.studyLink}>
                         Read the case study
-                        <span className="sr-only">: {studies[exhibit.id].title}</span>
+                        <span className="sr-only">: {studies[exhibit.id][0].title}</span>
                         <span aria-hidden="true">→</span>
                       </Link>
+                    ) : studies[exhibit.id]?.length ? (
+                      <div className={styles.studyLinks}>
+                        <p className={styles.studyLinksTitle} id={`${exhibit.id}-studies`}>
+                          Case studies
+                        </p>
+                        <ul aria-labelledby={`${exhibit.id}-studies`}>
+                          {studies[exhibit.id].map((study) => (
+                            <li key={study.href}>
+                              <Link href={study.href} className={styles.studyLink}>
+                                {study.shortTitle}
+                                <span className="sr-only">: {study.title}</span>
+                                <span aria-hidden="true">→</span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ) : null}
                     {exhibit.drawer && !fallback ? (
                       <button

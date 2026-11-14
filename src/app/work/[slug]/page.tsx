@@ -82,7 +82,7 @@ export default async function StudyPage({ params }: Props) {
 
       {study.hero ? <StudyFigure figure={study.hero} wide /> : null}
 
-      {sections.length > 2 ? (
+      {sections.length > 4 ? (
         <nav aria-labelledby="contents-title" className={styles.contents}>
           <h2 id="contents-title" className={styles.contentsTitle}>
             On this page

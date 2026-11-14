@@ -30,30 +30,31 @@ export function StudyFigure({ figure, wide = false, id }: { figure: Figure; wide
   );
 }
 
+/** Choices worth explaining. Each says what we did; the alternative and tradeoff appear only when known. */
 function Decisions({ items }: { items: Decision[] }) {
-  const rows: [keyof Decision, string][] = [
-    ["constraint", "Constraint"],
-    ["approach", "What I did"],
-    ["alternative", "Alternative"],
-    ["tradeoff", "Tradeoff"],
-  ];
   return (
     <ol className={styles.decisions}>
-      {items.map((decision, i) => (
+      {items.map((decision) => (
         <li key={decision.title} className={styles.decision}>
-          <p className={styles.decisionMeta}>
-            <span>Decision {i + 1}</span>
-            <span>{decision.when}</span>
-          </p>
+          {decision.when ? <p className={styles.decisionMeta}>{decision.when}</p> : null}
           <h3 className={styles.decisionTitle}>{decision.title}</h3>
-          <dl className={styles.decisionRows}>
-            {rows.map(([key, label]) => (
-              <div key={key}>
-                <dt>{label}</dt>
-                <dd>{decision[key]}</dd>
-              </div>
-            ))}
-          </dl>
+          <p className={styles.decisionBody}>{decision.body}</p>
+          {decision.alternative || decision.tradeoff ? (
+            <dl className={styles.decisionRows}>
+              {decision.alternative ? (
+                <div>
+                  <dt>The alternative</dt>
+                  <dd>{decision.alternative}</dd>
+                </div>
+              ) : null}
+              {decision.tradeoff ? (
+                <div>
+                  <dt>{decision.tradeoffLabel ?? "The tradeoff"}</dt>
+                  <dd>{decision.tradeoff}</dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -67,7 +68,7 @@ function Timeline({ items }: { items: TimelineEntry[] }) {
         <li key={entry.what}>
           <p className={styles.when}>{entry.when}</p>
           <div>
-            <p className={styles.who}>{entry.who}</p>
+            {entry.tag ? <p className={styles.who}>{entry.tag}</p> : null}
             <p>{entry.what}</p>
           </div>
         </li>
@@ -82,14 +83,28 @@ function StudyBlock({ block }: { block: Block }) {
       return <p>{block.text}</p>;
     case "subhead":
       return <h3 className={styles.subhead}>{block.text}</h3>;
-    case "list":
+    case "list": {
+      const List = block.ordered ? "ol" : "ul";
       return (
-        <ul className={styles.list}>
-          {block.items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
+        <List className={`${styles.list} ${block.ordered ? styles.ordered : ""}`}>
+          {block.items.map((item) => {
+            const cut = block.leads ? item.indexOf(". ") : -1;
+            return (
+              <li key={item}>
+                {cut > 0 ? (
+                  <>
+                    <strong>{item.slice(0, cut + 1)}</strong>
+                    {item.slice(cut + 1)}
+                  </>
+                ) : (
+                  item
+                )}
+              </li>
+            );
+          })}
+        </List>
       );
+    }
     case "figure":
       return <StudyFigure figure={block} wide />;
     case "decisions":

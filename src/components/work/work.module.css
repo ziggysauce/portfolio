@@ -182,7 +182,7 @@
 .card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 32px;
   align-items: center;
   padding: 24px;
@@ -194,6 +194,7 @@
 }
 .cardArt {
   min-width: 0;
+  container-type: inline-size;
 }
 .cardArtLabel {
   margin: 12px 0 0;
@@ -289,10 +290,35 @@
   align-items: center;
   min-height: 32px;
 }
-.more {
-  margin: 28px 0 0;
-  color: var(--soft);
-  font-style: italic;
+.shorter {
+  margin-top: 48px;
+}
+.shorterTitle {
+  margin: 0 0 14px;
+  font: 500 12px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.shorter ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shortCard {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  max-width: 44rem;
+  padding: 18px 22px;
+  background: var(--card);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.shortTitle {
+  margin: 0;
+  font: 400 clamp(24px, 2.8vw, 30px) / 1.1 var(--serif);
+  text-wrap: balance;
 }
 
 /* ---------------------------------------------------------------- study head */
@@ -356,6 +382,7 @@
 }
 .art {
   min-width: 0;
+  container-type: inline-size; /* Figures lay themselves out by their own width. */
 }
 .caption {
   display: grid;
@@ -490,6 +517,14 @@
 .list {
   margin: 0 0 1em;
   padding-left: 1.2em;
+  list-style: disc;
+}
+.ordered {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.list strong {
+  font-weight: 600;
 }
 .list li {
   margin-bottom: 0.5em;
@@ -516,48 +551,48 @@
 
 .decisions {
   display: grid;
-  gap: 20px;
-  max-width: var(--wide);
-  margin: 0;
+  gap: 16px;
+  max-width: var(--measure);
+  margin: 8px 0 24px;
   padding: 0;
   list-style: none;
 }
 .decision {
-  padding: 22px 24px 8px;
+  padding: 18px 22px 6px;
   background: var(--card);
-  border-radius: 3px;
+  border-left: 3px solid #c9a066;
+  border-radius: 0 3px 3px 0;
   box-shadow: inset 0 0 0 1px var(--rule);
 }
 .decisionMeta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px 16px;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font: 500 12px/1.5 var(--mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--bronze);
 }
 .decisionTitle {
-  margin: 0 0 14px;
-  font: 400 clamp(24px, 3vw, 30px) / 1.15 var(--serif);
+  margin: 0 0 8px;
+  font: 400 clamp(23px, 2.6vw, 27px) / 1.15 var(--serif);
   text-wrap: balance;
+}
+.decisionBody {
+  margin: 0 0 12px;
+  text-wrap: pretty;
 }
 .decisionRows {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 32px;
+  gap: 0;
   margin: 0;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 .decisionRows > div {
-  padding: 12px 0 14px;
+  padding: 10px 0 12px;
   border-top: 1px solid var(--rule);
 }
 .decisionRows dt {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   font: 500 11px/1.5 var(--mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -629,9 +664,6 @@
     gap: 20px;
     padding: 18px;
   }
-  .decisionRows {
-    grid-template-columns: 1fr;
-  }
 }
 @media (max-width: 640px) {
   .masthead {
@@ -654,7 +686,7 @@
     padding-top: 40px;
   }
   .decision {
-    padding: 18px 16px 4px;
+    padding: 16px 16px 4px;
   }
   .aside {
     padding: 4px 16px 12px;

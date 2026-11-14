@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { FigureArt } from "@/components/work/figures";
 import styles from "@/components/work/work.module.css";
-import { exhibitFor, listedStudies, museumHref, studyHref } from "@/content/work";
+import { exhibitFor, listedStudies, museumHref, studyHref, type Study } from "@/content/work";
 import { site } from "@/content/site";
 
-const description = "Case studies from Daniel Nguyen’s work at GoTab: the problem, what he built, what teammates built, and what changed.";
+const description = "Case studies from Daniel Nguyen’s work at GoTab: the problem, his role, what the team built, and what changed.";
 
 export const metadata: Metadata = {
   title: "Selected work",
@@ -15,32 +15,42 @@ export const metadata: Metadata = {
   openGraph: { title: `Selected work | ${site.name}`, description, url: "/work", siteName: site.name, type: "website", images: [site.ogImage] },
 };
 
+function Draft({ study }: { study: Study }) {
+  return study.status === "draft" ? <span className={styles.draft}>Draft</span> : null;
+}
+
 export default function WorkIndex() {
+  const featured = listedStudies.filter((study) => study.length !== "short");
+  const shorter = listedStudies.filter((study) => study.length === "short");
   return (
     <div className={styles.indexPage}>
       <header className={styles.indexHead}>
         <p className={styles.eyebrow}>Case studies</p>
         <h1 className={styles.pageTitle}>Selected work</h1>
         <p className={styles.lede}>
-          The museum introduces my career. These pages show the work behind it: the problem, what I built, what teammates built, and what changed.
+          The museum introduces my career. These pages tell the stories behind it: the problem we were solving, my part in it, what we built,
+          and what I learned.
         </p>
       </header>
 
       <ol className={styles.cards}>
-        {listedStudies.map((study, i) => {
+        {featured.map((study, i) => {
           const exhibit = exhibitFor(study);
           return (
             <li key={study.slug} className={styles.card}>
               {study.hero ? (
                 <div className={styles.cardArt}>
-                  <FigureArt figure={study.hero.figure} />
+                  {/* A preview of the study's lead visual; the study page describes it in full. */}
+                  <div aria-hidden="true">
+                    <FigureArt figure={study.hero.figure} />
+                  </div>
                   {study.hero.label ? <p className={styles.cardArtLabel}>{study.hero.label}</p> : null}
                 </div>
               ) : null}
               <div className={styles.cardBody}>
                 <p className={styles.cardMeta}>
                   <span>No. {String(i + 1).padStart(2, "0")}</span>
-                  {study.status === "draft" ? <span className={styles.draft}>Draft</span> : null}
+                  <Draft study={study} />
                 </p>
                 <h2 className={styles.cardTitle}>
                   <Link href={studyHref(study)} className={styles.cardLink}>
@@ -75,7 +85,32 @@ export default function WorkIndex() {
           );
         })}
       </ol>
-      <p className={styles.more}>More case studies are in preparation.</p>
+
+      {shorter.length ? (
+        <section aria-labelledby="shorter-title" className={styles.shorter}>
+          <h2 id="shorter-title" className={styles.shorterTitle}>
+            A shorter story
+          </h2>
+          <ul>
+            {shorter.map((study) => (
+              <li key={study.slug} className={styles.shortCard}>
+                <p className={styles.cardMeta}>
+                  <span>
+                    {study.role} · {study.timeframe}
+                  </span>
+                  <Draft study={study} />
+                </p>
+                <h3 className={styles.shortTitle}>
+                  <Link href={studyHref(study)} className={styles.cardLink}>
+                    {study.title}
+                  </Link>
+                </h3>
+                <p className={styles.cardSummary}>{study.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
