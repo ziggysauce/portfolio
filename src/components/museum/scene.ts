@@ -125,8 +125,9 @@ export type LabelAnchor = {
 export type PlinthAnchor = { x: number; y: number; opacity: number };
 
 export type MuseumScene = {
-  /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. */
-  setTarget(progress: number): void;
+  /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. `snap` puts the
+   *  camera there at once instead of walking (arriving at a case from a link, or a restored scroll). */
+  setTarget(progress: number, snap?: boolean): void;
   setHighlight(index: number | null): void;
   setReducedMotion(reduced: boolean): void;
   /** Whether the hall is on screen; ambient motion pauses when it isn't. */
@@ -1050,8 +1051,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
 
   const api: MuseumScene = {
-    setTarget(progress) {
+    setTarget(progress, snap = false) {
       target = THREE.MathUtils.clamp(progress, 0, exhibits.length - 1);
+      if (snap) {
+        current = target;
+        velocity = 0;
+      }
       kick();
     },
     setHighlight(index) {

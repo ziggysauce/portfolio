@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import { MuseumHall } from "@/components/museum/MuseumHall";
 import { desk, exhibits, fatherhood, hall, onView } from "@/content/exhibits";
 import { site } from "@/content/site";
-
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-instrument" });
-const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
+import { studyLinksByExhibit } from "@/content/work";
+import { mono, serif } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Hall of Natural History",
@@ -22,7 +20,9 @@ export default function MuseumPage() {
         directory={exhibits.map(({ id, number, title, status }) => ({ id, number, title, status }))}
         desk={desk}
         fatherhood={fatherhood}
+        studies={studyLinksByExhibit()}
         links={{
+          work: "/work",
           about: "/about",
           resume: site.resume,
           contact: "/contact",

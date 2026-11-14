@@ -269,6 +269,56 @@
   text-wrap: pretty;
 }
 
+/* A case with a written study links to it: plain text on the card, always there, no discovery needed. */
+.studyLink {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 32px;
+  margin-top: 6px;
+  color: var(--ink);
+  font: 500 11px/1.2 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgb(138 106 68 / 0.6);
+  text-underline-offset: 4px;
+}
+.studyLink:hover {
+  text-decoration-color: var(--ink);
+}
+.studyLink:focus-visible {
+  outline: 2px solid #8a6a44;
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .studyLink {
+    min-height: 44px;
+  }
+}
+/* Two studies on one case: a small heading and a compact row of links. */
+.studyLinks {
+  margin-top: 6px;
+}
+.studyLinksTitle {
+  font: 500 10px/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.studyLinks ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.studyLinks .studyLink {
+  margin-top: 0;
+}
+
 /* ---------------------------------------------------------------- the curator's note */
 
 .noteToggle {
@@ -964,6 +1014,7 @@
 .still {
   display: block;
   width: 100%;
+  height: auto;
   max-height: 72svh;
   object-fit: cover;
 }

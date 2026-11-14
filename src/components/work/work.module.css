@@ -1,0 +1,698 @@
+/* Selected work: the museum's identity as a reading page. Warm ivory, dark ink, restrained bronze and a
+   muted green. Instrument Serif and IBM Plex Mono for headings and catalog details; body text stays in
+   the site's Onest for legibility. Contrast on --paper: ink 13.9:1, soft 6.8:1, bronze 4.8:1, green 5.3:1. */
+
+.root {
+  --paper: #f6f0e2;
+  --card: #fbf7ee;
+  --cream: #efe5cf;
+  --ink: #2a2117;
+  --soft: #5f513b;
+  --bronze: #83633d;
+  --green: #4a6a58;
+  --rule: rgb(131 99 61 / 0.28);
+  --serif: var(--font-instrument), "Iowan Old Style", Georgia, serif;
+  --mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  --measure: 40rem;
+  --wide: 66rem;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.65;
+}
+/* Overscroll and the area behind the page match the paper, not the v3 canvas. */
+:global(html):has(.root) {
+  background: #f6f0e2;
+  scroll-padding-top: 24px;
+  scroll-padding-bottom: 24px;
+}
+@media (min-width: 768px) {
+  .root {
+    font-size: 18px;
+  }
+}
+.root :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.root a {
+  color: inherit;
+  text-decoration-color: rgb(131 99 61 / 0.6);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.root a:hover {
+  text-decoration-color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- masthead and footer */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  width: 100%;
+  max-width: calc(var(--wide) + 32px);
+  margin: 0 auto;
+  padding: 20px 16px 0;
+}
+.brand {
+  display: grid;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.brandName {
+  font: 400 22px/1.1 var(--serif);
+}
+.brandHall {
+  font: 500 10px/1.5 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  margin: 0 -10px;
+}
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-decoration: none;
+}
+.nav a:hover,
+.nav a[aria-current] {
+  color: var(--ink);
+}
+.nav a[aria-current] {
+  text-decoration: underline;
+  text-decoration-color: var(--bronze);
+  text-underline-offset: 6px;
+}
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--wide) + 32px);
+  margin: 0 auto;
+  padding: 0 16px 64px;
+}
+.main:focus {
+  outline: none;
+}
+.footer {
+  width: 100%;
+  max-width: calc(var(--wide) + 32px);
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  border-top: 1px solid var(--rule);
+  font-size: 15px;
+  color: var(--soft);
+}
+.footer p {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- shared type */
+
+.eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0 0 14px;
+  font: 500 12px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.draft {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  color: var(--green);
+  font: 500 11px/1.6 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pageTitle,
+.studyTitle {
+  margin: 0;
+  font: 400 clamp(40px, 7vw, 68px) / 1.02 var(--serif);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.studyTitle {
+  max-width: 18ch;
+}
+.lede {
+  max-width: var(--measure);
+  margin: 20px 0 0;
+  font-size: 1.15em;
+  line-height: 1.55;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------------- index */
+
+.indexHead {
+  padding: 56px 0 40px;
+}
+.cards {
+  display: grid;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  padding: 24px;
+  background: var(--card);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px var(--rule),
+    0 10px 30px rgb(42 33 23 / 0.07);
+}
+.cardArt {
+  min-width: 0;
+  container-type: inline-size;
+}
+.cardArtLabel {
+  margin: 12px 0 0;
+  font: 500 11px/1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.cardBody {
+  display: grid;
+  gap: 12px;
+}
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 500 12px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+/* A hairline after the catalog number, as on the museum's labels. */
+.cardMeta::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.cardTitle {
+  margin: 0;
+  font: 400 clamp(28px, 3.4vw, 38px) / 1.08 var(--serif);
+  text-wrap: balance;
+}
+.cardLink {
+  text-decoration: none;
+}
+.cardLink:hover {
+  text-decoration: underline;
+}
+/* The whole card opens the study; the museum link sits above this layer. */
+.cardLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.cardSummary {
+  margin: 0;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.cardFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 0;
+  font-size: 15px;
+}
+.cardFacts dt,
+.facts dt {
+  font: 500 11px/1.6 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.cardFacts dd,
+.facts dd {
+  margin: 0;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tags li {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--soft);
+  font-size: 13px;
+}
+.cardExhibit {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 15px;
+}
+.cardExhibit a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+.shorter {
+  margin-top: 48px;
+}
+.shorterTitle {
+  margin: 0 0 14px;
+  font: 500 12px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.shorter ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shortCard {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  max-width: 44rem;
+  padding: 18px 22px;
+  background: var(--card);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.shortTitle {
+  margin: 0;
+  font: 400 clamp(24px, 2.8vw, 30px) / 1.1 var(--serif);
+  text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------- study head */
+
+.study {
+  display: grid;
+}
+.studyHead {
+  padding: 28px 0 36px;
+}
+.crumbs {
+  margin-bottom: 40px;
+  font-size: 15px;
+}
+.crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crumbs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--soft);
+}
+.crumbs li + li::before {
+  content: "·";
+  margin-right: 18px;
+  color: var(--bronze);
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 18px 28px;
+  margin: 32px 0 0;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--rule);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.factDetail {
+  display: block;
+  margin-top: 4px;
+  color: var(--soft);
+}
+
+/* ---------------------------------------------------------------- figures */
+
+.figure {
+  max-width: var(--measure);
+  margin: 8px 0 32px;
+}
+.wide {
+  max-width: var(--wide);
+}
+.study > .figure {
+  margin-bottom: 48px;
+}
+.art {
+  min-width: 0;
+  container-type: inline-size; /* Figures lay themselves out by their own width. */
+}
+.caption {
+  display: grid;
+  gap: 6px;
+  max-width: var(--measure);
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--soft);
+}
+.figLabel {
+  justify-self: start;
+  font: 500 11px/1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.legend {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink);
+}
+.legend li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.legendNumber {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: #e0bf86;
+  color: var(--ink);
+  font: 600 12px/1 var(--mono);
+}
+
+/* ---------------------------------------------------------------- contents */
+
+.contents {
+  max-width: var(--measure);
+  margin: 0 0 24px;
+  padding: 18px 0;
+  border-block: 1px solid var(--rule);
+}
+.contentsTitle {
+  margin: 0 0 8px;
+  font: 500 11px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.contents ol {
+  margin: 0;
+  padding-left: 1.4em;
+  columns: 2 16rem;
+  column-gap: 32px;
+  font-size: 16px;
+}
+.contents li {
+  break-inside: avoid;
+  padding: 2px 0;
+}
+.contents a {
+  display: inline-block;
+  padding: 4px 0;
+}
+.contentsAside a {
+  color: var(--soft);
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.section {
+  padding-top: 48px;
+  scroll-margin-top: 8px;
+}
+.sectionNumber {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: var(--measure);
+  margin: 0 0 8px;
+  font: 500 12px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.sectionNumber::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.sectionTitle {
+  max-width: var(--measure);
+  margin: 0 0 16px;
+  font: 400 clamp(30px, 4vw, 40px) / 1.1 var(--serif);
+  text-wrap: balance;
+}
+.sectionIntro {
+  max-width: var(--measure);
+  margin: -8px 0 16px;
+  color: var(--soft);
+  font-style: italic;
+}
+.prose {
+  display: grid;
+}
+.prose > p,
+.prose > .list,
+.prose > .subhead {
+  max-width: var(--measure);
+}
+.prose > p {
+  margin: 0 0 1em;
+  text-wrap: pretty;
+}
+.subhead {
+  margin: 12px 0 6px;
+  font: 500 12px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.list {
+  margin: 0 0 1em;
+  padding-left: 1.2em;
+  list-style: disc;
+}
+.ordered {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.list strong {
+  font-weight: 600;
+}
+.list li {
+  margin-bottom: 0.5em;
+  padding-left: 0.2em;
+}
+.list li::marker {
+  color: var(--bronze);
+}
+
+/* An optional appendix: a quieter panel for readers who want the internals. */
+.aside {
+  margin-top: 56px;
+  padding: 8px 24px 16px;
+  background: var(--card);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 16px;
+}
+.aside .sectionTitle {
+  font-size: 30px;
+}
+
+/* ---------------------------------------------------------------- decisions */
+
+.decisions {
+  display: grid;
+  gap: 16px;
+  max-width: var(--measure);
+  margin: 8px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+.decision {
+  padding: 18px 22px 6px;
+  background: var(--card);
+  border-left: 3px solid #c9a066;
+  border-radius: 0 3px 3px 0;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.decisionMeta {
+  margin: 0 0 4px;
+  font: 500 12px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+.decisionTitle {
+  margin: 0 0 8px;
+  font: 400 clamp(23px, 2.6vw, 27px) / 1.15 var(--serif);
+  text-wrap: balance;
+}
+.decisionBody {
+  margin: 0 0 12px;
+  text-wrap: pretty;
+}
+.decisionRows {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.decisionRows > div {
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--rule);
+}
+.decisionRows dt {
+  margin-bottom: 2px;
+  font: 500 11px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.decisionRows dd {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------------- timeline */
+
+.timeline {
+  max-width: var(--measure);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 16px;
+}
+.timeline li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--rule);
+}
+.timeline p {
+  margin: 0;
+}
+.when {
+  font: 500 14px/1.6 var(--mono);
+  color: var(--bronze);
+}
+.who {
+  font: 500 11px/1.6 var(--mono) !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+/* ---------------------------------------------------------------- study footer */
+
+.studyFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  max-width: var(--measure);
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+  font-size: 16px;
+}
+.studyFoot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.returnLink {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- narrow screens */
+
+@media (max-width: 860px) {
+  .card {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .masthead {
+    padding-top: 14px;
+  }
+  .nav {
+    margin: 0 -7px;
+  }
+  .nav a {
+    padding: 0 7px;
+    letter-spacing: 0.1em;
+  }
+  .indexHead {
+    padding: 32px 0 28px;
+  }
+  .crumbs {
+    margin-bottom: 28px;
+  }
+  .section {
+    padding-top: 40px;
+  }
+  .decision {
+    padding: 16px 16px 4px;
+  }
+  .aside {
+    padding: 4px 16px 12px;
+  }
+  .timeline li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
