@@ -900,6 +900,10 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   let width = 1;
   let height = 1;
   const framing = { distance: 3.5, camX: 0, lookX: 0, lookY: SPECIMEN_Y, height: 1.4 };
+  // The desk pilot's view: at the desk only, the camera rises and turns a little more three-quarter, so
+  // the visitor looks down onto the lamplit desktop and sees the bell's whole silhouette. Eased in over the
+  // walk from case 006, so every other stop keeps exactly the resting camera.
+  const deskView = { lift: 0, look: 0, side: 0 };
 
   function frame() {
     const aspect = width / height;
@@ -919,12 +923,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       framing.lookX = 0.2 + 0.46 * wide;
       framing.lookY = 0.8;
       framing.height = 1.48;
+      Object.assign(deskView, { lift: 0.42, look: 0.06, side: -0.3 });
     } else {
       // Phones: the case in the upper half, the label below it.
       framing.distance = Math.max(2.75, 0.55 / halfH);
       framing.camX = framing.lookX = (CABINET.x0 + CABINET.x1) / 2;
       framing.lookY = SPECIMEN_Y - 0.34 * framing.distance * halfV;
       framing.height = framing.lookY + 0.3;
+      // Phones stand level with the desktop, so it shows edge-on: rise well above it.
+      Object.assign(deskView, { lift: 0.62, look: 0.1, side: -0.12 });
     }
   }
 
@@ -933,8 +940,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const x = current * BAY_WIDTH;
     // A touch of lead in the direction of travel, no zoom and no roll: the eye arrives slightly first.
     const lead = THREE.MathUtils.clamp(velocity * BAY_WIDTH * 0.03, -0.18, 0.18);
-    camera.position.set(x + framing.camX, framing.height, CASE_Z + framing.distance);
-    lookAt.set(x + framing.lookX + lead, framing.lookY, CASE_Z);
+    const d = deskIndex >= 0 ? 1 - THREE.MathUtils.smoothstep(Math.abs(current - deskIndex), 0, 1) : 0;
+    camera.position.set(x + framing.camX + deskView.side * d, framing.height + deskView.lift * d, CASE_Z + framing.distance);
+    lookAt.set(x + framing.lookX + lead, framing.lookY + deskView.look * d, CASE_Z);
     camera.lookAt(lookAt);
   }
 
