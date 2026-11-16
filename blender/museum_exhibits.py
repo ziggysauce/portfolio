@@ -428,6 +428,7 @@ def add_materials(mats):
         "plant_pot": principled("DeskPlantPot", srgb("#dccbb0"), 0.4),
         "plant_sage": principled("DeskLeafSage", srgb("#93a886"), 0.6),
         "plant_deep": principled("DeskLeafDeep", srgb("#6d8766"), 0.6),
+        "desk_ticket": principled("CanvasDeskTicket", srgb("#ffffff"), 0.85),  # Drawn by the web scene.
         "lamp_glass": principled("LampGlass", srgb("#3f7a5a"), 0.2),
         "leaflet_a": principled("LeafletCream", srgb("#efe4c8"), 0.9),
         "leaflet_b": principled("LeafletSage", srgb("#a9b9a2"), 0.9),
@@ -1015,6 +1016,60 @@ def banker_hood(length=0.098, depth=0.06, height=0.062, ends=0.78):
     return hood
 
 
+def admission_ticket(mats, w=0.13, h=0.0425, notch=0.0048, corner=0.0018, roll=5.0, thickness=0.0006):
+    """The visit's "After-hours admission / Guest of Dan" ticket (MuseumHall's .ticket), as a small paper
+    card seated at the front of the brochure stand: a rounded rectangle with a half-round notch in each
+    end, the same silhouette as the stub on the page. Leaned back against the front leaflets like them,
+    and rolled a few degrees in its own plane so one corner rests on the step: just put there by hand.
+    Its face ("CanvasDeskTicket") is drawn by the web scene in the page's own type."""
+    hw = w / 2
+    pts = []
+
+    def arc(cx, cz, r, a0, a1, n):
+        for i in range(n + 1):
+            a = math.radians(a0 + (a1 - a0) * i / n)
+            pts.append((cx + r * math.cos(a), cz + r * math.sin(a)))
+
+    arc(-hw + corner, corner, corner, 180, 270, 4)
+    arc(hw - corner, corner, corner, 270, 360, 4)
+    for i in range(13):  # The right notch, bitten inward.
+        t = math.radians(-90 + 180 * i / 12)
+        pts.append((hw - notch * math.cos(t), h / 2 + notch * math.sin(t)))
+    arc(hw - corner, h - corner, corner, 0, 90, 4)
+    arc(-hw + corner, h - corner, corner, 90, 180, 4)
+    for i in range(13):  # The left notch.
+        t = math.radians(-90 + 180 * i / 12)
+        pts.append((-hw + notch * math.cos(t), h / 2 - notch * math.sin(t)))
+    mesh = bpy.data.meshes.new("DeskTicket")
+    obj = bpy.data.objects.new("DeskTicket", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    bm = bmesh.new()
+    verts = [bm.verts.new((x, 0.0, z)) for x, z in pts]
+    face = bm.faces.new(verts)
+    face.normal_update()
+    if face.normal.y > 0:  # The printed face looks at the visitor (-y).
+        face.normal_flip()
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, verts=[v for v in ext["geom"] if isinstance(v, bmesh.types.BMVert)], vec=(0, thickness, 0))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(mesh)
+    bm.free()
+    plane_uv(obj, 0, 2)  # Mapped flat, then rolled, so the print turns with the card.
+    a = math.radians(roll)
+    for v in mesh.vertices:
+        x, y, z = v.co
+        v.co = (x * math.cos(a) - z * math.sin(a), y, x * math.sin(a) + z * math.cos(a))
+    low = min(v.co.z for v in mesh.vertices)
+    for v in mesh.vertices:
+        v.co.z -= low  # The low corner rests on the step.
+    # Parallel to the leaflets and just in front of them. The step's front edge is rounded (4 mm), so the low
+    # corner is tucked into that round-over rather than set on the flat top, which starts behind the leaflets.
+    obj.rotation_euler = (math.radians(-8), 0, 0)
+    obj.location = (-0.004, -0.0197, 0.0285)
+    obj.data.materials.append(mats["desk_ticket"])
+    return obj
+
+
 def build_desk(mats):
     """The last stop: an oak information counter with a green leather top, a brass service bell, a
     tiered brochure stand and a banker's lamp. It stands where a cabinet would, centred in the niche.
@@ -1061,11 +1116,13 @@ def build_desk(mats):
         grain_uv(step, seed=330 + tier)
         step.data.materials.append(mats["oak_prop"])
         stand.append(step)
-    for tier, mat in enumerate((mats["leaflet_a"], mats["leaflet_b"], mats["leaflet_c"])):
+    # Rose at the front, so the cream admission ticket seated there reads against it.
+    for tier, mat in enumerate((mats["leaflet_c"], mats["leaflet_b"], mats["leaflet_a"])):
         leaf = box("Leaflets", -0.06, 0.06, -0.014 + tier * 0.035, -0.006 + tier * 0.035, 0.03 + tier * 0.03, 0.105 + tier * 0.03)
         leaf.rotation_euler.x = math.radians(-8)
         leaf.data.materials.append(mat)
         stand.append(leaf)
+    stand.append(admission_ticket(mats))
     brochures = parent(stand, "Brochures")
     brochures.location = (0.29, cy + 0.03, h + 0.003)
     brochures.rotation_euler.z = math.radians(-10)
@@ -1113,7 +1170,7 @@ def build_desk(mats):
     return parent([desk, leather, bell_group, brochures, lamp_group], "Desk")
 
 
-def paddle_leaf(name, length, width, arch, cup, petiole, mat):
+def paddle_leaf(name, length, width, arch, cup, petiole, mat, twist=0.0):
     """One broad, rounded leaf on a short stalk, standing up from the origin along +z: fuller toward the
     tip like a paddle, its tip arching outward (-y) and its edges cupped a little, so it has a readable
     outline and a soft highlight. Built as one mesh with its origin at the stalk's foot."""
@@ -1126,6 +1183,18 @@ def paddle_leaf(name, length, width, arch, cup, petiole, mat):
         v.co = (x, y, z + length / 2 + petiole)
     stalk = cyl("Stalk", 0.0035, petiole + 0.01, (0, 0, (petiole + 0.01) / 2), vertices=6)
     frond = join([leaf, stalk], name)
+    a = math.radians(twist)  # Turned about its own midrib: some leaves show their face, some their edge.
+    for v in frond.data.vertices:
+        x, y, z = v.co
+        v.co = (x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a), z)
+    # Shade toward the base, where the leaves crowd and shadow each other (the web scene multiplies the
+    # vertex color in), and a touch toward the cupped centre line.
+    col = frond.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    frond.data.color_attributes.active_color = col
+    for i, v in enumerate(frond.data.vertices):
+        t = min(1.0, max(0.0, (v.co.z - petiole) / length))
+        k = 0.5 + 0.5 * (t * t * (3 - 2 * t)) ** 0.8
+        col.data[i].color = (k, k, k, 1.0)
     shade_smooth(frond)
     frond.data.materials.append(mat)
     return frond
@@ -1150,18 +1219,19 @@ def build_desk_plant(mats):
     shade_smooth(pot)
     pot.data.materials.append(mats["plant_pot"])
     soil = cyl("Soil", rim_r - 0.004, 0.006, (0, 0, pot_top - 0.004), mat=mats["shadow"])
-    # (angle around the pot in degrees, -90 faces the visitor; stalk, blade length, width, lean, tone)
+    # (angle around the pot in degrees, -90 faces the visitor; stalk, blade length, width, lean, twist about
+    # its midrib, tone). Leaves crowd toward the back and overlap; twists turn a few edge-on.
     spec = (
-        (100, 0.07, 0.16, 0.12, 14, "plant_deep"),  # the tall one at the back
-        (140, 0.045, 0.145, 0.115, 34, "plant_sage"),
-        (45, 0.04, 0.15, 0.118, 28, "plant_deep"),
-        (-130, 0.025, 0.13, 0.11, 52, "plant_sage"),
-        (-50, 0.03, 0.135, 0.112, 46, "plant_deep"),
-        (-95, 0.012, 0.115, 0.105, 64, "plant_sage"),  # short, leaning out toward the visitor
+        (95, 0.075, 0.165, 0.12, 12, 0, "plant_deep"),  # the tall one at the back, face on
+        (135, 0.05, 0.15, 0.115, 28, 38, "plant_sage"),  # turned half edge-on, in front of the back leaf
+        (62, 0.045, 0.15, 0.118, 24, -28, "plant_deep"),  # overlapping the back leaf from the right
+        (-145, 0.025, 0.13, 0.11, 48, 18, "plant_sage"),
+        (-50, 0.035, 0.14, 0.112, 40, -48, "plant_deep"),  # nearly edge-on
+        (-100, 0.015, 0.12, 0.105, 58, 8, "plant_sage"),  # short, leaning out toward the visitor
     )
     leaves = []
-    for i, (angle, petiole, length, width, lean, tone) in enumerate(spec):
-        frond = paddle_leaf("Frond", length, width, 0.03, 0.004, petiole, mats[tone])
+    for i, (angle, petiole, length, width, lean, twist, tone) in enumerate(spec):
+        frond = paddle_leaf("Frond", length, width, 0.03, 0.013, petiole, mats[tone], twist)
         a = math.radians(angle)
         frond.rotation_euler = (math.radians(lean), 0, a + math.pi / 2)
         frond.location = (math.cos(a) * 0.022, math.sin(a) * 0.022, pot_top - 0.006)

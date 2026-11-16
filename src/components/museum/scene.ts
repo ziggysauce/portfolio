@@ -21,6 +21,8 @@ const WIDE_CABINET = { x0: -0.45, x1: 0.45 };
 const PLINTH = { x: WINDOW.x, z: -0.765, top: 0.655, recess: 0.6475, front: 0.135 }; // front: the body's half depth
 // The desk pilot's lamp and bell (blender build_desk): the lamp's bulb sits just under its shade, and its
 // light pools on the desktop around the bell.
+// The desk bay's niche (blender build_bay): its back wall, 16 cm behind the wall face.
+const NICHE = { width: 1.3, spring: 1.85, z: WALL_Z - 0.16 };
 const DESK = { top: 0.903, bulb: { x: 0.05, y: 1.085, z: -0.26 }, bell: { x: -0.13, z: -0.09 } };
 const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, travel: 0.17 };
 
@@ -171,6 +173,50 @@ type Options = {
   frameLog?: number[];
 };
 
+/** The face of the desk's admission ticket: the page's "After-hours admission / Guest of Dan" stub (MuseumHall's
+ *  .ticket), in its own fonts, read from the CSS variables on the hall's wrapper. Waits briefly for them, so
+ *  the canvas doesn't fall back to a system face; at gallery distance the layout and type are what make it
+ *  recognizable. The card's outline, notches included, is geometry (blender admission_ticket). */
+async function admissionTicketFace(host: HTMLElement, anisotropy: number) {
+  const style = getComputedStyle(host);
+  const serif = `${style.getPropertyValue("--font-instrument").trim() || "Georgia"}, Georgia, serif`;
+  const mono = `${style.getPropertyValue("--font-plex-mono").trim() || "Menlo"}, Menlo, monospace`;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 168; // The card's own proportions, 13 x 4.25 cm.
+  const context = canvas.getContext("2d")!;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = false; // glTF UVs run top-down.
+  texture.anisotropy = anisotropy;
+  const draw = () => {
+    const paper = context.createLinearGradient(0, 0, 0, canvas.height);
+    paper.addColorStop(0, "#f3ead6"); // --cream
+    paper.addColorStop(1, "#e6d8bb"); // --cream-edge
+    context.fillStyle = paper;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#66573f"; // --ink-soft
+    context.font = `500 27px ${mono}`;
+    context.letterSpacing = "4px";
+    context.fillText("AFTER-HOURS ADMISSION", 46, 68);
+    context.fillStyle = "#2a2117"; // --ink
+    context.font = `italic 400 64px ${serif}`;
+    context.letterSpacing = "0px";
+    context.fillText("Guest of Dan", 44, 132);
+    texture.needsUpdate = true;
+  };
+  // Usually already loaded (the page's own ticket uses them). If they're slow, draw now in the fallback
+  // and again once they arrive; never hold the hall up for type.
+  let loaded: Promise<unknown> = Promise.resolve();
+  try {
+    loaded = Promise.all([document.fonts.load(`italic 64px ${serif}`), document.fonts.load(`500 27px ${mono}`)]);
+  } catch {}
+  const inTime = await Promise.race([loaded.then(() => true), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500))]).catch(() => false);
+  draw();
+  if (!inTime) loaded.then(draw, () => {});
+  return texture;
+}
+
 /** A soft round falloff, used for contact shadows under furniture and for dust motes. */
 function radialTexture(inner: string, outer: string) {
   const size = 128;
@@ -295,6 +341,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     renderer.forceContextLoss();
     throw error;
   }
+  const ticketFace = await admissionTicketFace(renderer.domElement, renderer.capabilities.getMaxAnisotropy());
   const bayTemplate = source.getObjectByName("Bay")!;
   const caseTemplate = source.getObjectByName("Case")!;
   const wideTemplate = source.getObjectByName("CaseWide") ?? caseTemplate;
@@ -362,6 +409,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       node.material = shade;
       return;
     }
+    if (node.name === "DeskTicket") {
+      // The visit's admission ticket, seated in the desk's brochure stand: paper, in the page's own type.
+      const ticket = new THREE.MeshStandardMaterial({ name: "DeskTicket", map: ticketFace, roughness: 0.85, metalness: 0 });
+      reflect(ticket, 0.6);
+      owned.push(ticket, ticketFace);
+      node.material = ticket;
+      node.castShadow = node.receiveShadow = true;
+      return;
+    }
     if (node.name === "PrinterLight") {
       // The kitchen printer's small status light: lit, restrained.
       const light = new THREE.MeshBasicMaterial({ name: "PrinterLight", color: "#8fdcaa", toneMapped: false });
@@ -419,6 +475,26 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const deckContactMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.55, depthWrite: false, fog: false });
   const seatMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.85, depthWrite: false, fog: false });
   owned.push(deckContactMaterial, seatMaterial);
+  // The desk niche's evening wash (see the desk, below).
+  const nicheGeometry = new THREE.PlaneGeometry(NICHE.width, NICHE.spring + 1.2);
+  const nicheCoolTexture = (() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 4;
+    const context = canvas.getContext("2d")!;
+    const gradient = context.createLinearGradient(0, 0, 256, 0);
+    gradient.addColorStop(0, "rgb(214,215,236)"); // Toward the window: cooler, a little plum.
+    gradient.addColorStop(0.62, "rgb(255,255,255)"); // Past the lamp: untouched.
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 256, 4);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  })();
+  const nicheCoolMaterial = new THREE.MeshBasicMaterial({ map: nicheCoolTexture, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, toneMapped: false, fog: false });
+  const nicheWarmTexture = radialTexture("rgba(255,184,116,1)", "rgba(255,170,96,0)");
+  const nicheWarmMaterial = new THREE.MeshBasicMaterial({ map: nicheWarmTexture, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  owned.push(nicheGeometry, nicheCoolTexture, nicheCoolMaterial, nicheWarmTexture, nicheWarmMaterial);
   const lampPoolTexture = radialTexture("rgba(255,190,120,1)", "rgba(255,170,96,0)");
   const lampPoolMaterial = new THREE.MeshBasicMaterial({ map: lampPoolTexture, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   owned.push(lampPoolTexture, lampPoolMaterial);
@@ -550,6 +626,17 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       lampPool.scale.set(0.62, 1, 0.42);
       lampPool.renderOrder = 1;
       scene.add(lampPool);
+      // Evening on the niche wall behind the desk: broad and faint. A cool, plum-blue multiply that fades in
+      // toward the night window (left), and a soft warm glow on the plaster behind the lamp. Both sit on the
+      // niche's back wall only, so the oak and the plinth's glow under the window keep their color.
+      const cool = new THREE.Mesh(nicheGeometry, nicheCoolMaterial);
+      cool.position.set(x, NICHE.spring / 2 + 0.6, NICHE.z + 0.003);
+      cool.renderOrder = 1;
+      const warm = new THREE.Mesh(nicheGeometry, nicheWarmMaterial);
+      warm.position.set(x + DESK.bulb.x, 1.2, NICHE.z + 0.004);
+      warm.scale.set(0.95, 0.42, 1);
+      warm.renderOrder = 1;
+      scene.add(cool, warm);
       // The bell sits on the leather, not over it: a small soft contact under its base.
       const seat = new THREE.Mesh(contactGeometry, seatMaterial);
       seat.position.set(x + DESK.bell.x, DESK.top + 0.0015, DESK.bell.z);
