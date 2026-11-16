@@ -2,7 +2,7 @@
 
 - **Status:** draft, revised 2026-11-16 with Daniel's correction on sandbox locations. Not yet approved for publication.
 - **Page:** `src/content/studies/merchant-onboarding.ts`, at `/work/merchant-onboarding`.
-- **Museum:** case 005 links here; Return to museum goes to case 005.
+- **Museum:** The Nearly Dry Marker (`marker`) and Plans & Pull Requests (`plans`) link here, since the work spans both roles; Return to the museum goes to `plans`.
 - **Daniel's role and period, 2019–2026:**
   - Engineer, 2019–20: wrote the Paysafe merchant forms.
   - EM, 2021–22: scoped and sliced the rebuild, built the shell, reviewed the pages.

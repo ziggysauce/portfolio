@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { MuseumHall } from "@/components/museum/MuseumHall";
-import { desk, exhibits, fatherhood, hall, onView } from "@/content/exhibits";
+import { desk, displayNumber, fatherhood, hall, onView } from "@/content/exhibits";
 import { site } from "@/content/site";
 import { studyLinksByExhibit } from "@/content/work";
 import { mono, serif } from "@/lib/fonts";
@@ -21,7 +21,8 @@ export default function MuseumPage() {
       <MuseumHall
         hall={hall}
         exhibits={onView}
-        directory={exhibits.map(({ id, number, title, status }) => ({ id, number, title, status }))}
+        identity={site.identity}
+        numbers={Object.fromEntries(onView.map((exhibit) => [exhibit.id, displayNumber(exhibit)]))}
         desk={desk}
         fatherhood={fatherhood}
         studies={studyLinksByExhibit()}

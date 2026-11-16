@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/daily-insights.ts`, at `/work/daily-insights`.
-- **Museum:** no label links here. Return to museum goes to case 003, the same era.
+- **Museum:** no label links here. Return to the museum goes to The First KDS (`kds`), the same era.
 - **Daniel's role and period:** new software developer, June – October 2018. He owned the SQL, the template and the send logic; two teammates reviewed.
 
 **Sources:** `DTN case studies.pdf`, chapter on pp. 41–46.

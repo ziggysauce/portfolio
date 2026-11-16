@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/menus.ts`, at `/work/menus`.
-- **Museum:** case 004 links here; Return to museum goes to case 004.
+- **Museum:** The First KDS (`kds`, Software Developer 2018–2021) and The Nearly Dry Marker (`marker`, Engineering Manager) link here; Return to the museum goes to The First KDS.
 - **Daniel's role and period:** software developer on a small team, June 2018 – March 2021.
   - Dashboard screens from 2018.
   - Most of the route split, April–May 2020.
@@ -35,10 +35,11 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 
 ## Museum mapping
 
-- You placed Menus on case 004 (Engineering Manager, 2021–2026).
-- The work itself is 2018–2021, during the Software Developer years (case 003).
-- The approved `site.ts` also lists Menus under the Engineering Manager role.
-- The study states its own dates, so the mismatch shows only in the museum placement.
+- Menus was first placed on the Engineering Manager exhibit (`marker`, 2021–2026).
+- The work itself is dated 2018–2021, during the Software Developer years (`kds`). The launch was November 2020, and follow-ups ran to March 2021.
+- The résumé (`public/Daniel_Nguyen_Resume.pdf`) lists "Led development of Menus" under Engineering Manager.
+- Since 2026-11-16 (usability pass): Return to the museum goes to The First KDS, matching the study's own dates, and both labels link here.
+- **Open question for Daniel:** did the Menus work continue after June 2021, as engineering manager? If so, the study's dates should say so. If not, the résumé line belongs under Software Developer.
 
 ## Deliberately left out of the public page
 

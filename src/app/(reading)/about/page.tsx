@@ -13,12 +13,13 @@ export const metadata: Metadata = {
   openGraph: { title: `About | ${site.name}`, description, url: "/about", siteName: site.name, type: "profile", images: [site.ogImage] },
 };
 
-/** "Case 003" with a link into the hall, for a line that has its own exhibit. */
+/** A link into the hall, named after the exhibit, for a line that has its own case. */
 function CaseLink({ id }: { id: string }) {
   const exhibit = exhibits.find((item) => item.id === id);
   return exhibit ? (
     <Link href={museumHref(id)} prefetch={false} className={styles.entryMeta}>
-      See case {exhibit.number}
+      {exhibit.title}
+      <span className="sr-only"> (exhibit in the museum)</span>
     </Link>
   ) : null;
 }

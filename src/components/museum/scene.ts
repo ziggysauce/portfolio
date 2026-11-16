@@ -132,7 +132,8 @@ const TONES: Record<string, Tone> = {
 };
 
 /** A stop on the walk: a case with a specimen, or the Information desk at the end. */
-export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk"; discovery?: Discovery };
+/** `catalog` is the exhibit's original number, which names its drawer props in the model (Discovery1…6). */
+export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk"; discovery?: Discovery; catalog?: string };
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
 export type LabelAnchor = {
@@ -241,7 +242,7 @@ function radialTexture(inner: string, outer: string) {
   return texture;
 }
 
-/** The benchmark's waxed oak (case 1's cabinet and riser): a satin finish whose roughness follows the
+/** The benchmark's waxed oak (the Origin Specimen's cabinet and riser): a satin finish whose roughness follows the
  *  grain only gently and stays in a narrow band, so rounded edges catch one broad highlight and the
  *  darkest grain lines never turn glossy. The grain samples at about 0.37 to 0.43 in linear color. */
 function satinOak(shader: { fragmentShader: string }) {
@@ -711,8 +712,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const drawer = part(display, "Drawer") ?? null;
     const drawerEntry: Drawer = { node: drawer, baseZ: drawer?.position.z ?? 0, discovery: null };
     drawers.push(drawerEntry);
-    // The curator's things live in the first gallery only.
-    if (i === 0 && propsTemplate) {
+    // The curator's things (a mug, field notebooks) live beside the Origin Specimen only.
+    if (exhibit.specimen === "Skull" && propsTemplate) {
       const props = propsTemplate.clone(true);
       props.position.x += x;
       scene.add(props);
@@ -757,7 +758,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     specimens.push(specimen);
     // The drawer's discovery: on the drawer floor, centred, 9 cm in from its front.
-    const discoveryTemplate = source.getObjectByName(`Discovery${i + 1}`);
+    const discoveryTemplate = exhibit.catalog ? source.getObjectByName(`Discovery${Number(exhibit.catalog)}`) : undefined;
     if (drawer && exhibit.discovery && discoveryTemplate) {
       display.updateMatrixWorld(true); // Box3 and attach read world matrices; the case was just placed.
       const oak = part(drawer, "DrawerOak");
@@ -918,8 +919,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
         // The benchmark bay's key is a tighter pool, falling off toward the cabinet's front as in the reference;
         // a touch broader and fully soft for the hall pass, so the light wraps the plaster cast.
-        key.angle = THREE.MathUtils.degToRad(bay === 0 ? 22 : 25);
-        key.penumbra = bay === 0 ? 1 : 0.9;
+        const benchmark = exhibits[bay]?.specimen === "Skull";
+        key.angle = THREE.MathUtils.degToRad(benchmark ? 22 : 25);
+        key.penumbra = benchmark ? 1 : 0.9;
         key.userData.base = KEY_INTENSITY;
         key.userData.color = AMBER;
         key.shadow.camera.near = 1.2;
@@ -939,9 +941,9 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       } else {
         set.fill.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16); // Bounced up from the deck.
         set.fill.color.set("#ffd3a0");
-        // The benchmark bay (case 1) gets a stronger bounce: the linen deck's warm light lifting the
+        // The benchmark bay (the Origin Specimen's) gets a stronger bounce: the linen deck's warm light lifting the
         // underside of the cranium, the sockets and the shadowed cheek, as it does in the reference.
-        set.fill.userData.full = bay === 0 ? 0.06 : isStop ? 0.03 : 0;
+        set.fill.userData.full = exhibits[bay]?.specimen === "Skull" ? 0.06 : isStop ? 0.03 : 0;
         set.fill.distance = 0.5;
       }
     });

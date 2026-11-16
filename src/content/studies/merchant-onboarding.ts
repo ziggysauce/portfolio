@@ -14,6 +14,9 @@ export const merchantOnboarding: Study = {
   timeframe: "2019–2026",
   tags: ["Onboarding", "Payments", "Self-serve"],
   exhibit: "plans",
+  // It spans three roles: the first forms as an engineer, the rebuild as an engineering manager, and
+  // self-serve signup as director. Both management-era labels link here.
+  featuredOn: ["marker", "plans"],
   length: "full",
   hero: {
     figure: "onboarding-hero",

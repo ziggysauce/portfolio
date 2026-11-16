@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "npx serve out -l 5001",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types 'src/**/*.test.ts'"
   },
   "dependencies": {
     "next": "^16.4.5",

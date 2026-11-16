@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/review-loop.ts`, at `/work/review-loop`.
-- **Museum:** cases 004 and 005 link here; Return to museum goes to case 005.
+- **Museum:** Plans & Pull Requests (`plans`) links here, and Return to the museum goes there. The work is July–November 2026, the director period, so it no longer links from the Engineering Manager exhibit.
 - **Daniel's role and period:** designer, builder and main user, July – November 2026.
   - Daniel: wrote the skills, scripts and rules, and decides what is posted or merged.
   - Claude Code: reads, drafts and applies.

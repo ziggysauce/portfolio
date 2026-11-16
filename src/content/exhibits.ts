@@ -1,4 +1,13 @@
-// The museum's exhibits, in walking order. Add a case by adding an entry here.
+// The museum's exhibits, in walking order: the career newest first (the hall opens at the current role),
+// then After Hours, a personal room outside that timeline. The Information desk follows them.
+//
+// Each exhibit has two names that never change, and a position that can:
+//   `id`       its address in the hall (/#plans, /#kds). Case studies and the directory use it.
+//   `catalog`  its number when the hall first opened, oldest first (001 was the Origin Specimen). Old links
+//              (/#case-003, /museum#case-003) still find it by this, and so does the 3D model, whose drawer
+//              props are named after it (Discovery1 to Discovery6). Never renumber.
+//   The number on a label is its position in the career walk (001 is the current role), worked out from
+//   the order below; After Hours has none.
 //
 // `status` decides what the hall shows:
 //   "on-view"         a lit case with its specimen (needs `specimen`, a node name in public/museum/museum.glb)
@@ -6,12 +15,17 @@
 //   "planned"         not shown yet; kept here so the content is ready when the model is
 //
 // The copy below is Daniel's approved final copy (2026-11-11). It supersedes earlier drafts and, where
-// they differ, older site content: don't "correct" it back to src/content/site.ts.
+// they differ, older site content: don't "correct" it back to src/content/site.ts. On 2026-11-16, at his
+// request, 005's description and the drawer notes were made concrete, from his résumé
+// (public/Daniel_Nguyen_Resume.pdf) and his own account of the KDS launch.
 // Specimens and quotes are playful symbols, never new facts.
 
 export type Exhibit = {
   id: string;
-  number: string;
+  /** Its original catalog number. See above: never renumber. */
+  catalog: string;
+  /** A role, a degree, or a personal room. Roles and degrees are the career walk; personal rooms aren't. */
+  kind: "role" | "education" | "personal";
   title: string;
   /** Short lines with intentional breaks: role, then company and dates (or degree, then school and year). */
   lines: string[];
@@ -25,6 +39,8 @@ export type Exhibit = {
   drawer?: Discovery;
   /** Words on the specimen itself (a plaque, a tag), pinned to it in the hall as crisp text. */
   caption?: string;
+  /** One concrete line about the real work, shown in the drawer under its discovery. */
+  drawerNote?: string;
 };
 
 /**
@@ -56,58 +72,22 @@ export const hall = {
 
 export const exhibits: Exhibit[] = [
   {
-    id: "origin",
-    number: "001",
-    title: "The Origin Specimen",
-    lines: ["B.S. in Evolutionary Anthropology", "University of Michigan · 2015"],
-    quote: "Explains the existence of this museum.",
+    id: "plans",
+    catalog: "005",
+    kind: "role",
+    title: "Plans & Pull Requests",
+    lines: ["Director of Technical Product Management", "GoTab · 2026–present"],
+    description: "Roadmap for GoTab’s QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by about 2,000 venues. Still shipping production code.",
+    quote: "Some assembly—and several meetings—required.",
     status: "on-view",
-    specimen: "Skull",
-    drawer: {
-      kind: "tooth",
-      tag: "An earlier career prospect.",
-      story: [
-        "I started college on a pre-dental track. An anatomy class got me interested in bones; evolutionary anthropology took that curiosity in another direction.",
-        "My favorite college class was primate anatomy.",
-      ],
-    },
-  },
-  {
-    id: "research",
-    number: "002",
-    title: "The Research Years",
-    lines: ["M.S. in Biomedical Science", "Rutgers University · 2016"],
-    description: "Studied insulin mimetics in diabetic rats, working with blood samples and recording research data in laboratory software.",
-    quote: "Samples carefully labeled. Career path less so.",
-    status: "on-view",
-    specimen: "Samples",
-    drawer: {
-      kind: "chart",
-      heading: "Further research required.",
-      xLabel: "Questions answered",
-      yLabel: "More questions",
-      footer: "Illustrative nonsense. Not actual research data.",
-      description: "A chart with a rising curve: the more questions answered, the more questions there are.",
-    },
-  },
-  {
-    id: "kds",
-    number: "003",
-    title: "The First KDS",
-    lines: ["Software Developer", "GoTab · 2018–2021"],
-    description: "Built GoTab’s first production kitchen display system. Much of that code still runs today.",
-    quote: "Please don’t tap the glass during the dinner rush.",
-    status: "on-view",
-    specimen: "KDS",
-    drawer: {
-      kind: "bell",
-      reveal: "You’re an expo now.",
-      tickets: [["1 soup", "1 coffee", "Hold the existential questions."], ["Please stop ringing the bell."]],
-    },
+    specimen: "Planning",
+    drawer: { kind: "stamp", cards: ["Make a plan.", "Build the thing.", "One small follow-up.", "Enjoy this moment."] },
+    drawerNote: "In two months as director, I got rid of more than 15 recurring causes of support requests by fixing the product and engineering problems behind them.",
   },
   {
     id: "marker",
-    number: "004",
+    catalog: "004",
+    kind: "role",
     title: "The Nearly Dry Marker",
     lines: ["Engineering Manager", "GoTab · 2021–2026"],
     description: "Hiring, releases, and code review—moving between the whiteboard and the codebase.",
@@ -124,19 +104,63 @@ export const exhibits: Exhibit[] = [
     },
   },
   {
-    id: "plans",
-    number: "005",
-    title: "Plans & Pull Requests",
-    lines: ["Director of Technical Product Management", "GoTab · 2026–present"],
-    description: "Planning projects, aligning clients and teams, and turning plans into production software.",
-    quote: "Some assembly—and several meetings—required.",
+    id: "kds",
+    catalog: "003",
+    kind: "role",
+    title: "The First KDS",
+    lines: ["Software Developer", "GoTab · 2018–2021"],
+    description: "Built GoTab’s first production kitchen display system. Much of that code still runs today.",
+    quote: "Please don’t tap the glass during the dinner rush.",
     status: "on-view",
-    specimen: "Planning",
-    drawer: { kind: "stamp", cards: ["Make a plan.", "Build the thing.", "One small follow-up.", "Enjoy this moment."] },
+    specimen: "KDS",
+    drawerNote: "When it launched, I was in the restaurant making changes while the kitchen used it.",
+    drawer: {
+      kind: "bell",
+      reveal: "You’re an expo now.",
+      tickets: [["1 soup", "1 coffee", "Hold the existential questions."], ["Please stop ringing the bell."]],
+    },
+  },
+  {
+    id: "research",
+    catalog: "002",
+    kind: "education",
+    title: "The Research Years",
+    lines: ["M.S. in Biomedical Science", "Rutgers University · 2016"],
+    description: "Studied insulin mimetics in diabetic rats, working with blood samples and recording research data in laboratory software.",
+    quote: "Samples carefully labeled. Career path less so.",
+    status: "on-view",
+    specimen: "Samples",
+    drawer: {
+      kind: "chart",
+      heading: "Further research required.",
+      xLabel: "Questions answered",
+      yLabel: "More questions",
+      footer: "Illustrative nonsense. Not actual research data.",
+      description: "A chart with a rising curve: the more questions answered, the more questions there are.",
+    },
+  },
+  {
+    id: "origin",
+    catalog: "001",
+    kind: "education",
+    title: "The Origin Specimen",
+    lines: ["B.S. in Evolutionary Anthropology", "University of Michigan · 2015"],
+    quote: "Explains the existence of this museum.",
+    status: "on-view",
+    specimen: "Skull",
+    drawer: {
+      kind: "tooth",
+      tag: "An earlier career prospect.",
+      story: [
+        "I started college on a pre-dental track. An anatomy class got me interested in bones; evolutionary anthropology took that curiosity in another direction.",
+        "My favorite college class was primate anatomy.",
+      ],
+    },
   },
   {
     id: "after-hours",
-    number: "006",
+    catalog: "006",
+    kind: "personal",
     title: "After Hours",
     lines: [],
     description: "Cooking, reading, records, and photography.",
@@ -162,6 +186,16 @@ export const exhibits: Exhibit[] = [
 ];
 
 export const onView = exhibits.filter((exhibit) => exhibit.status !== "planned");
+
+/** The career walk, newest first: roles, then degrees. */
+export const career = onView.filter((exhibit) => exhibit.kind !== "personal");
+
+/** The number on an exhibit's label: its place in the career walk ("001" is the current role), or null for a
+ *  personal room. */
+export function displayNumber(exhibit: Pick<Exhibit, "id">) {
+  const at = career.findIndex((item) => item.id === exhibit.id);
+  return at === -1 ? null : String(at + 1).padStart(3, "0");
+}
 
 /** A small unnumbered display between the last case and the desk. Not a stop on the walk. */
 export const fatherhood = {

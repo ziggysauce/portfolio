@@ -13,7 +13,10 @@ export const menus: Study = {
   role: "Software developer",
   timeframe: "2018–2021",
   tags: ["Operator tools", "Data model", "Menus"],
-  exhibit: "marker",
+  // The work is dated 2018–2021, when Daniel was a software developer, so Return to the museum goes to that
+  // role. His résumé lists Menus under Engineering Manager (2021–2026), so the label there links here too.
+  exhibit: "kds",
+  featuredOn: ["kds", "marker"],
   length: "full",
   hero: {
     figure: "menus-hero",
