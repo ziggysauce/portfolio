@@ -23,6 +23,10 @@
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
+/* Overscroll and the area behind the hall match its evening, not the reading pages' paper. */
+:global(html):has(.root) {
+  background: #222a29;
+}
 
 /* ---------------------------------------------------------------- sign and navigation */
 

@@ -15,7 +15,7 @@ type Props = {
   exhibits: Exhibit[];
   /** Every exhibit, planned ones included, for the gallery directory. */
   directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
-  links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
+  links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string };
   /** Cases with a case study to read, keyed by exhibit id. */
   studies: Record<string, { href: string; title: string; shortTitle: string }[]>;
   desk: { summary: string; farewell: string };
@@ -63,7 +63,7 @@ function supportsWebGL() {
 }
 
 /**
- * Each stop's address in the URL: /museum#case-003, or #desk. A case study's "Return to museum" link uses
+ * Each stop's address in the URL: /#case-003, or #desk. A case study's "Return to museum" link uses
  * it, and leaving the hall by one of its own links writes it, so Back lands on the same case. These are
  * not element ids: the browser leaves them alone and the hall walks there itself, once.
  */
@@ -830,11 +830,6 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood,
                     <li>
                       <a href={links.github} target="_blank" rel="noreferrer">
                         GitHub
-                      </a>
-                    </li>
-                    <li>
-                      <a href={links.site} target="_blank" rel="noreferrer">
-                        Current site
                       </a>
                     </li>
                   </ul>

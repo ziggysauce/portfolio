@@ -5,13 +5,14 @@ import { hall } from "@/content/exhibits";
 import { site } from "@/content/site";
 import { mono, serif } from "@/lib/fonts";
 
-// The case-study pages: the museum's ivory, ink and bronze as a plain reading page. Nothing from the 3D
-// hall loads here, so a study reads the same whether or not the visitor has been to the museum.
-export default function WorkLayout({ children }: { children: React.ReactNode }) {
+// The museum's reading pages (Selected work and each study, About, Contact, the 404): the museum's ivory, ink
+// and bronze as a plain page. Nothing from the 3D hall loads here, and links back to the hall don't prefetch
+// it, so a page reads the same whether or not the visitor has been to the museum.
+export function ReadingShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${serif.variable} ${mono.variable} ${styles.root}`}>
       <header className={styles.masthead}>
-        <Link href="/museum" prefetch={false} className={styles.brand}>
+        <Link href="/" prefetch={false} className={styles.brand}>
           <span className={styles.brandName}>{site.name}</span>
           <span className={styles.brandHall}>{hall.name.replace(/^The Daniel Nguyen /, "")}</span>
         </Link>
