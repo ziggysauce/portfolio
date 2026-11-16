@@ -7,7 +7,7 @@ Builds the museum's 3D assets from scratch: no downloaded models or textures.
 Writes:
     blender/museum.blend           editable source (open it in Blender to tweak)
     blender/textures/*.png         generated textures: oak, plaster, evening sky, rug
-    public/museum/museum.glb       web asset: "Bay", "Case" (with its "Drawer"), "Skull", "Fern", "Props", and from
+    public/museum/museum.glb       web asset: "Bay", "Case" (with its "Drawer"), "Skull", "Props", and from
                                    museum_exhibits.py the other specimens, "Desk" and the room's dressing
     public/museum/hall.jpg         still render, used as the no-WebGL fallback (with --render)
 
@@ -1089,11 +1089,14 @@ def main():
 
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BLEND_DIR, "museum.blend"))
 
+    # The fern stays in the .blend for the still (hall.jpg); the browser hall uses the cupped-leaf plants.
     bpy.ops.object.select_all(action="SELECT")
+    for obj in [fern, *fern.children_recursive]:
+        obj.select_set(False)
     bpy.ops.export_scene.gltf(
         filepath=os.path.join(WEB_DIR, "museum.glb"),
         export_format="GLB",
-        use_selection=False,
+        use_selection=True,
         export_apply=True,
         export_yup=True,
         export_image_format="JPEG",

@@ -387,6 +387,7 @@ export function createDiscovery(options: {
         const material = face.material as THREE.MeshStandardMaterial;
         material.side = THREE.DoubleSide;
         material.color.set("#fbf6ea");
+        material.roughness = 0.5; // Thermal paper's faint sheen: the curl at its edge catches the case light.
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(ROWS * 2 * 3);
         const uvs = new Float32Array(ROWS * 2 * 2);
