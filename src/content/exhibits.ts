@@ -77,7 +77,7 @@ export const exhibits: Exhibit[] = [
     kind: "role",
     title: "Plans & Pull Requests",
     lines: ["Director of Technical Product Management", "GoTab · 2026–present"],
-    description: "Roadmap for GoTab’s QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by about 2,000 venues. Still shipping production code.",
+    description: "I own the roadmap for GoTab’s QR ordering, POS, Kiosk, KDS and Manager Dashboard, used by about 2,000 venues, and I still ship production code.",
     quote: "Some assembly—and several meetings—required.",
     status: "on-view",
     specimen: "Planning",

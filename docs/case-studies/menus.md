@@ -39,7 +39,11 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 - The work itself is dated 2018–2021, during the Software Developer years (`kds`). The launch was November 2020, and follow-ups ran to March 2021.
 - The résumé (`public/Daniel_Nguyen_Resume.pdf`) lists "Led development of Menus" under Engineering Manager.
 - Since 2026-11-16 (usability pass): Return to the museum goes to The First KDS, matching the study's own dates, and both labels link here.
-- **Open question for Daniel:** did the Menus work continue after June 2021, as engineering manager? If so, the study's dates should say so. If not, the résumé line belongs under Software Developer.
+- **Evidence, checked 2026-11-16** (GitHub, `GoTab-Inc/node`, merged PRs with "menu" in the title):
+  - `gh pr list --repo GoTab-Inc/node --author ziggysauce --state merged --search "menu in:title"`: Daniel authored about 70, from January 2020 to May 2021. The Menus PR (#2081) merged 2020-11-03 and his follow-ups ran densely to May 2021, not March. After June 2021 he authored only a handful: availability fixes (2021-07), prompt removal (2021-12), two display fixes (2022-01), a searchable icon (2022-08) and the POS menu (2022-09).
+  - Same search for everyone else, merged 2021-06 to 2023-12: 81 PRs (22 in 2021, 35 in 2022, 24 in 2023), including shared and foreign menus, copying menus between locations, GraphQL menus and POS menu selection.
+  - Reading: the study's dates for Daniel's own build are right. Menus kept being developed by the team during his engineering-manager years, which fits "Led development of Menus" under EM, but PR authorship can't show who led it. Nothing changed on the site or the résumé.
+- **Open question for Daniel:** did you lead the team's Menus work after June 2021 (shared menus, copying menus, POS menus)? If yes, both documents are right as they stand. If no, the résumé line belongs under Software Developer.
 
 ## Deliberately left out of the public page
 

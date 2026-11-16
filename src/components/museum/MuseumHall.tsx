@@ -6,6 +6,7 @@ import type { Exhibit } from "@/content/exhibits";
 import type { LabelAnchor, MuseumScene, PlinthAnchor } from "./scene";
 import { STEP_MS } from "./discoveries";
 import { DrawerContents, stepsFor } from "./DrawerContents";
+import { ceilingFor, clearOf, fitBetween, type Obstacle } from "./layout";
 import { hashForStop, positionLabel, stepLabel, stopFromHash } from "./stops";
 import styles from "./museum.module.css";
 
@@ -38,9 +39,6 @@ function walk(progress: number) {
   const t = progress - i;
   return i + t - (HOLD * Math.sin(2 * Math.PI * t)) / (2 * Math.PI);
 }
-
-/** The least height a drawer's note gets on a portrait screen before it scrolls inside itself. */
-const NOTE_MIN = 220;
 
 /** A stop between cases this close to one is left alone: it's a deliberate small adjustment. */
 const NEAR = 0.12;
@@ -222,19 +220,34 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
     const frameLog: number[] = [];
     if (debug) (window as unknown as { __museumFrames: number[] }).__museumFrames = frameLog;
 
-    // On a portrait screen the labels and notes sit low, so they're kept above the directory and walking
-    // controls: their heights and that floor are measured on resize, not every frame.
+    // Labels and notes are kept between the sign and navigation above and the directory and walking
+    // controls below. Their natural heights, those bounds and the header's pieces are measured on resize,
+    // not every frame.
     const heights = new Map<Element, number>();
+    const widths = new Map<Element, number>();
     let floor = Infinity;
-    let ceiling = 0; // Just under the sign and navigation: on a short phone a label stops here.
+    let ceiling = 0; // Just under the whole header: on a phone, where a label spans the screen, it stops here.
+    let obstacles: Obstacle[] = []; // The header's pieces, one by one: on a wide screen a label clears only those above it.
     const measure = () => {
       // Measured within the pinned viewport, where labels are placed, so it holds while the hall scrolls in.
-      const nav = document.querySelector('nav[aria-label="Gallery directory"]');
       const layer = labels.current[0]?.closest("ol");
       const header = layer?.parentElement?.querySelector("header");
-      floor = nav && layer ? nav.getBoundingClientRect().top - layer.getBoundingClientRect().top - 12 : Infinity;
-      ceiling = header && layer ? header.getBoundingClientRect().bottom - layer.getBoundingClientRect().top + 8 : 0;
-      for (const node of [...labels.current, ...notes.current]) if (node) heights.set(node, node.offsetHeight);
+      const origin = layer?.getBoundingClientRect().top ?? 0;
+      const bottomBar = [document.querySelector('nav[aria-label="Gallery directory"] > button'), layer?.parentElement?.querySelector(`.${styles.controls}`)];
+      const tops = bottomBar.flatMap((node) => (node ? [node.getBoundingClientRect().top - origin] : []));
+      floor = tops.length ? Math.min(...tops) - 12 : Infinity;
+      ceiling = header ? header.getBoundingClientRect().bottom - origin + 8 : 0;
+      obstacles = header
+        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].map((node) => {
+            const box = node.getBoundingClientRect();
+            return { left: box.left, right: box.right, bottom: box.bottom - origin };
+          })
+        : [];
+      // scrollHeight, not the rendered height: a label capped to fit a short screen still knows its full height.
+      for (const node of [...labels.current, ...notes.current]) if (node) {
+          heights.set(node, node.scrollHeight);
+          widths.set(node, node.offsetWidth);
+        }
     };
     const sizes = new ResizeObserver(measure);
     const watchSizes = () => {
@@ -260,8 +273,22 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
         const portrait = window.innerWidth / window.innerHeight < 0.8;
         // On a portrait screen the label sits under the case, above the controls, and never up under the sign;
         // if a short screen leaves too little room, it scrolls inside itself instead.
-        const y = portrait ? Math.max(ceiling, above(label, anchor.y)) : anchor.y;
-        label.style.maxHeight = portrait && Number.isFinite(floor) ? `${Math.max(160, floor - y).toFixed(0)}px` : "";
+        // On a wide screen it stays beside its case, centred on the case's corner where it fits, but never up
+        // under the sign or navigation above it nor down over the controls; if even that gap is too short,
+        // it fills the gap and scrolls inside itself.
+        let y: number;
+        let top: number;
+        if (portrait) {
+          y = Math.max(ceiling, above(label, anchor.y));
+          top = y;
+          label.style.maxHeight = Number.isFinite(floor) ? `${Math.max(160, floor - y).toFixed(0)}px` : "";
+        } else {
+          const h = heights.get(label) ?? 0;
+          const fit = fitBetween(anchor.y - h / 2, h, ceilingFor(anchor.x, anchor.x + (widths.get(label) ?? 0), obstacles, 12, 16, 120), Number.isFinite(floor) ? floor : window.innerHeight - 16);
+          top = fit.top;
+          y = fit.top + (fit.maxHeight ?? h) / 2; // The stylesheet centres it on this point.
+          label.style.maxHeight = fit.maxHeight === null ? "" : `${fit.maxHeight.toFixed(0)}px`;
+        }
         label.style.transform = `translate3d(${anchor.x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
         const opacity = anchor.visible ? Math.max(0, 1 - distance * 1.8) : 0;
         // The specimen's own caption, pinned to it: shown while its case is the one you're at.
@@ -281,22 +308,38 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
         label.style.visibility = "visible";
         label.style.pointerEvents = opacity > 0.05 && !covered ? "auto" : "none";
         label.inert = covered; // Out of the tab order while the note covers it; focus is in the note then.
-        // The note comes out beside its drawer. On a portrait screen it sits just below the drawer, in the
-        // label's place, so the props rising out of the drawer stay in view; it never runs under the
-        // directory and walking controls, and a long one scrolls inside itself.
+        // The note comes out beside its drawer. On a portrait screen it takes the label's place just below the
+        // drawer, so the props rising out of it stay in view, unless its text needs the room: then it rises
+        // as far as the sign and navigation, over the case. It never runs under the directory and walking
+        // controls, and if it is still too long it scrolls inside itself.
         const note = notes.current[i];
         if (!note) return;
         if (portrait) {
           const room = Number.isFinite(floor) ? floor : window.innerHeight;
-          const top = Math.max(ceiling, Math.min(anchor.drawer.y + 28, room - NOTE_MIN));
-          note.style.maxHeight = `${Math.max(NOTE_MIN, room - top).toFixed(0)}px`;
+          const fit = fitBetween(anchor.drawer.y + 28, heights.get(note) ?? 0, ceiling, room);
+          const top = fit.top;
+          note.style.maxHeight = `${(fit.maxHeight ?? room - top).toFixed(0)}px`;
           note.style.transform = `translate3d(${(window.innerWidth / 2).toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
         } else {
-          // Beside the drawer, centred a little above it (the stylesheet lifts it by 40% of its height),
-          // but never down over the directory and walking controls.
-          const h = heights.get(note) ?? 0;
-          note.style.maxHeight = "";
-          note.style.transform = `translate3d(${anchor.drawer.x.toFixed(1)}px, ${Math.min(anchor.drawer.y, floor - 0.6 * h).toFixed(1)}px, 0)`;
+          // Beside the drawer, centred a little above it (the stylesheet lifts it by 40% of its height and
+          // nudges it 18px right), but never over the case's label, the controls or the header; a few pixels
+          // spare for its tilt.
+          const h = (heights.get(note) ?? 0) + 8;
+          const w = (widths.get(note) ?? 0) + 8;
+          // Fitted between header and controls first, then moved right if that spot covers the label, then
+          // fitted again for the new columns.
+          const labelHeight = parseFloat(label.style.maxHeight) || (heights.get(label) ?? 0);
+          const bottom = Number.isFinite(floor) ? floor : window.innerHeight - 16;
+          const want = anchor.drawer.y - 0.4 * h;
+          let left = anchor.drawer.x + 18;
+          let fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
+          const moved = clearOf({ left, top: fit.top, width: w, height: fit.maxHeight ?? h }, { left: anchor.x, top, width: widths.get(label) ?? 0, height: labelHeight }, window.innerWidth);
+          if (moved !== left) {
+            left = moved;
+            fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
+          }
+          note.style.maxHeight = fit.maxHeight === null ? "" : `${(fit.maxHeight - 8).toFixed(0)}px`;
+          note.style.transform = `translate3d(${(left - 18).toFixed(1)}px, ${(fit.top + 0.4 * (fit.maxHeight ?? h)).toFixed(1)}px, 0) rotate(1.5deg)`;
         }
       });
     }
