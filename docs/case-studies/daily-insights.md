@@ -40,3 +40,8 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 ## Open questions
 
 None that affect the copy.
+
+## Revision, 2026-11-16
+
+- **Shortened** to two sections: why the existing email, and what lasted. The inbox-constraints list, the weekly version and the three-weeks-to-merge detail were dropped.
+- **Stated a reason** at Daniel's request: "Rather than start a new report they'd have to remember to open, I added to the email they already received." The PDF flags the reasons as reconstructed, so this is **C**: Daniel to confirm it's why.

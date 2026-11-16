@@ -10,8 +10,9 @@ const description = "Case studies from Daniel Nguyen’s work at GoTab: the prob
 export const metadata: Metadata = {
   title: "Selected work",
   description,
-  // While a draft is listed here, its title and summary stay out of search engines too.
-  robots: listedStudies.some((study) => study.status === "draft") ? { index: false, follow: false } : undefined,
+  // While a draft is listed here, its title and summary stay out of search engines too, and so does the
+  // page itself while it has no studies at all (a production build before any is published).
+  robots: listedStudies.length === 0 || listedStudies.some((study) => study.status === "draft") ? { index: false, follow: false } : undefined,
   openGraph: { title: `Selected work | ${site.name}`, description, url: "/work", siteName: site.name, type: "website", images: [site.ogImage] },
 };
 
@@ -32,6 +33,11 @@ export default function WorkIndex() {
           and what I learned.
         </p>
       </header>
+
+      {listedStudies.length === 0 ? (
+        // A production build before any study is approved: say so plainly instead of showing an empty list.
+        <p className={styles.lede}>The first case studies are being finished. In the meantime, the museum has the short version.</p>
+      ) : null}
 
       <ol className={styles.cards}>
         {featured.map((study, i) => {

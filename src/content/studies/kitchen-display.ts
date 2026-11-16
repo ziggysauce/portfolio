@@ -8,7 +8,7 @@ export const kitchenDisplay: Study = {
   title: "From printed tickets to a working kitchen display",
   shortTitle: "Kitchen display",
   summary:
-    "GoTab’s first kitchen display system: a screen where each station sees its orders, how long they’ve waited, and what’s done. I built the first release, and I was in a restaurant making changes in real time as we launched it.",
+    "GoTab’s first kitchen display system, where every station shares the same up-to-date view of each order’s progress. I built the first release, and when it launched I was in the restaurant, making changes while the kitchen used it.",
   status: "draft",
   role: "Software developer",
   timeframe: "2018–2019",
@@ -18,30 +18,44 @@ export const kitchenDisplay: Study = {
   hero: {
     figure: "kds-hero",
     alt: "A printed kitchen ticket beside a tablet showing the same order as a card on a kitchen display, with an elapsed-time bar and other open orders for the grill station.",
-    caption: "A ticket can only be read. A card shows how long the order has waited, and can be claimed, finished and recalled.",
+    caption:
+      "A printed ticket is one station’s copy: a cook can mark it, but nobody else sees the mark. On the screen, claiming or finishing an order updates it for every station at once, along with how long it has waited.",
     label: "Illustrative reconstruction",
   },
   facts: [
     {
       label: "My role",
-      value: "Software developer. I built the first release and kept improving it through its first months.",
+      value: "Software developer. I built the first release, was on site for its launch, and kept improving it through its first months.",
     },
     { label: "When", value: "Late 2018 to mid-2019" },
-    { label: "Team", value: "A small engineering team, working from a designer’s mockups" },
     { label: "Status", value: "Shipped in 2019. Parts of the first release are still in production." },
   ],
   sections: [
     {
-      id: "problem",
-      heading: "The kitchen before the screen",
+      id: "launch",
+      heading: "Launch night, in the kitchen",
       blocks: [
         {
           type: "p",
-          text: "Before the KDS, an order reached a GoTab kitchen as a printed ticket, one for each station’s printer. Paper does the basic job: it tells a cook what to make. It can’t show how long an order has been waiting, it can’t tell the grill that the cold station has finished its half, and it can’t be marked done.",
+          text: "Building the first KDS was fun and exciting, and the best part was the launch. I was in the restaurant when the kitchen started using it, watching cooks work with something I’d built and making changes in real time as they used it. Seeing it in use for the first time was really cool.",
         },
         {
           type: "p",
-          text: "Kitchens needed a screen that could do those things, and it had to run on whatever tablets a kitchen already owned.",
+          text: "Being there meant I didn’t have to wait for a report to learn what needed to change. I could see the kitchen using it and change it while they did.",
+        },
+      ],
+    },
+    {
+      id: "problem",
+      heading: "What paper couldn’t share",
+      blocks: [
+        {
+          type: "p",
+          text: "Before the KDS, an order reached a GoTab kitchen as printed tickets, one for each station’s printer. A cook can mark a ticket by hand, but that mark lives on one piece of paper at one station. The grill can’t see that the cold station has finished its half, and expo, the station that pulls each order together, can’t see either from its own ticket.",
+        },
+        {
+          type: "p",
+          text: "A screen could keep every station looking at the same order, updated automatically as each one claimed or finished its part, with each order’s waiting time in view. It also had to run on whatever tablets a kitchen already owned.",
         },
       ],
     },
@@ -51,11 +65,7 @@ export const kitchenDisplay: Study = {
       blocks: [
         {
           type: "p",
-          text: "I started building the KDS in December 2018, in a new app a teammate had set up, working from a designer’s mockups. I built the first release, that teammate reviewed it closely, and it merged about two months after I started.",
-        },
-        {
-          type: "p",
-          text: "Building it was fun and exciting. When we launched, I was in a restaurant, making changes in real time while the kitchen started using it. It was really cool to see it in use for the first time.",
+          text: "I started building the KDS in December 2018, working from a designer’s mockups, and built the first release. It merged about two months later, and I kept building on it through mid-2019.",
         },
       ],
     },
@@ -65,15 +75,15 @@ export const kitchenDisplay: Study = {
       blocks: [
         {
           type: "p",
-          text: "We kept the first release to what a station needs during service. Each station sees only its own items, and expo, the station that pulls each order together, sees them all. A cook taps to claim an order and taps twice to finish it. A finished order can be recalled or its ticket reprinted, and every order shows its elapsed time, colored against how long it should take.",
+          text: "We kept the first release to what a station needs during service. Each station sees only its own items, and expo sees them all. A cook taps to claim an order and taps twice to finish it, and every other screen shows the change. A finished order can be recalled or its ticket reprinted, and every order shows its elapsed time, colored against how long it should take.",
         },
         {
           type: "decisions",
           items: [
             {
-              title: "Choose the simple way to keep the screen current",
-              body: "New orders had to appear without anyone touching the screen. I first prototyped live updates pushed from the server, but the prototype still had a reliability problem I hadn’t solved. I replaced it with something simpler: each screen checked the server for new orders on a short, regular interval. That’s the version we launched.",
-              tradeoff: "A new order could take several seconds to appear, and every screen added a little load on the server. As the product grew, it moved to live updates.",
+              title: "Choose the simple way to keep every screen current",
+              body: "New orders and other stations’ progress had to appear without anyone touching the screen. I first prototyped live updates pushed from the server, but the prototype still had a reliability problem I hadn’t solved. I replaced it with something simpler: each screen checked the server for changes on a short, regular interval. That’s the version we launched.",
+              tradeoff: "A change could take several seconds to reach the other screens. As the product grew, it moved to live updates.",
             },
             {
               title: "Treat each screen as a device the restaurant sets up",
@@ -97,8 +107,8 @@ export const kitchenDisplay: Study = {
           legend: [
             "Station and expo views. Each station sees its own items; expo sees them all.",
             "Elapsed time, colored against the item’s prep time.",
-            "Tap to claim, so others know it’s being made.",
-            "Tap twice to finish. The order moves to Closed.",
+            "Tap to claim, and every screen shows it’s being made.",
+            "Tap twice to finish. The order moves to Closed everywhere.",
             "From Closed, recall an order or reprint its ticket.",
           ],
         },
@@ -119,11 +129,7 @@ export const kitchenDisplay: Study = {
       blocks: [
         {
           type: "p",
-          text: "Kitchens could run service from a screen: each station tracking its own orders and how long they’d waited, and expo seeing the whole picture. The first release went into use in a restaurant, and parts of it, including recall and reprint, are still in GoTab’s product today.",
-        },
-        {
-          type: "p",
-          text: "The setup flow reached further than the KDS itself. Because a screen was a general display from the start, later POS, kiosk and task screens connect the same way.",
+          text: "Kitchens could run service from a shared, live picture: each station tracking its own orders and how long they’d waited, and expo seeing the whole order come together without walking the line. Parts of the first release, including recall and reprint, are still in GoTab’s product today, and the setup flow now connects POS, kiosk and task screens as well.",
         },
       ],
     },

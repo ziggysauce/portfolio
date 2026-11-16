@@ -11,13 +11,17 @@ type Props = { params: Promise<{ slug: string }> };
 // Only studies with a page are built. A planned study's slug is a 404, never an empty page.
 export const dynamicParams = false;
 
+// A static export must build at least one page here. Until a study is published, a production build has
+// none, so it builds one placeholder that renders the 404 page (getStudy finds nothing for it).
+const NONE = "no-published-studies";
+
 export function generateStaticParams() {
-  return listedStudies.map((study) => ({ slug: study.slug }));
+  return listedStudies.length ? listedStudies.map((study) => ({ slug: study.slug })) : [{ slug: NONE }];
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const study = getStudy((await params).slug);
-  if (!study) return {};
+  if (!study) return { robots: { index: false, follow: false } }; // The placeholder (see NONE).
   return {
     title: study.title,
     description: study.summary,

@@ -27,10 +27,10 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 | Decision: client-side menu switching, one menu at a time, a light list, cache, back button | PDF p.25–26, p.50 | S. "We": Daniel built switching; the fetching refactor was a follow-up. A senior engineer's revert-and-restore is omitted. |
 | Availability rules: on, in dates, schedule, area, segment; first available menu | PDF p.27 | S. The figure shows "can switch to others that also pass", which is inferred from the menu-switching feature. |
 | Dashboard split: most of the work was Daniel's; area by area, least-changing first; features kept shipping; still the layout six years later | PDF p.24, 29, 50 | S. A senior engineer moved the first groups; omitted for brevity. |
-| "A deciding factor for some prospective clients at launch" | Approved site copy ("A deciding factor for prospective clients at launch") | S (site), softened with "some" |
+| ~~"A deciding factor for some prospective clients at launch"~~ | Removed 2026-11-16 | Unconfirmed; no longer on the page. |
 | Core still in product; menus shared across locations added later by teammates | PDF p.29 | S |
 | About a third of menu changes in the following months were fixes | PDF p.29: 17 of 52 menu-titled PRs, Nov 2020 – Jun 2021 | S |
-| A rework broke segment-only visibility; a support report surfaced it; a teammate fixed it | PDF p.30 | S |
+| A rework broke segment-only visibility; a support report surfaced it; a teammate fixed it | PDF p.30 | S. Removed from the page 2026-11-16. |
 | Lessons: name the old thing first; access test before refactor; small branches | PDF p.29–30 | S |
 
 ## Museum mapping
@@ -56,3 +56,11 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 ## Open questions
 
 1. Is the site's "deciding factor for prospective clients" still a claim you want in the study?
+
+## Revision, 2026-11-16
+
+- **Led with the holiday preorder:** a menu ordered from in October for late-November pickup, from PDF p.23. "Bend the everyday schedules around it or duplicate products, then keep copies in sync by hand" is how the page explains why one catalog fell short (**I**, drawn from the decision's stated alternative).
+- **Removed:** "a deciding factor for some prospective clients" (unconfirmed), the later segment-visibility regression and its teammate fix, and the "access test" lesson that depended on it.
+- **Trimmed:** the dashboard-restructuring section, the teammates' database logic, and menus shared across locations.
+- **Kept:** the lesson that "menu" meant two things (the catalog and the new menus) and confused people, as Daniel asked.
+- Open question 1 is resolved by removing the claim.
