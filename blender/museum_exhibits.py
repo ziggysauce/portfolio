@@ -421,6 +421,13 @@ def add_materials(mats):
         "book_olive": principled("BookOlive", srgb("#7b7a52"), 0.8),
         # The desk and the dressing.
         "leather": principled("Leather", srgb("#3e5a4a"), 0.6),
+        # The desk pilot ("miniature after closing"): the desk's own oak, brass and plant, so the look can be
+        # tuned at the desk without touching the cases, props or the other bays' plants.
+        "desk_oak": principled("DeskOak", srgb("#c99f72"), 0.42, image=next(n.image for n in mats["grain"].node_tree.nodes if n.type == "TEX_IMAGE")),
+        "bell_brass": principled("BellBrass", srgb("#c9a45c"), 0.25, metallic=1.0),
+        "plant_pot": principled("DeskPlantPot", srgb("#dccbb0"), 0.4),
+        "plant_sage": principled("DeskLeafSage", srgb("#93a886"), 0.6),
+        "plant_deep": principled("DeskLeafDeep", srgb("#6d8766"), 0.6),
         "lamp_glass": principled("LampGlass", srgb("#3f7a5a"), 0.2),
         "leaflet_a": principled("LeafletCream", srgb("#efe4c8"), 0.9),
         "leaflet_b": principled("LeafletSage", srgb("#a9b9a2"), 0.9),
@@ -984,15 +991,16 @@ def build_kds(mats):
 # ---------------------------------------------------------------- the information desk
 
 
-def banker_hood(length=0.105, depth=0.047, height=0.046):
-    """The open surface of a banker's lamp shade: the top half of a superellipsoid, long along x, with
-    ends that are rounded but fuller than an egg's. Built at the origin with its rim on z 0."""
+def banker_hood(length=0.098, depth=0.06, height=0.062, ends=0.78):
+    """The open surface of a banker's lamp shade: the top half of a superellipsoid, long along x. Rounder
+    and taller than a real banker's hood (ends 0.78, a fuller dome), so it reads as a lamp shade by its
+    outline alone at gallery distance. Built at the origin with its rim on z 0."""
     bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=40, radius=1, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
     hood = bpy.context.active_object
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)  # Poles at the ends, along x.
     for v in hood.data.vertices:
         x, y, z = v.co
-        v.co = (math.copysign(abs(x) ** 0.55, x) * length, y * depth, z * height)
+        v.co = (math.copysign(abs(x) ** ends, x) * length, y * depth, z * height)
     bm = bmesh.new()
     bm.from_mesh(hood.data)
     # Cut a hair above the equator, not through it: the end poles lie on the equator, and a cut through
@@ -1009,37 +1017,42 @@ def banker_hood(length=0.105, depth=0.047, height=0.046):
 
 def build_desk(mats):
     """The last stop: an oak information counter with a green leather top, a brass service bell, a
-    tiered brochure stand and a banker's lamp. It stands where a cabinet would, centred in the niche."""
+    tiered brochure stand and a banker's lamp. It stands where a cabinet would, centred in the niche.
+
+    Desk pilot: the bell sits in the lamp's pool (the web scene lights the desktop from under the shade),
+    the shade is a rounder dome whose warm lining shows as a lip under its rim, and the counter's edges
+    are softer so they take the lamplight as one broad highlight."""
     cy = CASE_Y
     h = 0.9
     oak = []
-    oak.append(box("DeskBase", -0.47, 0.47, cy - 0.26, cy + 0.2, 0.0, 0.08, bevel=0.025, segments=5))
-    oak.append(box("DeskBody", -0.44, 0.44, cy - 0.23, cy + 0.18, 0.06, h - 0.03, bevel=0.045, segments=7))
-    oak.append(box("DeskTop", -0.48, 0.48, cy - 0.27, cy + 0.21, h - 0.04, h, bevel=0.02, segments=5))
+    oak.append(box("DeskBase", -0.47, 0.47, cy - 0.26, cy + 0.2, 0.0, 0.08, bevel=0.03, segments=6))
+    oak.append(box("DeskBody", -0.44, 0.44, cy - 0.23, cy + 0.18, 0.06, h - 0.03, bevel=0.05, segments=8))
+    oak.append(box("DeskTop", -0.48, 0.48, cy - 0.27, cy + 0.21, h - 0.045, h, bevel=0.022, segments=7))
     front = cy - 0.23
     for x0, x1 in ((-0.38, -0.13), (-0.11, 0.11), (0.13, 0.38)):
-        oak.append(box("DeskPanel", x0, x1, front - 0.012, front + 0.004, 0.16, h - 0.14, bevel=0.012, segments=4))
+        oak.append(box("DeskPanel", x0, x1, front - 0.012, front + 0.004, 0.16, h - 0.14, bevel=0.0075, segments=5))
     for i, part in enumerate(oak):
         grain_uv(part, seed=320 + i)
     desk = join(oak, "DeskOak")
-    desk.data.materials.append(mats["oak_prop"])  # Supporting furniture: the quieter oak.
+    desk.data.materials.append(mats["desk_oak"])  # Its own oak, rendered quieter than the props' (scene.ts).
     shade_smooth(desk)
-    leather = box("DeskLeather", -0.43, 0.43, cy - 0.22, cy + 0.17, h, h + 0.003, bevel=0.002, segments=2)
+    leather = box("DeskLeather", -0.43, 0.43, cy - 0.22, cy + 0.17, h, h + 0.003, bevel=0.0015, segments=2)
     leather.data.materials.append(mats["leather"])
 
-    # Brass service bell: a smooth dome on a rounded base with a little plunger. Dense and smooth-shaded,
-    # so its highlights are clean arcs rather than facets.
+    # Brass service bell: a full, round dome on a chunky rounded base with a little plunger, a toy you
+    # could pick up. Dense and smooth-shaded, so the lamp draws one clean highlight on the dome.
+    brass = mats["bell_brass"]
     bell = []
-    bell.append(rcyl("BellBase", 0.039, 0.012, (0, 0, 0.006), edge=0.0035, vertices=64, mat=mats["bronze"]))
-    dome = ellipsoid((0, 0, 0.0135), (0.033, 0.033, 0.03), 48, 24, "BellDome")
+    bell.append(rcyl("BellBase", 0.052, 0.017, (0, 0, 0.0085), edge=0.0065, vertices=64, mat=brass))
+    dome = ellipsoid((0, 0, 0.016), (0.043, 0.043, 0.043), 48, 24, "BellDome")
     shade_smooth(dome)
-    bell.append(with_mat(dome, mats["bronze"]))
-    bell.append(cyl("BellStem", 0.0026, 0.012, (0, 0, 0.048), vertices=16, mat=mats["bronze"]))
-    button = ellipsoid((0, 0, 0.056), (0.0065, 0.0065, 0.0045), 24, 12, "BellButton")
+    bell.append(with_mat(dome, brass))
+    bell.append(cyl("BellStem", 0.0036, 0.014, (0, 0, 0.065), vertices=16, mat=brass))
+    button = ellipsoid((0, 0, 0.0755), (0.0105, 0.0105, 0.007), 24, 12, "BellButton")
     shade_smooth(button)
-    bell.append(with_mat(button, mats["bronze"]))
+    bell.append(with_mat(button, brass))
     bell_group = parent(bell, "Bell")
-    bell_group.location = (-0.24, cy - 0.12, h + 0.003)
+    bell_group.location = (-0.13, cy - 0.11, h + 0.003)  # In the lamp's pool, front left of the stem.
 
     # A tiered brochure stand with three stacks of leaflets in different papers.
     stand = []
@@ -1054,45 +1067,106 @@ def build_desk(mats):
         leaf.data.materials.append(mat)
         stand.append(leaf)
     brochures = parent(stand, "Brochures")
-    brochures.location = (0.27, cy + 0.02, h + 0.003)
+    brochures.location = (0.29, cy + 0.03, h + 0.003)
     brochures.rotation_euler.z = math.radians(-10)
 
-    # A banker's lamp: a domed brass foot and stem, and a proper banker's shade: a long, softly domed
-    # green glass hood with rounded ends and a rolled rim, lined in warm opal glass. (The web scene lights
-    # the lining from the bulb and gives the green glass gloss and a faint glow.)
+    # A banker's lamp, simplified: a round brass foot, one straight stem with a small knuckle, and a
+    # rounded green glass dome with a rolled rim. Its opal lining hangs a few millimetres below the glass,
+    # so from above the lit underside still shows as a warm lip. (The web scene makes the lining glow and
+    # puts the real light just under it.)
     lamp = []
-    lamp.append(rcyl("LampFoot", 0.05, 0.014, (0, 0, 0.007), edge=0.005, vertices=64, mat=mats["bronze"]))
-    foot_dome = ellipsoid((0, 0, 0.014), (0.034, 0.034, 0.012), 48, 16, "LampFootDome")
+    lamp.append(rcyl("LampFoot", 0.054, 0.015, (0, 0, 0.0075), edge=0.006, vertices=64, mat=mats["bronze"]))
+    foot_dome = ellipsoid((0, 0, 0.015), (0.036, 0.036, 0.014), 48, 16, "LampFootDome")
     shade_smooth(foot_dome)
     lamp.append(with_mat(foot_dome, mats["bronze"]))
-    lamp.append(cyl("LampStem", 0.0062, 0.19, (0, 0.02, 0.105), vertices=24, mat=mats["bronze"]))
+    shade_z = 0.2
+    lamp.append(cyl("LampStem", 0.0075, shade_z - 0.012, (0, 0, (shade_z - 0.012) / 2 + 0.012), vertices=24, mat=mats["bronze"]))
+    knuckle = ellipsoid((0, 0, shade_z - 0.004), (0.011, 0.011, 0.009), 24, 12, "LampKnuckle")
+    shade_smooth(knuckle)
+    lamp.append(with_mat(knuckle, mats["bronze"]))
     hood = banker_hood()
     lining = hood.copy()
     lining.data = hood.data.copy()
     bpy.context.scene.collection.objects.link(lining)
     lining.name = "LampLining"
-    lining.scale = (0.96, 0.92, 0.9)  # Clear of the glass, which is solidified 2.8 mm inward.
+    lining.scale = (0.965, 0.93, 0.92)  # Clear of the glass, which is solidified 3 mm inward.
+    lining.location.z = -0.0035  # The warm lip under the rim.
     activate(lining)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     lining.data.materials.append(mats["lamp_lining"])
-    # The glass: given thickness inward, then its rim rolled.
     glass = hood.modifiers.new("Glass", "SOLIDIFY")
-    glass.thickness = 0.0028
+    glass.thickness = 0.003
     glass.offset = -1
     apply_modifiers(hood)
-    hood = soften(hood, 0.0011, 2)
+    hood = soften(hood, 0.0016, 3)  # A rolled, rounded rim.
     hood.name = "LampShade"
     hood.data.materials.append(mats["lamp_glass"])
     for part in (hood, lining):
-        part.location = (0, -0.004, 0.193)
+        part.location = (0, 0, shade_z)
         lamp.append(part)
-    finial = ellipsoid((0, -0.004, 0.193 + 0.046), (0.0062, 0.0062, 0.005), 24, 12, "LampFinial")
+    finial = ellipsoid((0, 0, shade_z + 0.062), (0.0075, 0.0075, 0.006), 24, 12, "LampFinial")
     shade_smooth(finial)
     lamp.append(with_mat(finial, mats["bronze"]))
     lamp_group = parent(lamp, "BankersLamp")
-    lamp_group.location = (0.02, cy + 0.08, h + 0.003)
+    lamp_group.location = (0.05, cy + 0.06, h + 0.003)
 
     return parent([desk, leather, bell_group, brochures, lamp_group], "Desk")
+
+
+def paddle_leaf(name, length, width, arch, cup, petiole, mat):
+    """One broad, rounded leaf on a short stalk, standing up from the origin along +z: fuller toward the
+    tip like a paddle, its tip arching outward (-y) and its edges cupped a little, so it has a readable
+    outline and a soft highlight. Built as one mesh with its origin at the stalk's foot."""
+    leaf = ellipsoid((0, 0, 0), (width / 2, 0.0035, length / 2), 16, 10, name)
+    for v in leaf.data.vertices:
+        x, y, z = v.co
+        t = (z + length / 2) / length  # 0 at the base of the blade, 1 at the tip
+        x *= 0.72 + 0.4 * t
+        y += -arch * t * t + cup * (x / (width / 2)) ** 2
+        v.co = (x, y, z + length / 2 + petiole)
+    stalk = cyl("Stalk", 0.0035, petiole + 0.01, (0, 0, (petiole + 0.01) / 2), vertices=6)
+    frond = join([leaf, stalk], name)
+    shade_smooth(frond)
+    frond.data.materials.append(mat)
+    return frond
+
+
+def build_desk_plant(mats):
+    """The desk bay's own plant (a local variant: the other bays keep the shared SnakePlant): a squat,
+    round ceramic pot and six broad leaves in two sage tones, at different heights and leaning unevenly,
+    so the whole plant has one clear, friendly silhouette. Each leaf is a "Frond", so it sways a little."""
+    # A squat, round-shouldered tub: wider than tall, its edges rounded generously, with a rolled lip.
+    pot_r, pot_top = 0.1, 0.12
+    body = soften(cyl("DeskPlantPot", pot_r, pot_top, (0, 0, pot_top / 2), vertices=32, smooth=False), 0.034, 4)
+    for v in body.data.vertices:  # A gentle belly: a touch narrower at the foot than at the shoulder.
+        t = v.co.z / pot_top
+        k = 0.9 + 0.1 * min(1.0, t * 1.6)
+        v.co.x *= k
+        v.co.y *= k
+    rim_r = pot_r - 0.008
+    bpy.ops.mesh.primitive_torus_add(major_radius=rim_r, minor_radius=0.012, major_segments=32, minor_segments=8, location=(0, 0, pot_top - 0.004))
+    rim = bpy.context.active_object
+    pot = join([body, rim], "DeskPlantPot")
+    shade_smooth(pot)
+    pot.data.materials.append(mats["plant_pot"])
+    soil = cyl("Soil", rim_r - 0.004, 0.006, (0, 0, pot_top - 0.004), mat=mats["shadow"])
+    # (angle around the pot in degrees, -90 faces the visitor; stalk, blade length, width, lean, tone)
+    spec = (
+        (100, 0.07, 0.16, 0.12, 14, "plant_deep"),  # the tall one at the back
+        (140, 0.045, 0.145, 0.115, 34, "plant_sage"),
+        (45, 0.04, 0.15, 0.118, 28, "plant_deep"),
+        (-130, 0.025, 0.13, 0.11, 52, "plant_sage"),
+        (-50, 0.03, 0.135, 0.112, 46, "plant_deep"),
+        (-95, 0.012, 0.115, 0.105, 64, "plant_sage"),  # short, leaning out toward the visitor
+    )
+    leaves = []
+    for i, (angle, petiole, length, width, lean, tone) in enumerate(spec):
+        frond = paddle_leaf("Frond", length, width, 0.03, 0.004, petiole, mats[tone])
+        a = math.radians(angle)
+        frond.rotation_euler = (math.radians(lean), 0, a + math.pi / 2)
+        frond.location = (math.cos(a) * 0.022, math.sin(a) * 0.022, pot_top - 0.006)
+        leaves.append(frond)
+    return parent([pot, soil] + leaves, "DeskPlant")
 
 
 # ---------------------------------------------------------------- the room's dressing
@@ -1427,6 +1501,7 @@ def build_all(mats):
         build_desk(mats),
         build_plinth(mats),
         build_snake_plant(mats),
+        build_desk_plant(mats),
         build_pothos(mats),
         build_books(mats),
         *build_discoveries(mats),
