@@ -382,6 +382,7 @@ def add_materials(mats):
         # 002: sample tubes and slides.
         "tube_glass": principled("SampleGlass", srgb("#e8eef0"), 0.08, alpha=0.28),
         "ruby": principled("Ruby", srgb("#8a2d34"), 0.25),
+        "plasma": principled("SamplePlasma", srgb("#dca23a"), 0.22),  # The straw-coloured layer of a spun sample.
         "stopper": principled("Stopper", srgb("#a98a64"), 0.75),  # cork
         "sample_label": principled("SampleLabel", srgb("#f1e8d6"), 0.85),
         "slide_glass": principled("SlideGlass", srgb("#eef2f0"), 0.06, alpha=0.32),
@@ -421,6 +422,14 @@ def add_materials(mats):
         "book_olive": principled("BookOlive", srgb("#7b7a52"), 0.8),
         # The desk and the dressing.
         "leather": principled("Leather", srgb("#3e5a4a"), 0.6),
+        # The desk pilot ("miniature after closing"): the desk's own oak, brass and plant, so the look can be
+        # tuned at the desk without touching the cases, props or the other bays' plants.
+        "desk_oak": principled("DeskOak", srgb("#c99f72"), 0.42, image=next(n.image for n in mats["grain"].node_tree.nodes if n.type == "TEX_IMAGE")),
+        "bell_brass": principled("BellBrass", srgb("#c9a45c"), 0.25, metallic=1.0),
+        "plant_pot": principled("DeskPlantPot", srgb("#dccbb0"), 0.4),
+        "plant_sage": principled("DeskLeafSage", srgb("#93a886"), 0.6),
+        "plant_deep": principled("DeskLeafDeep", srgb("#6d8766"), 0.6),
+        "desk_ticket": principled("CanvasDeskTicket", srgb("#ffffff"), 0.85),  # Drawn by the web scene.
         "lamp_glass": principled("LampGlass", srgb("#3f7a5a"), 0.2),
         "leaflet_a": principled("LeafletCream", srgb("#efe4c8"), 0.9),
         "leaflet_b": principled("LeafletSage", srgb("#a9b9a2"), 0.9),
@@ -431,12 +440,15 @@ def add_materials(mats):
         "checklist": principled("ChecklistCard", srgb("#e3d3b4"), 0.9),
         "checklist_shadow": principled("ChecklistShadow", srgb("#b9aa8c"), 1.0),
         "printer_light": principled("PrinterLight", srgb("#7fd39a"), 0.4),
+        "printer_case": principled("PrinterCase", srgb("#3a3836"), 0.38),  # Satin: its rounded shoulders catch the key.
         "ivory": principled("IvoryLining", srgb("#efe6d4"), 0.95),
         # The drawer discoveries. "Canvas*" faces are drawn by the web scene (text, the chart, the stamp).
         "enamel": principled("ToothEnamel", srgb("#f5efe3"), 0.35),
         "velvet": principled("Velvet", srgb("#eadfca"), 1.0),
         "kraft": principled("FolderKraft", srgb("#b08d62"), 0.85),
         "rubber": principled("StampRubber", srgb("#8d3f33"), 0.8),
+        "stamp_board": principled("StampBoard", srgb("#5e4232"), 0.7),  # Dark walnut, so the cream cards stand out.
+        "stamp_lacquer": principled("StampLacquer", srgb("#34465a"), 0.32),  # The stamp's handle: deep blue lacquer.
         "canvas_chart": principled("CanvasChart", srgb("#ffffff"), 0.9),
         "canvas_cover": principled("CanvasCardCover", srgb("#ffffff"), 0.9),
         "canvas_inside": principled("CanvasCardInside", srgb("#ffffff"), 0.9),
@@ -454,25 +466,33 @@ def add_materials(mats):
 # ---------------------------------------------------------------- 002: the research years
 
 
-def sample_tube(mats, x, fill, seed):
-    """A chubby, rounded-bottom sample tube: clear glass, a ruby sample, a cream label band and a
-    domed cork stopper. Built standing on z 0 at (x, 0)."""
+def sample_tube(mats, x, layers, stopper_mat):
+    """A chubby, rounded-bottom sample tube: clear glass, its sample in layers from the bottom up
+    ((material, height), ...), a cream label band and a domed stopper whose colour codes the tube, as in a
+    lab. Built standing on z 0 at (x, 0)."""
     r, length = 0.0105, 0.07
     parts = []
     glass = join([ellipsoid((x, 0, r), (r, r, r), 28, 14, "TubeEnd"), cyl("TubeWall", r, length, (x, 0, r + length / 2), vertices=28)], "TubeGlass")
     shade_smooth(glass)
     parts.append(with_mat(glass, mats["tube_glass"]))
     s = r * 0.8
-    sample = join([ellipsoid((x, 0, r), (s, s, s), 20, 12, "SampleEnd"), cyl("SampleBody", s, fill, (x, 0, r + fill / 2), vertices=20)], "Sample")
-    shade_smooth(sample)
-    parts.append(with_mat(sample, mats["ruby"]))
+    level = 0.0
+    for k, (mat, height) in enumerate(layers):
+        pieces = [cyl("SampleBody", s, height, (x, 0, r + level + height / 2), vertices=20)]
+        if k == 0:
+            pieces.append(ellipsoid((x, 0, r), (s, s, s), 20, 12, "SampleEnd"))
+        sample = join(pieces, "Sample")
+        shade_smooth(sample)
+        parts.append(with_mat(sample, mat))
+        level += height
+    fill = level
     parts.append(rcyl("TubeLabel", r * 1.04, 0.013, (x, 0, r + fill + 0.016), edge=0.0012, vertices=28, mat=mats["sample_label"]))
     top = r + length
     plug = rcyl("Stopper", r * 1.22, 0.011, (x, 0, top + 0.002), edge=0.0035, vertices=28)
     dome = ellipsoid((x, 0, top + 0.0072), (r * 1.08, r * 1.08, 0.0052), 28, 12, "StopperDome")
     stopper = join([plug, dome], "Stopper")
     shade_smooth(stopper)
-    parts.append(with_mat(stopper, mats["stopper"]))
+    parts.append(with_mat(stopper, stopper_mat))
     return parts
 
 
@@ -488,8 +508,15 @@ def build_samples(mats):
         shade_smooth(finial)
         rack.append(oak(finial, 341, mats))
     rack.append(oak(rbox("RackRail", -0.068, 0.068, -0.016, 0.016, 0.05, 0.062, 0.0055), 342, mats))
-    for i, (x, fill) in enumerate(((-0.038, 0.032), (0.0, 0.042), (0.038, 0.026))):
-        rack += sample_tube(mats, x, fill, i)
+    # Three tubes told apart at a glance: whole blood, one spun into its two layers, and a second whole
+    # sample, each under a different coloured stopper.
+    ruby, plasma = mats["ruby"], mats["plasma"]
+    for x, layers, cap in (
+        (-0.038, ((ruby, 0.032),), mats["tab_rust"]),
+        (0.0, ((ruby, 0.016), (plasma, 0.028)), mats["tab_sage"]),
+        (0.038, ((ruby, 0.026),), mats["tab_slate"]),
+    ):
+        rack += sample_tube(mats, x, layers, cap)
     for part in rack:
         part.location.z += 0.014 if part.name.startswith(("Tube", "Sample", "Stopper")) else 0
     rack_group = parent(rack, "TubeRack")
@@ -584,8 +611,12 @@ def build_laptop(mats):
     shade_smooth(nib)
     m.append(with_mat(nib, mats["felt"]))
     marker = parent(m, "MarkerPen")
-    marker.location = (0.112, cy - 0.08, z + r)
-    marker.rotation_euler.z = math.radians(-24)
+    # The title object: a size up, lying across the front of the deck where nothing overlaps it, its red
+    # band and cap the case's one bright accent.
+    big = 1.3
+    marker.scale = (big, big, big)
+    marker.location = (0.078, cy - 0.118, z + r * big)
+    marker.rotation_euler.z = math.radians(-14)
 
     rc = 0.0088
     c = []
@@ -595,8 +626,9 @@ def build_laptop(mats):
     c.append(with_mat(cap_end, mats["marker_cap"]))
     c.append(rbox("Clip", -0.013, 0.012, -0.0022, 0.0022, rc - 0.0012, rc + 0.0024, 0.0011, 2, mat=mats["marker_cap"]))
     cap = parent(c, "MarkerCap")
-    cap.location = (0.158, cy - 0.03, z + rc)
-    cap.rotation_euler.z = math.radians(-64)
+    cap.scale = (big, big, big)
+    cap.location = (0.168, cy - 0.072, z + rc * big)
+    cap.rotation_euler.z = math.radians(-28)  # Side on to the visitor, so it reads as a cap, not a blob.
 
     return parent([laptop, stand, marker, cap], "Laptop")
 
@@ -632,30 +664,34 @@ def build_planning(mats):
         x, zc = xs[col], zs[lane]
         code = (lane, col) == (2, 2)
         hw, hh = (0.024, 0.017) if code else (0.021, 0.015)
-        card = box("PlanCard", x - hw, x + hw, -0.0012, 0.0, zc - hh, zc + hh)
+        # Paper with a little body, standing off the cork, so each card's edge catches light and drops a
+        # thin shadow: a board assembled by hand, not printed on.
+        back = rbox("PlanCardEdge", x - hw, x + hw, -0.0034, -0.0008, zc - hh, zc + hh, 0.0009, 2, mat=mats["paper"])
+        card = box("PlanCard", x - hw + 0.0006, x + hw - 0.0006, -0.0037, -0.0033, zc - hh + 0.0006, zc + hh - 0.0006)
         plane_uv(card, 0, 2)
         card.data.materials.append(mats["code_card"] if code else mats["card"])
-        tab = box("CardTab", x - hw + 0.004, x - hw + 0.016, -0.0013, -0.0001, zc + hh - 0.002, zc + hh + 0.005)
-        tab.data.materials.append(tabs[lane])
-        tilt = math.radians(rng.uniform(-3, 3))
-        for part in (card, tab):  # A hand-pinned card is never quite square.
+        # The lane's tab: a little larger than before, so the three colour groups read from the gallery.
+        tab = rbox("CardTab", x - hw + 0.003, x - hw + 0.019, -0.0036, -0.0012, zc + hh - 0.003, zc + hh + 0.0075, 0.0009, 2, mat=tabs[lane])
+        tilt = math.radians(rng.uniform(-5, 5))
+        for part in (back, card, tab):  # A hand-pinned card is never quite square.
             activate(part)
             bpy.context.scene.cursor.location = (x, 0, zc)
             bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
             part.rotation_euler.y = tilt
             board.append(part)
         bpy.context.scene.cursor.location = (0, 0, 0)
-        pins[(lane, col)] = (x + 0.006, -0.002, zc + hh - 0.004)
-    # Milestones: a brass pin on each, joined across the lanes with red thread.
+        pins[(lane, col)] = (x + 0.006, -0.0038, zc + hh - 0.0045)
+    # Every card is pinned: milestones with a brass pin, joined across the lanes with red thread; the rest
+    # with a pushpin in its lane's colour.
     milestones = [(0, 1), (1, 2), (2, 3), (0, 3)]
-    for key in milestones:
-        x, y, zc = pins[key]
-        pin = ellipsoid((x, y - 0.002, zc), (0.0038, 0.0038, 0.0038), 16, 10, "PinHead")
+    for key, (x, y, zc) in pins.items():
+        brass = key in milestones
+        pin = ellipsoid((x, y - 0.0028, zc), (0.0042, 0.0034, 0.0042) if brass else (0.0036, 0.0032, 0.0036), 16, 10, "PinHead")
         shade_smooth(pin)
-        board.append(with_mat(pin, mats["bronze"]))
+        board.append(with_mat(pin, mats["bronze"] if brass else tabs[key[0]]))
     for a, b in (((0, 1), (1, 2)), ((1, 2), (2, 3)), ((0, 3), (1, 2))):
         pa, pb = pins[a], pins[b]
-        board.append(rod("Thread", (pa[0], pa[1] - 0.003, pa[2]), (pb[0], pb[1] - 0.003, pb[2]), 0.0007, mats["thread"], vertices=6))
+        board.append(rod("Thread", (pa[0], pa[1] - 0.0045, pa[2]), (pb[0], pb[1] - 0.0045, pb[2]), 0.0007, mats["thread"], vertices=6))
     # The easel: two front legs behind the board, a ledge it stands on, a back leg.
     for x in (-0.08, 0.08):
         leg = rcyl("EaselLeg", 0.0062, bh + 0.08, (x, 0.013, (bh + 0.035 - 0.045) / 2), edge=0.003, vertices=20)
@@ -710,13 +746,9 @@ def build_after_hours(mats):
     # Books, stacked flat: plain cloth covers, no titles.
     books = []
     zb = 0.0
-    for mat, w, l, t, turn in ((mats["book_slate"], 0.13, 0.17, 0.026, 3), (mats["book_oat"], 0.12, 0.16, 0.02, -5), (mats["book_olive"], 0.105, 0.15, 0.022, 9)):
-        # Soft, pillowy cloth boards over a cream page block, with a rounded spine on the left.
-        cover = rbox("BookCover", -w / 2, w / 2, -l / 2, l / 2, 0, t, 0.0055, 4)
-        cover.data.materials.append(mat)
-        pages = rbox("BookPages", -w / 2 + 0.006, w / 2 + 0.0008, -l / 2 + 0.005, l / 2 - 0.005, 0.0035, t - 0.0035, 0.0012, 2)
-        pages.data.materials.append(mats["paper"])
-        book = parent([cover, pages], "Book")
+    # Cloth covers in the collection's colours, page edges toward the visitor.
+    for mat, w, l, t, turn in ((mats["book_b"], 0.13, 0.17, 0.026, 3), (mats["book_oat"], 0.12, 0.16, 0.02, -5), (mats["book_a"], 0.105, 0.15, 0.022, 9)):
+        book = cloth_book("Book", w / 2, l / 2, t, mat, mats)
         book.location = (0, 0, zb)
         book.rotation_euler.z = math.radians(turn)
         books.append(book)
@@ -965,10 +997,12 @@ def build_kds(mats):
     # A small thermal kitchen printer at the front right of the deck: a rounded dark casing, a paper slot
     # on top and a small status light. The web scene feeds the chits from "ChitSlot" and lays the cut
     # first chit on the deck at "ChitRestAnchor", to the printer's left, in clear view.
-    printer = [rbox("PrinterBody", -0.032, 0.032, -0.03, 0.03, 0, 0.044, 0.01, 5, mat=mats["bezel"])]
-    printer.append(rbox("PrinterSlot", -0.026, 0.026, -0.016, -0.009, 0.041, 0.0448, 0.0025, 2, mat=mats["printer_slot"]))
-    printer.append(rbox("PrinterLid", -0.028, 0.028, -0.006, 0.026, 0.043, 0.0465, 0.006, 3, mat=mats["bezel"]))
-    light = ellipsoid((0.02, -0.0302, 0.03), (0.0026, 0.0012, 0.0026), 16, 8, "PrinterLight")
+    # A chunky, pebble-soft casing: generously rounded all round, in a satin finish so its shoulders and the
+    # paper slot's lip catch the key light.
+    printer = [rbox("PrinterBody", -0.032, 0.032, -0.03, 0.03, 0, 0.044, 0.0135, 6, mat=mats["printer_case"])]
+    printer.append(rbox("PrinterSlot", -0.019, 0.019, -0.016, -0.009, 0.041, 0.0448, 0.0025, 2, mat=mats["printer_slot"]))
+    printer.append(rbox("PrinterLid", -0.0205, 0.0205, -0.006, 0.0175, 0.042, 0.0472, 0.0024, 3, mat=mats["printer_case"]))
+    light = ellipsoid((0.0135, -0.0302, 0.028), (0.0026, 0.0012, 0.0026), 16, 8, "PrinterLight")
     shade_smooth(light)
     printer.append(with_mat(light, mats["printer_light"]))
     printer.append(anchor("ChitSlot", (0, -0.0125, 0.0448)))
@@ -984,15 +1018,16 @@ def build_kds(mats):
 # ---------------------------------------------------------------- the information desk
 
 
-def banker_hood(length=0.105, depth=0.047, height=0.046):
-    """The open surface of a banker's lamp shade: the top half of a superellipsoid, long along x, with
-    ends that are rounded but fuller than an egg's. Built at the origin with its rim on z 0."""
+def banker_hood(length=0.098, depth=0.06, height=0.062, ends=0.78):
+    """The open surface of a banker's lamp shade: the top half of a superellipsoid, long along x. Rounder
+    and taller than a real banker's hood (ends 0.78, a fuller dome), so it reads as a lamp shade by its
+    outline alone at gallery distance. Built at the origin with its rim on z 0."""
     bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=40, radius=1, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
     hood = bpy.context.active_object
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)  # Poles at the ends, along x.
     for v in hood.data.vertices:
         x, y, z = v.co
-        v.co = (math.copysign(abs(x) ** 0.55, x) * length, y * depth, z * height)
+        v.co = (math.copysign(abs(x) ** ends, x) * length, y * depth, z * height)
     bm = bmesh.new()
     bm.from_mesh(hood.data)
     # Cut a hair above the equator, not through it: the end poles lie on the equator, and a cut through
@@ -1007,39 +1042,98 @@ def banker_hood(length=0.105, depth=0.047, height=0.046):
     return hood
 
 
+def admission_ticket(mats, w=0.13, h=0.0425, notch=0.0048, corner=0.0018, roll=5.0, thickness=0.0006):
+    """The visit's "After-hours admission / Guest of Dan" ticket (MuseumHall's .ticket), as a small paper
+    card seated at the front of the brochure stand: a rounded rectangle with a half-round notch in each
+    end, the same silhouette as the stub on the page. Leaned back against the front leaflets like them,
+    and rolled a few degrees in its own plane so one corner rests on the step: just put there by hand.
+    Its face ("CanvasDeskTicket") is drawn by the web scene in the page's own type."""
+    hw = w / 2
+    pts = []
+
+    def arc(cx, cz, r, a0, a1, n):
+        for i in range(n + 1):
+            a = math.radians(a0 + (a1 - a0) * i / n)
+            pts.append((cx + r * math.cos(a), cz + r * math.sin(a)))
+
+    arc(-hw + corner, corner, corner, 180, 270, 4)
+    arc(hw - corner, corner, corner, 270, 360, 4)
+    for i in range(13):  # The right notch, bitten inward.
+        t = math.radians(-90 + 180 * i / 12)
+        pts.append((hw - notch * math.cos(t), h / 2 + notch * math.sin(t)))
+    arc(hw - corner, h - corner, corner, 0, 90, 4)
+    arc(-hw + corner, h - corner, corner, 90, 180, 4)
+    for i in range(13):  # The left notch.
+        t = math.radians(-90 + 180 * i / 12)
+        pts.append((-hw + notch * math.cos(t), h / 2 - notch * math.sin(t)))
+    mesh = bpy.data.meshes.new("DeskTicket")
+    obj = bpy.data.objects.new("DeskTicket", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    bm = bmesh.new()
+    verts = [bm.verts.new((x, 0.0, z)) for x, z in pts]
+    face = bm.faces.new(verts)
+    face.normal_update()
+    if face.normal.y > 0:  # The printed face looks at the visitor (-y).
+        face.normal_flip()
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, verts=[v for v in ext["geom"] if isinstance(v, bmesh.types.BMVert)], vec=(0, thickness, 0))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(mesh)
+    bm.free()
+    plane_uv(obj, 0, 2)  # Mapped flat, then rolled, so the print turns with the card.
+    a = math.radians(roll)
+    for v in mesh.vertices:
+        x, y, z = v.co
+        v.co = (x * math.cos(a) - z * math.sin(a), y, x * math.sin(a) + z * math.cos(a))
+    low = min(v.co.z for v in mesh.vertices)
+    for v in mesh.vertices:
+        v.co.z -= low  # The low corner rests on the step.
+    # Parallel to the leaflets and just in front of them. The step's front edge is rounded (4 mm), so the low
+    # corner is tucked into that round-over rather than set on the flat top, which starts behind the leaflets.
+    obj.rotation_euler = (math.radians(-8), 0, 0)
+    obj.location = (-0.004, -0.0197, 0.0285)
+    obj.data.materials.append(mats["desk_ticket"])
+    return obj
+
+
 def build_desk(mats):
     """The last stop: an oak information counter with a green leather top, a brass service bell, a
-    tiered brochure stand and a banker's lamp. It stands where a cabinet would, centred in the niche."""
+    tiered brochure stand and a banker's lamp. It stands where a cabinet would, centred in the niche.
+
+    Desk pilot: the bell sits in the lamp's pool (the web scene lights the desktop from under the shade),
+    the shade is a rounder dome whose warm lining shows as a lip under its rim, and the counter's edges
+    are softer so they take the lamplight as one broad highlight."""
     cy = CASE_Y
     h = 0.9
     oak = []
-    oak.append(box("DeskBase", -0.47, 0.47, cy - 0.26, cy + 0.2, 0.0, 0.08, bevel=0.025, segments=5))
-    oak.append(box("DeskBody", -0.44, 0.44, cy - 0.23, cy + 0.18, 0.06, h - 0.03, bevel=0.045, segments=7))
-    oak.append(box("DeskTop", -0.48, 0.48, cy - 0.27, cy + 0.21, h - 0.04, h, bevel=0.02, segments=5))
+    oak.append(box("DeskBase", -0.47, 0.47, cy - 0.26, cy + 0.2, 0.0, 0.08, bevel=0.03, segments=6))
+    oak.append(box("DeskBody", -0.44, 0.44, cy - 0.23, cy + 0.18, 0.06, h - 0.03, bevel=0.05, segments=8))
+    oak.append(box("DeskTop", -0.48, 0.48, cy - 0.27, cy + 0.21, h - 0.045, h, bevel=0.022, segments=7))
     front = cy - 0.23
     for x0, x1 in ((-0.38, -0.13), (-0.11, 0.11), (0.13, 0.38)):
-        oak.append(box("DeskPanel", x0, x1, front - 0.012, front + 0.004, 0.16, h - 0.14, bevel=0.012, segments=4))
+        oak.append(box("DeskPanel", x0, x1, front - 0.012, front + 0.004, 0.16, h - 0.14, bevel=0.0075, segments=5))
     for i, part in enumerate(oak):
         grain_uv(part, seed=320 + i)
     desk = join(oak, "DeskOak")
-    desk.data.materials.append(mats["oak_prop"])  # Supporting furniture: the quieter oak.
+    desk.data.materials.append(mats["desk_oak"])  # Its own oak, rendered quieter than the props' (scene.ts).
     shade_smooth(desk)
-    leather = box("DeskLeather", -0.43, 0.43, cy - 0.22, cy + 0.17, h, h + 0.003, bevel=0.002, segments=2)
+    leather = box("DeskLeather", -0.43, 0.43, cy - 0.22, cy + 0.17, h, h + 0.003, bevel=0.0015, segments=2)
     leather.data.materials.append(mats["leather"])
 
-    # Brass service bell: a smooth dome on a rounded base with a little plunger. Dense and smooth-shaded,
-    # so its highlights are clean arcs rather than facets.
+    # Brass service bell: a full, round dome on a chunky rounded base with a little plunger, a toy you
+    # could pick up. Dense and smooth-shaded, so the lamp draws one clean highlight on the dome.
+    brass = mats["bell_brass"]
     bell = []
-    bell.append(rcyl("BellBase", 0.039, 0.012, (0, 0, 0.006), edge=0.0035, vertices=64, mat=mats["bronze"]))
-    dome = ellipsoid((0, 0, 0.0135), (0.033, 0.033, 0.03), 48, 24, "BellDome")
+    bell.append(rcyl("BellBase", 0.052, 0.017, (0, 0, 0.0085), edge=0.0065, vertices=64, mat=brass))
+    dome = ellipsoid((0, 0, 0.016), (0.043, 0.043, 0.043), 48, 24, "BellDome")
     shade_smooth(dome)
-    bell.append(with_mat(dome, mats["bronze"]))
-    bell.append(cyl("BellStem", 0.0026, 0.012, (0, 0, 0.048), vertices=16, mat=mats["bronze"]))
-    button = ellipsoid((0, 0, 0.056), (0.0065, 0.0065, 0.0045), 24, 12, "BellButton")
+    bell.append(with_mat(dome, brass))
+    bell.append(cyl("BellStem", 0.0036, 0.014, (0, 0, 0.065), vertices=16, mat=brass))
+    button = ellipsoid((0, 0, 0.0755), (0.0105, 0.0105, 0.007), 24, 12, "BellButton")
     shade_smooth(button)
-    bell.append(with_mat(button, mats["bronze"]))
+    bell.append(with_mat(button, brass))
     bell_group = parent(bell, "Bell")
-    bell_group.location = (-0.24, cy - 0.12, h + 0.003)
+    bell_group.location = (-0.13, cy - 0.11, h + 0.003)  # In the lamp's pool, front left of the stem.
 
     # A tiered brochure stand with three stacks of leaflets in different papers.
     stand = []
@@ -1048,77 +1142,190 @@ def build_desk(mats):
         grain_uv(step, seed=330 + tier)
         step.data.materials.append(mats["oak_prop"])
         stand.append(step)
-    for tier, mat in enumerate((mats["leaflet_a"], mats["leaflet_b"], mats["leaflet_c"])):
+    # Rose at the front, so the cream admission ticket seated there reads against it.
+    for tier, mat in enumerate((mats["leaflet_c"], mats["leaflet_b"], mats["leaflet_a"])):
         leaf = box("Leaflets", -0.06, 0.06, -0.014 + tier * 0.035, -0.006 + tier * 0.035, 0.03 + tier * 0.03, 0.105 + tier * 0.03)
         leaf.rotation_euler.x = math.radians(-8)
         leaf.data.materials.append(mat)
         stand.append(leaf)
+    stand.append(admission_ticket(mats))
     brochures = parent(stand, "Brochures")
-    brochures.location = (0.27, cy + 0.02, h + 0.003)
+    brochures.location = (0.29, cy + 0.03, h + 0.003)
     brochures.rotation_euler.z = math.radians(-10)
 
-    # A banker's lamp: a domed brass foot and stem, and a proper banker's shade: a long, softly domed
-    # green glass hood with rounded ends and a rolled rim, lined in warm opal glass. (The web scene lights
-    # the lining from the bulb and gives the green glass gloss and a faint glow.)
+    # A banker's lamp, simplified: a round brass foot, one straight stem with a small knuckle, and a
+    # rounded green glass dome with a rolled rim. Its opal lining hangs a few millimetres below the glass,
+    # so from above the lit underside still shows as a warm lip. (The web scene makes the lining glow and
+    # puts the real light just under it.)
     lamp = []
-    lamp.append(rcyl("LampFoot", 0.05, 0.014, (0, 0, 0.007), edge=0.005, vertices=64, mat=mats["bronze"]))
-    foot_dome = ellipsoid((0, 0, 0.014), (0.034, 0.034, 0.012), 48, 16, "LampFootDome")
+    lamp.append(rcyl("LampFoot", 0.054, 0.015, (0, 0, 0.0075), edge=0.006, vertices=64, mat=mats["bronze"]))
+    foot_dome = ellipsoid((0, 0, 0.015), (0.036, 0.036, 0.014), 48, 16, "LampFootDome")
     shade_smooth(foot_dome)
     lamp.append(with_mat(foot_dome, mats["bronze"]))
-    lamp.append(cyl("LampStem", 0.0062, 0.19, (0, 0.02, 0.105), vertices=24, mat=mats["bronze"]))
+    shade_z = 0.2
+    lamp.append(cyl("LampStem", 0.0075, shade_z - 0.012, (0, 0, (shade_z - 0.012) / 2 + 0.012), vertices=24, mat=mats["bronze"]))
+    knuckle = ellipsoid((0, 0, shade_z - 0.004), (0.011, 0.011, 0.009), 24, 12, "LampKnuckle")
+    shade_smooth(knuckle)
+    lamp.append(with_mat(knuckle, mats["bronze"]))
     hood = banker_hood()
     lining = hood.copy()
     lining.data = hood.data.copy()
     bpy.context.scene.collection.objects.link(lining)
     lining.name = "LampLining"
-    lining.scale = (0.96, 0.92, 0.9)  # Clear of the glass, which is solidified 2.8 mm inward.
+    lining.scale = (0.965, 0.93, 0.92)  # Clear of the glass, which is solidified 3 mm inward.
+    lining.location.z = -0.0035  # The warm lip under the rim.
     activate(lining)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     lining.data.materials.append(mats["lamp_lining"])
-    # The glass: given thickness inward, then its rim rolled.
     glass = hood.modifiers.new("Glass", "SOLIDIFY")
-    glass.thickness = 0.0028
+    glass.thickness = 0.003
     glass.offset = -1
     apply_modifiers(hood)
-    hood = soften(hood, 0.0011, 2)
+    hood = soften(hood, 0.0016, 3)  # A rolled, rounded rim.
     hood.name = "LampShade"
     hood.data.materials.append(mats["lamp_glass"])
     for part in (hood, lining):
-        part.location = (0, -0.004, 0.193)
+        part.location = (0, 0, shade_z)
         lamp.append(part)
-    finial = ellipsoid((0, -0.004, 0.193 + 0.046), (0.0062, 0.0062, 0.005), 24, 12, "LampFinial")
+    finial = ellipsoid((0, 0, shade_z + 0.062), (0.0075, 0.0075, 0.006), 24, 12, "LampFinial")
     shade_smooth(finial)
     lamp.append(with_mat(finial, mats["bronze"]))
     lamp_group = parent(lamp, "BankersLamp")
-    lamp_group.location = (0.02, cy + 0.08, h + 0.003)
+    lamp_group.location = (0.05, cy + 0.06, h + 0.003)
 
     return parent([desk, leather, bell_group, brochures, lamp_group], "Desk")
+
+
+def paddle_leaf(name, length, width, arch, cup, petiole, mat, twist=0.0):
+    """One broad, rounded leaf on a short stalk, standing up from the origin along +z: fuller toward the
+    tip like a paddle, its tip arching outward (-y) and its edges cupped a little, so it has a readable
+    outline and a soft highlight. Built as one mesh with its origin at the stalk's foot."""
+    leaf = ellipsoid((0, 0, 0), (width / 2, 0.0035, length / 2), 16, 10, name)
+    for v in leaf.data.vertices:
+        x, y, z = v.co
+        t = (z + length / 2) / length  # 0 at the base of the blade, 1 at the tip
+        x *= 0.72 + 0.4 * t
+        y += -arch * t * t + cup * (x / (width / 2)) ** 2
+        v.co = (x, y, z + length / 2 + petiole)
+    stalk = cyl("Stalk", 0.0035, petiole + 0.01, (0, 0, (petiole + 0.01) / 2), vertices=6)
+    frond = join([leaf, stalk], name)
+    a = math.radians(twist)  # Turned about its own midrib: some leaves show their face, some their edge.
+    for v in frond.data.vertices:
+        x, y, z = v.co
+        v.co = (x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a), z)
+    # Shade toward the base, where the leaves crowd and shadow each other (the web scene multiplies the
+    # vertex color in), and a touch toward the cupped centre line.
+    col = frond.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    frond.data.color_attributes.active_color = col
+    for i, v in enumerate(frond.data.vertices):
+        t = min(1.0, max(0.0, (v.co.z - petiole) / length))
+        k = 0.5 + 0.5 * (t * t * (3 - 2 * t)) ** 0.8
+        col.data[i].color = (k, k, k, 1.0)
+    shade_smooth(frond)
+    frond.data.materials.append(mat)
+    return frond
+
+
+def cupped_plant(mats, name, pot_name, pot_mat, pot_r, pot_top, spec, arch=0.03, cup=0.013, spread=0.022):
+    """A potted plant of a few broad, cupped leaves (paddle_leaf): a round-shouldered pot with a rolled lip,
+    and leaves at different heights, leaning and turning unevenly so they overlap, some face on and some
+    edge on. One clear, friendly silhouette that reads from across the hall. Each leaf is a "Frond", so
+    the web scene sways it a little. spec: (angle around the pot in degrees, -90 faces the visitor; stalk,
+    blade length, width, lean, twist about its midrib, material key)."""
+    body = soften(cyl(pot_name, pot_r, pot_top, (0, 0, pot_top / 2), vertices=32, smooth=False), pot_r * 0.34, 4)
+    for v in body.data.vertices:  # A gentle belly: a touch narrower at the foot than at the shoulder.
+        t = v.co.z / pot_top
+        k = 0.9 + 0.1 * min(1.0, t * 1.6)
+        v.co.x *= k
+        v.co.y *= k
+    rim_r = pot_r - 0.008
+    bpy.ops.mesh.primitive_torus_add(major_radius=rim_r, minor_radius=pot_r * 0.12, major_segments=32, minor_segments=8, location=(0, 0, pot_top - 0.004))
+    rim = bpy.context.active_object
+    pot = join([body, rim], pot_name)
+    shade_smooth(pot)
+    pot.data.materials.append(pot_mat)
+    soil = cyl("Soil", rim_r - 0.004, 0.006, (0, 0, pot_top - 0.004), mat=mats["shadow"])
+    leaves = []
+    for angle, petiole, length, width, lean, twist, tone in spec:
+        frond = paddle_leaf("Frond", length, width, arch, cup, petiole, mats[tone], twist)
+        a = math.radians(angle)
+        frond.rotation_euler = (math.radians(lean), 0, a + math.pi / 2)
+        frond.location = (math.cos(a) * spread, math.sin(a) * spread, pot_top - 0.006)
+        leaves.append(frond)
+    return parent([pot, soil] + leaves, name)
+
+
+def build_desk_plant(mats):
+    """The desk bay's own plant: a squat, round oatmeal pot and six broad leaves in two sage tones."""
+    # Leaves crowd toward the back and overlap; twists turn a few edge-on.
+    spec = (
+        (95, 0.075, 0.165, 0.12, 12, 0, "plant_deep"),  # the tall one at the back, face on
+        (135, 0.05, 0.15, 0.115, 28, 38, "plant_sage"),  # turned half edge-on, in front of the back leaf
+        (62, 0.045, 0.15, 0.118, 24, -28, "plant_deep"),  # overlapping the back leaf from the right
+        (-145, 0.025, 0.13, 0.11, 48, 18, "plant_sage"),
+        (-50, 0.035, 0.14, 0.112, 40, -48, "plant_deep"),  # nearly edge-on
+        (-100, 0.015, 0.12, 0.105, 58, 8, "plant_sage"),  # short, leaning out toward the visitor
+    )
+    return cupped_plant(mats, "DeskPlant", "DeskPlantPot", mats["plant_pot"], 0.1, 0.12, spec)
+
+
+def build_hall_plant(mats):
+    """The hall's corner plant (in place of the old fern): the desk plant's cupped leaves, a little taller,
+    in the hall's own greens and a terracotta pot, so each corner has one soft, readable silhouette."""
+    spec = (
+        (90, 0.12, 0.18, 0.125, 10, 6, "leaf"),  # tall at the back, face on
+        (128, 0.085, 0.17, 0.12, 24, 34, "leaf_light"),
+        (55, 0.075, 0.165, 0.12, 22, -30, "leaf"),
+        (-150, 0.045, 0.15, 0.112, 44, 20, "leaf_light"),
+        (-40, 0.05, 0.155, 0.115, 38, -46, "leaf"),  # nearly edge-on
+        (-95, 0.02, 0.13, 0.105, 56, 10, "leaf_light"),  # short, leaning out toward the visitor
+    )
+    return cupped_plant(mats, "HallPlant", "HallPlantPot", mats["clay"], 0.082, 0.13, spec, spread=0.02)
+
+
+def build_sill_plant(mats):
+    """A small sill plant: four cupped leaves in a cream ceramic pot, sized for the window sill."""
+    spec = (
+        (80, 0.05, 0.1, 0.075, 14, 10, "leaf_dark"),
+        (150, 0.03, 0.09, 0.07, 36, 30, "leaf"),
+        (20, 0.03, 0.092, 0.072, 34, -34, "leaf"),
+        (-95, 0.012, 0.08, 0.066, 52, 6, "leaf_dark"),
+    )
+    return cupped_plant(mats, "SillPlant", "SillPlantPot", mats["ceramic"], 0.05, 0.068, spec, arch=0.02, cup=0.009, spread=0.012)
 
 
 # ---------------------------------------------------------------- the room's dressing
 
 
 def build_snake_plant(mats):
-    """Tall, stiff, pointed leaves in a cream ceramic pot: a vertical accent, unlike the fern."""
+    """Tall, upright, round-tipped leaves in a cream ceramic pot: a vertical accent, unlike the cupped plants.
+    Broad and soft rather than spiky, in two greens, so the clump reads as a few distinct leaves."""
     rng = np.random.default_rng(51)
-    pot = soften(cyl("SnakePot", 0.058, 0.11, (0, 0, 0.055), vertices=32, smooth=False), 0.006, 3)
+    pot = soften(cyl("SnakePot", 0.058, 0.11, (0, 0, 0.055), vertices=32, smooth=False), 0.012, 3)
     pot.data.materials.append(mats["ceramic"])
     soil = cyl("Soil", 0.052, 0.008, (0, 0, 0.106), mat=mats["shadow"])
-    leaves = []
-    for i in range(8):
-        a = i / 8 * 2 * math.pi + rng.uniform(-0.3, 0.3)
-        height = rng.uniform(0.2, 0.34)
-        leaf = ellipsoid((0, 0, 0), (0.013, 0.0035, height / 2), 12, 10, "Leaf")
-        leaf.location = (math.cos(a) * 0.018, math.sin(a) * 0.018, 0.105 + height / 2 - 0.01)
-        leaf.rotation_euler = (math.radians(rng.uniform(-9, 9)), math.radians(rng.uniform(-9, 9)), a)
-        leaves.append(leaf)
-    for leaf in leaves:
-        activate(leaf)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    blades = join(leaves, "Blades")
-    shade_smooth(blades)
-    blades.data.materials.append(mats["leaf_dark"])
-    return parent([pot, soil, blades], "SnakePlant")
+    tones = ([], [])
+    for i in range(6):
+        a = i / 6 * 2 * math.pi + rng.uniform(-0.3, 0.3)
+        height = rng.uniform(0.21, 0.33)
+        leaf = ellipsoid((0, 0, 0), (0.019, 0.0045, height / 2), 14, 12, "Leaf")
+        for v in leaf.data.vertices:  # Fuller toward the top, and cupped a little along the midrib.
+            t = (v.co.z + height / 2) / height
+            v.co.x *= 0.78 + 0.32 * math.sin(math.pi * min(1.0, t * 0.85))
+            v.co.y += 0.006 * (v.co.x / 0.019) ** 2
+        leaf.location = (math.cos(a) * 0.02, math.sin(a) * 0.02, 0.105 + height / 2 - 0.01)
+        leaf.rotation_euler = (math.radians(rng.uniform(-11, 11)), math.radians(rng.uniform(-11, 11)), a)
+        tones[i % 2].append(leaf)
+    blades = []
+    for k, group in enumerate(tones):
+        for leaf in group:
+            activate(leaf)
+            bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+        part = join(group, "Blades")
+        shade_smooth(part)
+        part.data.materials.append(mats["leaf_dark"] if k == 0 else mats["leaf"])
+        blades.append(part)
+    return parent([pot, soil] + blades, "SnakePlant")
 
 
 def build_pothos(mats):
@@ -1368,7 +1575,7 @@ def build_card(mats):
 def build_stamp_station(mats):
     """005: a small slanted oak board with a tray for finished cards (left), four task cards (centre)
     and a rubber stamp (right). The scene moves the stamp and slides each stamped card to the tray."""
-    board = [oak(rbox("StampBoardTop", -0.135, 0.135, -0.05, 0.05, 0, 0.008, 0.004), 372, mats)]
+    board = [rbox("StampBoardTop", -0.135, 0.135, -0.05, 0.05, 0, 0.008, 0.004, mat=mats["stamp_board"])]
     lips = [
         rbox("TrayLip", -0.128, -0.04, -0.046, -0.04, 0.008, 0.014, 0.002, 2),
         rbox("TrayLip", -0.128, -0.04, 0.04, 0.046, 0.008, 0.014, 0.002, 2),
@@ -1381,11 +1588,12 @@ def build_stamp_station(mats):
         card.append(face(f"TaskFace{n + 1}", -0.03, 0.03, -0.02, 0.02, z + 0.00145, mats["canvas_task"]))
         board.append(parent(card, f"TaskCard{n + 1}"))
     stamp = [rbox("StampPad", -0.017, 0.017, -0.013, 0.013, 0.008, 0.012, 0.0015, 2, mat=mats["rubber"])]
-    stamp.append(oak(rbox("StampBlock", -0.018, 0.018, -0.014, 0.014, 0.012, 0.024, 0.0035), 373, mats))
+    # A dark lacquered handle on a brass neck, so the stamp reads against the cream card as it presses.
+    stamp.append(rbox("StampBlock", -0.018, 0.018, -0.014, 0.014, 0.012, 0.024, 0.0035, mat=mats["stamp_lacquer"]))
     stamp.append(rcyl("StampNeck", 0.0058, 0.016, (0, 0, 0.031), edge=0.002, vertices=20, mat=mats["bronze"]))
     knob = ellipsoid((0, 0, 0.044), (0.0115, 0.0115, 0.0095), 32, 16, "StampKnob")
     shade_smooth(knob)
-    stamp.append(oak(knob, 374, mats))
+    stamp.append(with_mat(knob, mats["stamp_lacquer"]))
     for part in stamp:
         part.location.x += 0.098
     board.append(parent(stamp, "Stamp"))
@@ -1394,17 +1602,35 @@ def build_stamp_station(mats):
     return on_tray(5, [tilt], 0.14, 0.05, mats)
 
 
+def cloth_book(name, w, l, t, mat, mats, centred=False):
+    """A cloth-bound book lying flat: two soft boards and a rounded spine (at the back, +y) around a cream
+    page block, set in a little from the boards, so its page edges show as a pale band along the front and
+    the right. w, l are half sizes. Built on z 0, or about its centre if centred."""
+    b = min(0.0032, t * 0.22)  # board thickness
+    z0 = -t / 2 if centred else 0.0
+    boards = [
+        rbox("BookBoard", -w, w, -l, l, z0, z0 + b, b * 0.45, 2),
+        rbox("BookBoard", -w, w, -l, l, z0 + t - b, z0 + t, b * 0.45, 2),
+        rbox("BookSpine", -w, w, l - 0.006, l, z0, z0 + t, min(0.004, t * 0.45), 3),
+    ]
+    cover = join(boards, f"{name}Cover")
+    shade_smooth(cover)
+    cover.data.materials.append(mat)
+    pages = rbox(f"{name}Pages", -w + 0.0022, w - 0.0016, -l + 0.0016, l - 0.004, z0 + b * 0.8, z0 + t - b * 0.8, 0.0012, 2, mat=mats["paper"])
+    return parent([cover, pages], name)
+
+
 def build_book_stack(mats):
     """006: nine chunky rounded books ("ListBook1" to "ListBook9"), each with its origin at its centre so
     the scene can stack, add, wobble and spill them; it poses every one. A wider tray to hold the pile."""
     books = []
-    colors = (mats["book_slate"], mats["book_a"], mats["book_oat"], mats["book_b"], mats["book_c"], mats["book_olive"])
+    # Strong, distinct cover colours, neighbour to neighbour, and cream page edges between the boards, so
+    # each new book reads as one more on the pile.
+    colors = (mats["book_b"], mats["book_a"], mats["book_c"], mats["book_slate"], mats["leaflet_c"], mats["book_olive"])
     t = 0.016
     for n in range(9):
         w, l = 0.06 - (n % 3) * 0.004, 0.044 - (n % 2) * 0.003
-        cover = rbox("ListCover", -w, w, -l, l, -t / 2, t / 2 - 0.0006, 0.005, 4, mat=colors[n % len(colors)])
-        pages = rbox("ListPages", -w + 0.005, w + 0.0008, -l + 0.004, l - 0.004, -t / 2 + 0.003, t / 2 - 0.0036, 0.0012, 2, mat=mats["paper"])
-        book = parent([cover, pages], f"ListBook{n + 1}")
+        book = cloth_book(f"ListBook{n + 1}", w, l, t - 0.0006, colors[n % len(colors)], mats, centred=True)
         book.location.z = t / 2 + n * t
         books.append(book)
     return on_tray(6, books, 0.24, 0.058, mats)  # Wide enough to catch the stack when it topples.
@@ -1427,6 +1653,9 @@ def build_all(mats):
         build_desk(mats),
         build_plinth(mats),
         build_snake_plant(mats),
+        build_desk_plant(mats),
+        build_hall_plant(mats),
+        build_sill_plant(mats),
         build_pothos(mats),
         build_books(mats),
         *build_discoveries(mats),

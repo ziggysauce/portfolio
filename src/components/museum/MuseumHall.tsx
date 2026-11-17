@@ -6,16 +6,23 @@ import type { Exhibit } from "@/content/exhibits";
 import type { LabelAnchor, MuseumScene, PlinthAnchor } from "./scene";
 import { STEP_MS } from "./discoveries";
 import { DrawerContents, stepsFor } from "./DrawerContents";
+import { ceilingFor, clearOf, fitBetween, type Obstacle } from "./layout";
+import { hashForStop, positionLabel, stepLabel, stopFromHash } from "./stops";
 import styles from "./museum.module.css";
 
 type Status = "loading" | "ready" | "fallback";
 
 type Props = {
   hall: { name: string; subtitle: string };
+  /** Who this is, readable on the first screen under the hall's name. */
+  identity: string;
+  /** In walking order: the career newest first, then personal rooms. */
   exhibits: Exhibit[];
-  /** Every exhibit, planned ones included, for the gallery directory. */
-  directory: Pick<Exhibit, "id" | "number" | "title" | "status">[];
-  links: { about: string; resume: string; contact: string; linkedin: string; github: string; site: string };
+  /** Each exhibit's label number (its place in the career walk), by id; personal rooms have none. */
+  numbers: Record<string, string | null>;
+  links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string };
+  /** Cases with a case study to read, keyed by exhibit id. */
+  studies: Record<string, { href: string; title: string; shortTitle: string }[]>;
   desk: { summary: string; farewell: string };
   /** The small unnumbered display between the last case and the desk: a card, not a stop. */
   fatherhood: { title: string; note: string; setting: string };
@@ -60,7 +67,11 @@ function supportsWebGL() {
   }
 }
 
-export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood }: Props) {
+// Each stop's address in the URL (/#kds, /#desk, or an old /#case-003; see stops.ts). A case study's
+// "Return to the museum" link uses it, and leaving the hall by one of its own links writes it, so Back lands
+// on the same case. These are not element ids: the browser leaves them alone and the hall walks there itself.
+
+export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fatherhood, studies }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLElement | null)[]>([]);
@@ -101,6 +112,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const deskIndex = exhibits.length;
   const count = exhibits.length + 1;
   const ready = useRef(false);
+  const arrival = useRef<number | null>(null); // A stop named in the URL, to focus once the hall is ready.
   const idle = useRef(0); // The "finish the walk" timer.
   const direction = useRef(0); // Which way the visitor was last walking.
   const pressing = useRef(false); // A finger is on the screen.
@@ -208,16 +220,34 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const frameLog: number[] = [];
     if (debug) (window as unknown as { __museumFrames: number[] }).__museumFrames = frameLog;
 
-    // On a portrait screen the labels and notes sit low, so they're kept above the directory and walking
-    // controls: their heights and that floor are measured on resize, not every frame.
+    // Labels and notes are kept between the sign and navigation above and the directory and walking
+    // controls below. Their natural heights, those bounds and the header's pieces are measured on resize,
+    // not every frame.
     const heights = new Map<Element, number>();
+    const widths = new Map<Element, number>();
     let floor = Infinity;
+    let ceiling = 0; // Just under the whole header: on a phone, where a label spans the screen, it stops here.
+    let obstacles: Obstacle[] = []; // The header's pieces, one by one: on a wide screen a label clears only those above it.
     const measure = () => {
       // Measured within the pinned viewport, where labels are placed, so it holds while the hall scrolls in.
-      const nav = document.querySelector('nav[aria-label="Gallery directory"]');
       const layer = labels.current[0]?.closest("ol");
-      floor = nav && layer ? nav.getBoundingClientRect().top - layer.getBoundingClientRect().top - 12 : Infinity;
-      for (const node of [...labels.current, ...notes.current]) if (node) heights.set(node, node.offsetHeight);
+      const header = layer?.parentElement?.querySelector("header");
+      const origin = layer?.getBoundingClientRect().top ?? 0;
+      const bottomBar = [document.querySelector('nav[aria-label="Gallery directory"] > button'), layer?.parentElement?.querySelector(`.${styles.controls}`)];
+      const tops = bottomBar.flatMap((node) => (node ? [node.getBoundingClientRect().top - origin] : []));
+      floor = tops.length ? Math.min(...tops) - 12 : Infinity;
+      ceiling = header ? header.getBoundingClientRect().bottom - origin + 8 : 0;
+      obstacles = header
+        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].map((node) => {
+            const box = node.getBoundingClientRect();
+            return { left: box.left, right: box.right, bottom: box.bottom - origin };
+          })
+        : [];
+      // scrollHeight, not the rendered height: a label capped to fit a short screen still knows its full height.
+      for (const node of [...labels.current, ...notes.current]) if (node) {
+          heights.set(node, node.scrollHeight);
+          widths.set(node, node.offsetWidth);
+        }
     };
     const sizes = new ResizeObserver(measure);
     const watchSizes = () => {
@@ -241,7 +271,24 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         if (!label) return;
         const distance = Math.abs(i - progress);
         const portrait = window.innerWidth / window.innerHeight < 0.8;
-        const y = portrait ? above(label, anchor.y) : anchor.y;
+        // On a portrait screen the label sits under the case, above the controls, and never up under the sign;
+        // if a short screen leaves too little room, it scrolls inside itself instead.
+        // On a wide screen it stays beside its case, centred on the case's corner where it fits, but never up
+        // under the sign or navigation above it nor down over the controls; if even that gap is too short,
+        // it fills the gap and scrolls inside itself.
+        let y: number;
+        let top: number;
+        if (portrait) {
+          y = Math.max(ceiling, above(label, anchor.y));
+          top = y;
+          label.style.maxHeight = Number.isFinite(floor) ? `${Math.max(160, floor - y).toFixed(0)}px` : "";
+        } else {
+          const h = heights.get(label) ?? 0;
+          const fit = fitBetween(anchor.y - h / 2, h, ceilingFor(anchor.x, anchor.x + (widths.get(label) ?? 0), obstacles, 12, 16, 120), Number.isFinite(floor) ? floor : window.innerHeight - 16);
+          top = fit.top;
+          y = fit.top + (fit.maxHeight ?? h) / 2; // The stylesheet centres it on this point.
+          label.style.maxHeight = fit.maxHeight === null ? "" : `${fit.maxHeight.toFixed(0)}px`;
+        }
         label.style.transform = `translate3d(${anchor.x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
         const opacity = anchor.visible ? Math.max(0, 1 - distance * 1.8) : 0;
         // The specimen's own caption, pinned to it: shown while its case is the one you're at.
@@ -252,14 +299,48 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
           caption.style.opacity = shown.toFixed(3);
           caption.style.visibility = shown > 0.01 ? "visible" : "hidden";
         }
-        label.style.opacity = String(opacity);
+        // On a portrait screen an open note takes the label's place (see below), so the label steps aside
+        // instead of showing around its edges. Faded, not hidden, so focus inside it is never lost.
+        const covered = portrait && openRef.current === i;
+        label.style.opacity = String(covered ? 0 : opacity);
         // Faded, not hidden: every label stays readable to screen readers and reachable with Tab,
         // and tabbing to one walks the camera to its case.
         label.style.visibility = "visible";
-        label.style.pointerEvents = opacity > 0.05 ? "auto" : "none";
-        // The note comes out beside its drawer; on a portrait screen it lies over the label, from its top.
+        label.style.pointerEvents = opacity > 0.05 && !covered ? "auto" : "none";
+        label.inert = covered; // Out of the tab order while the note covers it; focus is in the note then.
+        // The note comes out beside its drawer. On a portrait screen it takes the label's place just below the
+        // drawer, so the props rising out of it stay in view, unless its text needs the room: then it rises
+        // as far as the sign and navigation, over the case. It never runs under the directory and walking
+        // controls, and if it is still too long it scrolls inside itself.
         const note = notes.current[i];
-        if (note) note.style.transform = `translate3d(${(portrait ? window.innerWidth / 2 : anchor.drawer.x).toFixed(1)}px, ${(portrait ? above(note, y) : anchor.drawer.y).toFixed(1)}px, 0)`;
+        if (!note) return;
+        if (portrait) {
+          const room = Number.isFinite(floor) ? floor : window.innerHeight;
+          const fit = fitBetween(anchor.drawer.y + 28, heights.get(note) ?? 0, ceiling, room);
+          const top = fit.top;
+          note.style.maxHeight = `${(fit.maxHeight ?? room - top).toFixed(0)}px`;
+          note.style.transform = `translate3d(${(window.innerWidth / 2).toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
+        } else {
+          // Beside the drawer, centred a little above it (the stylesheet lifts it by 40% of its height and
+          // nudges it 18px right), but never over the case's label, the controls or the header; a few pixels
+          // spare for its tilt.
+          const h = (heights.get(note) ?? 0) + 8;
+          const w = (widths.get(note) ?? 0) + 8;
+          // Fitted between header and controls first, then moved right if that spot covers the label, then
+          // fitted again for the new columns.
+          const labelHeight = parseFloat(label.style.maxHeight) || (heights.get(label) ?? 0);
+          const bottom = Number.isFinite(floor) ? floor : window.innerHeight - 16;
+          const want = anchor.drawer.y - 0.4 * h;
+          let left = anchor.drawer.x + 18;
+          let fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
+          const moved = clearOf({ left, top: fit.top, width: w, height: fit.maxHeight ?? h }, { left: anchor.x, top, width: widths.get(label) ?? 0, height: labelHeight }, window.innerWidth);
+          if (moved !== left) {
+            left = moved;
+            fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
+          }
+          note.style.maxHeight = fit.maxHeight === null ? "" : `${(fit.maxHeight - 8).toFixed(0)}px`;
+          note.style.transform = `translate3d(${(left - 18).toFixed(1)}px, ${(fit.top + 0.4 * (fit.maxHeight ?? h)).toFixed(1)}px, 0) rotate(1.5deg)`;
+        }
       });
     }
 
@@ -268,7 +349,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         createMuseumScene({
           canvas: canvas.current!,
           exhibits: [
-            ...exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status, kind: "case" as const, discovery: exhibit.drawer })),
+            ...exhibits.map((exhibit) => ({ specimen: exhibit.specimen, status: exhibit.status, kind: "case" as const, discovery: exhibit.drawer, catalog: exhibit.catalog })),
             { status: "on-view", kind: "desk" as const },
           ],
           url: "/museum/museum.glb",
@@ -282,6 +363,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         if (cancelled) return created.dispose();
         scene.current = created;
         watchSizes();
+        // Arriving at a named stop (from a case study, or Back to the hall): stand there, no walk. The
+        // camera also starts at any restored scroll position instead of walking to it from the first case.
+        const named = stopFromHash(window.location.hash, exhibits);
+        if (named !== null) window.scrollTo({ top: offsetFor(named), behavior: "instant" });
+        arrival.current = named;
+        const progress = Math.max(0, Math.min(count - 1, (window.scrollY - offsetFor(0)) / caseHeight()));
+        created.setTarget(motion.matches ? Math.round(walk(progress)) : walk(progress), true);
         setStatus("ready");
         window.dispatchEvent(new Event("scroll")); // Pick up a restored scroll position.
       })
@@ -304,7 +392,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [exhibits, stopGlide]);
+  }, [exhibits, stopGlide, offsetFor, caseHeight, count]);
 
   // Scrolling moves the camera. With reduced motion it cuts between cases instead of gliding.
   useEffect(() => {
@@ -348,6 +436,13 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         }
         shown = nearest;
         setIndex(nearest);
+        // A stop already named in the URL follows you, so a refresh doesn't send you back to the old one.
+        // (The hall never adds one on its own; links in and out of it do.)
+        const named = stopFromHash(window.location.hash, exhibits);
+        if (named !== null && named !== nearest) {
+          const hash = hashForStop(nearest, exhibits);
+          window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
+        }
         if (openRef.current !== null && openRef.current !== nearest) changeDrawer(null); // The drawer shuts behind you.
         // If focus was in a note that just closed, it lands on the label of the case you walked to.
         if (notes.current.some((note, i) => i !== nearest && note?.contains(document.activeElement))) labels.current[nearest]?.focus();
@@ -384,6 +479,12 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
     const watcher = new IntersectionObserver(([entry]) => scene.current?.setVisible(entry.isIntersecting));
     if (stage.current) watcher.observe(stage.current);
     onScroll();
+    // Keyboard focus lands on the case you came back to, not the top of the page. Focusing a label walks
+    // to it, and the hall is already there, so nothing moves.
+    if (arrival.current !== null) {
+      labels.current[arrival.current]?.focus({ preventScroll: true });
+      arrival.current = null;
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     window.addEventListener("wheel", onWheel, { passive: true });
@@ -406,7 +507,42 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
       window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("keydown", onScrollKey);
     };
-  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer]);
+  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer, exhibits, deskIndex]);
+
+  // A new stop typed or pasted into the address bar while the hall is open is a same-page navigation:
+  // walk there like the directory does. (The hall's own replaceState calls don't fire this.)
+  useEffect(() => {
+    if (status !== "ready") return;
+    function onHash() {
+      const named = stopFromHash(window.location.hash, exhibits);
+      if (named !== null) go(named);
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [status, exhibits, go]);
+
+  // Without the 3D hall, a stop named in the URL just brings its label into view, with focus on it.
+  useEffect(() => {
+    if (status !== "fallback") return;
+    const named = stopFromHash(window.location.hash, exhibits);
+    const label = named === null ? null : labels.current[named];
+    if (!label) return;
+    label.scrollIntoView({ block: "center" });
+    label.focus({ preventScroll: true });
+  }, [status, exhibits]);
+
+  /** Leaving by one of the hall's own links writes the stop into this page's URL, so Back returns to it. */
+  function rememberStop(event: React.MouseEvent) {
+    const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    if (!(link instanceof HTMLAnchorElement) || link.target === "_blank" || link.origin !== window.location.origin) return;
+    if (link.pathname === window.location.pathname) return;
+    // A link on a label belongs to that stop; the header's links, to wherever you're standing.
+    const holder = labels.current.findIndex((node) => node?.contains(link));
+    const stop = holder !== -1 ? holder : ready.current ? heading() : null;
+    if (stop === null) return;
+    const hash = hashForStop(stop, exhibits);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
+  }
 
   // A click anywhere outside the open directory folds it away.
   useEffect(() => {
@@ -425,6 +561,12 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   useEffect(() => {
     exhibits.forEach((_, i) => scene.current?.setDrawer(i, openNote === i));
   }, [openNote, exhibits, status]);
+  // On a portrait screen the open note takes the label's place, so focus follows from the label's Open
+  // drawer button into the note; closing it brings focus back to that button (closeNote).
+  useEffect(() => {
+    if (openNote === null || window.innerWidth / window.innerHeight >= 0.8) return;
+    if (labels.current[openNote]?.contains(document.activeElement)) notes.current[openNote]?.focus({ preventScroll: true });
+  }, [openNote]);
   useEffect(() => {
     steps.forEach((step, i) => scene.current?.setDiscoveryStep(i, step));
   }, [steps, status]);
@@ -457,6 +599,8 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   );
   const closeNote = useCallback((i: number) => {
     changeDrawer(null);
+    const label = labels.current[i];
+    if (label) label.inert = false; // Before focus goes back to its toggle (placeLabels catches up next frame).
     // Focus goes back to the control that opened it, if it was inside the note.
     if (notes.current[i]?.contains(document.activeElement)) noteToggles.current[i]?.focus();
   }, [changeDrawer]);
@@ -542,7 +686,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
   const fallback = status === "fallback";
 
   return (
-    <div className={`${styles.root} ${fallback ? styles.static : ""}`}>
+    <div className={`${styles.root} ${fallback ? styles.static : ""}`} onClickCapture={rememberStop}>
       <main id="main">
         <section
           ref={stage}
@@ -560,6 +704,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                 <div className={styles.sign}>
                   <p className={styles.hallName}>{hall.name}</p>
                   <h1 className={styles.subtitle}>{hall.subtitle}</h1>
+                  <p className={styles.identity}>{identity}</p>
                   {/* The premise, in one small ticket stub: the museum has closed, and you're a guest. */}
                   <p className={styles.ticket}>
                     <span className={styles.admission}>After-hours admission</span>
@@ -567,6 +712,9 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   </p>
                 </div>
                 <nav aria-label="Main" className={styles.nav}>
+                  <Link href={links.work} className={styles.navWork}>
+                    Selected work
+                  </Link>
                   <Link href={links.about}>About</Link>
                   <a href={links.resume} target="_blank" rel="noreferrer">
                     Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
@@ -579,6 +727,8 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
               <img
                 className={styles.still}
                 src="/museum/hall.jpg"
+                width={1600}
+                height={1000} // Reserves its space, so a label scrolled into view stays there as it loads.
                 alt="A plaster skull cast in a bronze-framed glass case on a squat oak cabinet with a drawer, a mug and field notebooks beside it, lit warmly in an arched plaster niche at dusk."
               />
             ) : (
@@ -613,7 +763,9 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     onPointerEnter={() => scene.current?.setHighlight(i)}
                     onPointerLeave={() => scene.current?.setHighlight(null)}
                   >
-                    <p className={styles.number}>{exhibit.number}</p>
+                    <p className={styles.number}>
+                      {numbers[exhibit.id] ? (i === 0 ? `${numbers[exhibit.id]} · Current role` : numbers[exhibit.id]) : "Off the clock"}
+                    </p>
                     <h2 id={`${exhibit.id}-title`} className={styles.title}>
                       {exhibit.title}
                     </h2>
@@ -624,6 +776,31 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     ))}
                     {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
+                    {/* The evidence behind the case, one click away: no drawer, bell or animation needed. */}
+                    {studies[exhibit.id]?.length === 1 ? (
+                      <Link href={studies[exhibit.id][0].href} className={styles.studyLink}>
+                        Read the case study
+                        <span className="sr-only">: {studies[exhibit.id][0].title}</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    ) : studies[exhibit.id]?.length ? (
+                      <div className={styles.studyLinks}>
+                        <p className={styles.studyLinksTitle} id={`${exhibit.id}-studies`}>
+                          Case studies
+                        </p>
+                        <ul aria-labelledby={`${exhibit.id}-studies`}>
+                          {studies[exhibit.id].map((study) => (
+                            <li key={study.href}>
+                              <Link href={study.href} className={styles.studyLink}>
+                                {study.shortTitle}
+                                <span className="sr-only">: {study.title}</span>
+                                <span aria-hidden="true">→</span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                     {exhibit.drawer && !fallback ? (
                       <button
                         ref={(node) => {
@@ -645,6 +822,7 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                       <details className={styles.drawerStatic}>
                         <summary>Open drawer</summary>
                         <DrawerContents drawer={exhibit.drawer} step={0} id={`${exhibit.id}-static`} />
+                        <DrawerExtra note={exhibit.drawerNote} work={null} />
                       </details>
                     ) : null}
                   </article>
@@ -656,9 +834,11 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                         notes.current[i] = node;
                       }}
                       className={styles.note}
+                      tabIndex={-1}
                       aria-label={`Drawer: ${exhibit.title}`}
                     >
                       <DrawerContents drawer={exhibit.drawer} step={steps[i]} busy={busy === i} onAct={() => act(i)} id={exhibit.id} />
+                      <DrawerExtra note={exhibit.drawerNote} work={exhibit.kind === "role" ? links.work : null} />
                       <button type="button" className={styles.noteClose} onClick={() => closeNote(i)}>
                         Close the drawer
                       </button>
@@ -714,6 +894,9 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   <p className={styles.farewell}>{desk.farewell}</p>
                   <ul className={styles.deskLinks}>
                     <li>
+                      <Link href={links.work}>Browse selected work</Link>
+                    </li>
+                    <li>
                       <a href={links.resume} target="_blank" rel="noreferrer">
                         Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
                       </a>
@@ -729,11 +912,6 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                     <li>
                       <a href={links.github} target="_blank" rel="noreferrer">
                         GitHub
-                      </a>
-                    </li>
-                    <li>
-                      <a href={links.site} target="_blank" rel="noreferrer">
-                        Current site
                       </a>
                     </li>
                   </ul>
@@ -755,75 +933,54 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
                   {/* Where you are, always visible, even with the directory folded away. */}
                   <span className={styles.dirCurrent}>
                     <span className="sr-only">, you are at </span>
-                    {index === deskIndex ? "Desk" : exhibits[index]?.number}
+                    {index === deskIndex ? "Desk" : (numbers[exhibits[index]?.id] ?? "Off the clock")}
                   </span>
                 </button>
                 <div id="gallery-directory" className={styles.directoryList}>
                   <p className={styles.directoryTitle} aria-hidden="true">
                     Gallery directory
                   </p>
-                  <ol>
-                    {directory.map((item) => {
-                      const at = exhibits.findIndex((exhibit) => exhibit.id === item.id);
-                      const here = at === index;
-                      return (
-                        <li key={item.id}>
-                          {at === -1 ? (
-                            // Not built yet: listed honestly, not a control.
-                            <span className={styles.closed}>
-                              <span className={styles.dirNumber}>{item.number}</span>
-                              <span className={styles.dirTitle}>{item.title}</span>
-                              <span className={styles.soon}>Opening later</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              aria-current={here ? "location" : undefined}
-                              onClick={() => {
-                                go(at);
-                                closeDirectory();
-                              }}
-                            >
-                              <span className={styles.dirNumber}>{item.number}</span>
-                              <span className={styles.dirTitle}>{item.title}</span>
-                              {here ? <span className={styles.here}>You are here</span> : null}
-                            </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                    <li key="desk">
-                      <button
-                        type="button"
-                        aria-current={index === deskIndex ? "location" : undefined}
-                        onClick={() => {
-                          go(deskIndex);
-                          closeDirectory();
-                        }}
-                      >
-                        <span className={styles.dirNumber} aria-hidden="true">
-                          ·
-                        </span>
-                        <span className={styles.dirTitle}>Information desk</span>
-                        {index === deskIndex ? <span className={styles.here}>You are here</span> : null}
-                      </button>
-                    </li>
+                  {/* Two groups, so the numbers count the career only: then the rooms outside it. */}
+                  <p className={styles.directoryGroup} id="directory-career">
+                    Career, newest first
+                  </p>
+                  <ol aria-labelledby="directory-career">
+                    {exhibits.map((item, at) =>
+                      item.kind === "personal" ? null : <DirectoryStop key={item.id} number={numbers[item.id]} title={item.title} here={at === index} onGo={() => { go(at); closeDirectory(); }} />,
+                    )}
                   </ol>
+                  <p className={styles.directoryGroup} id="directory-more">
+                    Also here
+                  </p>
+                  <ul aria-labelledby="directory-more">
+                    {exhibits.map((item, at) =>
+                      item.kind === "personal" ? <DirectoryStop key={item.id} number={null} title={item.title} here={at === index} onGo={() => { go(at); closeDirectory(); }} /> : null,
+                    )}
+                    <DirectoryStop key="desk" number={null} title="Information desk" here={index === deskIndex} onGo={() => { go(deskIndex); closeDirectory(); }} />
+                  </ul>
                 </div>
               </nav>
             )}
 
             {fallback ? null : (
               <div className={styles.controls}>
-                <button type="button" onClick={() => go(heading() - 1)} disabled={index === 0}>
-                  <span aria-hidden="true">←</span> Previous
-                </button>
+                <StepButton
+                  exhibits={exhibits}
+                  from={index}
+                  to={index - 1}
+                  onGo={() => go(heading() - 1)}
+                  edge={{ label: "Later role", short: "Later", name: "Later role: none, this is the current role" }}
+                />
                 <p className={styles.counter} aria-live="polite">
-                  {index === deskIndex ? "Information desk" : `Case ${index + 1} of ${exhibits.length}`}
+                  <Position text={positionLabel(index, exhibits)} />
                 </p>
-                <button type="button" onClick={() => go(heading() + 1)} disabled={index === count - 1}>
-                  Next <span aria-hidden="true">→</span>
-                </button>
+                <StepButton
+                  exhibits={exhibits}
+                  from={index}
+                  to={index + 1}
+                  onGo={() => go(heading() + 1)}
+                  edge={{ label: "End of the hall", short: "End", name: "End of the hall" }}
+                />
               </div>
             )}
 
@@ -839,6 +996,69 @@ export function MuseumHall({ hall, exhibits, directory, links, desk, fatherhood 
         </section>
 
       </main>
+    </div>
+  );
+}
+
+type StepText = { label: string; short: string; name: string };
+
+/** One walking control: names the way it goes (see stepLabel), or, disabled, the end it has reached. */
+function StepButton({ exhibits, from, to, onGo, edge }: { exhibits: Exhibit[]; from: number; to: number; onGo: () => void; edge: StepText }) {
+  const back = to < from;
+  const end = to < 0 || to > exhibits.length;
+  const { label, short, name } = end ? edge : stepLabel(from, to, exhibits);
+  return (
+    <button type="button" onClick={onGo} disabled={end} aria-label={name}>
+      {back ? <span aria-hidden="true">←</span> : null}
+      <span className={styles.stepLong}>{label}</span>
+      <span className={styles.stepShort} aria-hidden="true">
+        {short}
+      </span>
+      {back ? null : <span aria-hidden="true">→</span>}
+    </button>
+  );
+}
+
+/** The counter's text. On a narrow screen "Current role · 1 of 5" keeps just "1 of 5". */
+function Position({ text }: { text: string }) {
+  const [lead, count] = text.includes(" · ") ? text.split(" · ") : [null, text];
+  return (
+    <>
+      {lead ? <span className={styles.counterLead}>{lead} · </span> : null}
+      {count}
+    </>
+  );
+}
+
+/** A stop in the gallery directory. */
+function DirectoryStop({ number, title, here, onGo }: { number: string | null; title: string; here: boolean; onGo: () => void }) {
+  return (
+    <li>
+      <button type="button" aria-current={here ? "location" : undefined} onClick={onGo}>
+        <span className={styles.dirNumber} aria-hidden={number ? undefined : true}>
+          {number ?? "·"}
+        </span>
+        <span className={styles.dirTitle}>{title}</span>
+        {here ? <span className={styles.here}>You are here</span> : null}
+      </button>
+    </li>
+  );
+}
+
+/** Under a drawer's discovery: one concrete line about the real work, and (for a role) the way to the
+ *  write-ups. The label above already links its own case studies, so the drawer doesn't repeat them. */
+function DrawerExtra({ note, work }: { note?: string; work: string | null }) {
+  if (!note && !work) return null;
+  return (
+    <div className={styles.drawerExtra}>
+      {note ? <p className={styles.drawerNote}>{note}</p> : null}
+      {work ? (
+        <p className={styles.drawerLinks}>
+          <Link href={work}>
+            Selected work <span aria-hidden="true">→</span>
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

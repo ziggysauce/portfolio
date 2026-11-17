@@ -19,6 +19,11 @@ const CABINET = { x0: -0.32, x1: 0.54 };
 const WIDE_CABINET = { x0: -0.45, x1: 0.45 };
 // The fatherhood plinth: under the desk bay's window, between case 006 and the desk.
 const PLINTH = { x: WINDOW.x, z: -0.765, top: 0.655, recess: 0.6475, front: 0.135 }; // front: the body's half depth
+// The desk pilot's lamp and bell (blender build_desk): the lamp's bulb sits just under its shade, and its
+// light pools on the desktop around the bell.
+// The desk bay's niche (blender build_bay): its back wall, 16 cm behind the wall face.
+const NICHE = { width: 1.3, spring: 1.85, z: WALL_Z - 0.16 };
+const DESK = { top: 0.903, bulb: { x: 0.05, y: 1.085, z: -0.26 }, bell: { x: -0.13, z: -0.09 } };
 const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, travel: 0.17 };
 
 // The light: a broad warm key on the exhibit, a warm sconce, a cool evening window, a blue-green room.
@@ -26,6 +31,9 @@ const DRAWER = { x0: -0.245, x1: 0.465, y0: 0.555, y1: 0.695, front: 0.074, trav
 const AMBER = new THREE.Color("#ffd2a0");
 const AMBER_HOVER = new THREE.Color("#ffbf80");
 const KEY_INTENSITY = 30;
+// The desk's banker's lamp (the desk pilot): an incandescent warm, a little deeper than the exhibit key.
+const LAMP = new THREE.Color("#ffbf7a");
+const LAMP_INTENSITY = 1.5;
 const ENV_INTENSITY = 0.12; // Room reflections: just enough for brass and glass to catch a highlight.
 const LIFT = 0.012; // How far a specimen rises on hover, in meters: enough to notice, still grounded.
 
@@ -40,7 +48,10 @@ const TONES: Record<string, Tone> = {
   PaintCream: { color: "#e2d2b6", roughness: 1, env: 0.5 },
   // Waxed oak. Roughness comes from the grain texture, which samples at about 0.37 to 0.43 in linear
   // color, so the factor sits well above 1: the result lands at about 0.9 to 1, matte, grain-led.
-  OakGrain: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
+  // The hall pass: every cabinet, riser, wainscot and the plinth take the benchmark's satin oak (case 1's,
+  // approved for the whole museum), with its grain quieted and a cool evening shade toward the floor
+  // (hallOak), so rounded edges catch one soft highlight and the lit decks hold the eye.
+  OakGrain: { color: "#ad937c", roughness: 1, grainRoughness: true, env: 0.85 },
   Oak: { color: "#b3967a", roughness: 2.4, grainRoughness: true, env: 0.55 },
   FloorOak: { color: "#a48d75", roughness: 2.4, grainRoughness: true, env: 0.55 },
   // Props and the desk: the same oak with its grain turned down and a satin finish, so small near pieces
@@ -63,6 +74,11 @@ const TONES: Record<string, Tone> = {
   // Exhibits 002 to 006 and the desk.
   SampleGlass: { color: "#e8eef0", roughness: 0.08, env: 2.4 }, // Clear and a little bright at the edges.
   Ruby: { color: "#8a2d34", roughness: 0.25, env: 1.1 }, // Restrained, not red paint.
+  SamplePlasma: { color: "#dca23a", roughness: 0.3, env: 0.9 }, // The straw-coloured layer of a spun sample.
+  PrinterCase: { color: "#3a3836", roughness: 0.38, env: 1.3 }, // Satin: the casing's round shoulders catch the key.
+  StampBoard: { color: "#5e4232", roughness: 0.7, env: 0.6 }, // Dark walnut under the cream task cards.
+  StampLacquer: { color: "#34465a", roughness: 0.32, env: 1.2 }, // The stamp's handle, dark against the card.
+  Velvet: { color: "#3e5b5c", roughness: 1, env: 0.4 }, // The tooth's cushion: deep teal, so the white tooth reads.
   Stopper: { color: "#a98a64", roughness: 0.75, env: 0.5 }, // cork
   SampleLabel: { color: "#f1e8d6", roughness: 0.85, env: 0.5 },
   SlideGlass: { color: "#eef2f0", roughness: 0.06, env: 2.4 },
@@ -74,7 +90,7 @@ const TONES: Record<string, Tone> = {
   LaptopKey: { color: "#303133", roughness: 0.5, env: 0.8 },
   Whiteboard: { color: "#ffffff", roughness: 0.3, env: 0.8 },
   MarkerBody: { color: "#ece6da", roughness: 0.4, env: 0.8 },
-  MarkerCap: { color: "#9a4436", roughness: 0.4, env: 0.8 },
+  MarkerCap: { color: "#c4503a", roughness: 0.38, env: 0.9 }, // 004's one bright accent: the marker's band and cap.
   Felt: { color: "#2f3a52", roughness: 1, env: 0.4 },
   Cork: { color: "#ffffff", roughness: 0.95, env: 0.45 },
   PlanCard: { color: "#ffffff", roughness: 0.9, env: 0.5 },
@@ -95,6 +111,13 @@ const TONES: Record<string, Tone> = {
   BookSlate: { color: "#56646e", roughness: 0.8, env: 0.5 },
   BookOlive: { color: "#7b7a52", roughness: 0.8, env: 0.5 },
   Leather: { color: "#3e5a4a", roughness: 0.6, env: 0.6 },
+  // The desk pilot: the counter's own oak (quieter still, cooler toward the floor: deskOak), a brighter,
+  // smoother brass for the bell so the lamp draws one clean highlight, and the desk bay's plant.
+  DeskOak: { color: "#bc9f84", roughness: 1, grainRoughness: true, quiet: true, env: 0.7 },
+  BellBrass: { color: "#c9a45c", roughness: 0.24, metalness: 1, env: 1.5 },
+  DeskPlantPot: { color: "#dccbb0", roughness: 0.4, env: 0.9 }, // Oatmeal glaze: a soft sheen, no mirror.
+  DeskLeafSage: { color: "#93a886", roughness: 0.6, env: 0.7 },
+  DeskLeafDeep: { color: "#6d8766", roughness: 0.6, env: 0.7 },
   LeafletCream: { color: "#efe4c8", roughness: 0.9, env: 0.5 },
   LeafletSage: { color: "#a9b9a2", roughness: 0.9, env: 0.5 },
   LeafletRose: { color: "#d6a88f", roughness: 0.9, env: 0.5 },
@@ -109,7 +132,8 @@ const TONES: Record<string, Tone> = {
 };
 
 /** A stop on the walk: a case with a specimen, or the Information desk at the end. */
-export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk"; discovery?: Discovery };
+/** `catalog` is the exhibit's original number, which names its drawer props in the model (Discovery1…6). */
+export type SceneExhibit = { specimen?: string; status: string; kind?: "case" | "desk"; discovery?: Discovery; catalog?: string };
 
 /** Where a case's label goes and where its drawer front is, in CSS pixels. */
 export type LabelAnchor = {
@@ -125,8 +149,9 @@ export type LabelAnchor = {
 export type PlinthAnchor = { x: number; y: number; opacity: number };
 
 export type MuseumScene = {
-  /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. */
-  setTarget(progress: number): void;
+  /** Continuous position along the hall: 0 is the first case, 1 the second, and so on. `snap` puts the
+   *  camera there at once instead of walking (arriving at a case from a link, or a restored scroll). */
+  setTarget(progress: number, snap?: boolean): void;
   setHighlight(index: number | null): void;
   setReducedMotion(reduced: boolean): void;
   /** Whether the hall is on screen; ambient motion pauses when it isn't. */
@@ -157,6 +182,50 @@ type Options = {
   frameLog?: number[];
 };
 
+/** The face of the desk's admission ticket: the page's "After-hours admission / Guest of Dan" stub (MuseumHall's
+ *  .ticket), in its own fonts, read from the CSS variables on the hall's wrapper. Waits briefly for them, so
+ *  the canvas doesn't fall back to a system face; at gallery distance the layout and type are what make it
+ *  recognizable. The card's outline, notches included, is geometry (blender admission_ticket). */
+async function admissionTicketFace(host: HTMLElement, anisotropy: number) {
+  const style = getComputedStyle(host);
+  const serif = `${style.getPropertyValue("--font-instrument").trim() || "Georgia"}, Georgia, serif`;
+  const mono = `${style.getPropertyValue("--font-plex-mono").trim() || "Menlo"}, Menlo, monospace`;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 168; // The card's own proportions, 13 x 4.25 cm.
+  const context = canvas.getContext("2d")!;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = false; // glTF UVs run top-down.
+  texture.anisotropy = anisotropy;
+  const draw = () => {
+    const paper = context.createLinearGradient(0, 0, 0, canvas.height);
+    paper.addColorStop(0, "#f3ead6"); // --cream
+    paper.addColorStop(1, "#e6d8bb"); // --cream-edge
+    context.fillStyle = paper;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#66573f"; // --ink-soft
+    context.font = `500 27px ${mono}`;
+    context.letterSpacing = "4px";
+    context.fillText("AFTER-HOURS ADMISSION", 46, 68);
+    context.fillStyle = "#2a2117"; // --ink
+    context.font = `italic 400 64px ${serif}`;
+    context.letterSpacing = "0px";
+    context.fillText("Guest of Dan", 44, 132);
+    texture.needsUpdate = true;
+  };
+  // Usually already loaded (the page's own ticket uses them). If they're slow, draw now in the fallback
+  // and again once they arrive; never hold the hall up for type.
+  let loaded: Promise<unknown> = Promise.resolve();
+  try {
+    loaded = Promise.all([document.fonts.load(`italic 64px ${serif}`), document.fonts.load(`500 27px ${mono}`)]);
+  } catch {}
+  const inTime = await Promise.race([loaded.then(() => true), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500))]).catch(() => false);
+  draw();
+  if (!inTime) loaded.then(draw, () => {});
+  return texture;
+}
+
 /** A soft round falloff, used for contact shadows under furniture and for dust motes. */
 function radialTexture(inner: string, outer: string) {
   const size = 128;
@@ -173,7 +242,7 @@ function radialTexture(inner: string, outer: string) {
   return texture;
 }
 
-/** The benchmark's waxed oak (case 1's cabinet and riser): a satin finish whose roughness follows the
+/** The benchmark's waxed oak (the Origin Specimen's cabinet and riser): a satin finish whose roughness follows the
  *  grain only gently and stays in a narrow band, so rounded edges catch one broad highlight and the
  *  darkest grain lines never turn glossy. The grain samples at about 0.37 to 0.43 in linear color. */
 function satinOak(shader: { fragmentShader: string }) {
@@ -192,6 +261,35 @@ function quietOak(shader: { fragmentShader: string }) {
     "#include <map_fragment>\n\tdiffuseColor.rgb = mix(diffuse * textureLod(map, vMapUv, 12.0).rgb, diffuseColor.rgb, 0.45);",
   );
 }
+
+/** Satin oak with its grain pulled toward its own average (grain: how much of the grain's contrast is
+ *  kept), and a cool, plum-blue shade that deepens toward the floor below `top` (world height), so lower
+ *  panels sit back in the evening and the lit tops hold the eye. Returns the compile hook and a cache key
+ *  (the hooks share their source text, so three needs the key to keep their programs apart). */
+function eveningOak(grain: number, shade: string, top: number) {
+  const [r, g, b] = shade.split(",");
+  return {
+    key: `eveningOak:${grain}:${shade}:${top}`,
+    compile(shader: { vertexShader: string; fragmentShader: string }) {
+      satinOak(shader);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying float vOakY;")
+        .replace("#include <project_vertex>", "#include <project_vertex>\n\tvOakY = (modelMatrix * vec4(transformed, 1.0)).y;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vOakY;")
+        .replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>
+\tdiffuseColor.rgb = mix(diffuse * textureLod(map, vMapUv, 12.0).rgb, diffuseColor.rgb, ${grain.toFixed(2)});
+\tdiffuseColor.rgb *= mix(vec3(${r}, ${g}, ${b}), vec3(1.0), smoothstep(0.1, ${top.toFixed(2)}, vOakY));`,
+        );
+    },
+  };
+}
+/** The desk pilot's counter: the grain pulled furthest toward its average, the deepest shade. */
+const deskOak = eveningOak(0.25, "0.74,0.72,0.86", 0.84);
+/** The hall's cabinets, risers, wainscot and plinth: a step less quiet and less shaded than the desk. */
+const hallOak = eveningOak(0.4, "0.84,0.82,0.92", 0.74);
 
 /** Keeps waxed oak from going glossy where its grain map is darkest. */
 function floorRoughness(shader: { fragmentShader: string }) {
@@ -263,6 +361,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     renderer.forceContextLoss();
     throw error;
   }
+  const ticketFace = await admissionTicketFace(renderer.domElement, renderer.capabilities.getMaxAnisotropy());
   const bayTemplate = source.getObjectByName("Bay")!;
   const caseTemplate = source.getObjectByName("Case")!;
   const wideTemplate = source.getObjectByName("CaseWide") ?? caseTemplate;
@@ -323,10 +422,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     if (node.name === "LampShade") {
       // The banker's lamp's green glass: glossy, so the room draws soft highlights along its dome, with a
       // faint glow of the bulb coming through it.
-      const shade = new THREE.MeshStandardMaterial({ name: "LampGlass", color: "#245c40", roughness: 0.14, metalness: 0, emissive: "#1d4a33", emissiveIntensity: 0.35, side: THREE.DoubleSide });
+      // Desk pilot: a softer, sage-leaning green, and a little more glow, so the dome reads as lit glass.
+      const shade = new THREE.MeshStandardMaterial({ name: "LampGlass", color: "#3a7656", roughness: 0.16, metalness: 0, emissive: "#2a5c40", emissiveIntensity: 0.5, side: THREE.DoubleSide });
       reflect(shade, 2.2);
       owned.push(shade);
       node.material = shade;
+      return;
+    }
+    if (node.name === "DeskTicket") {
+      // The visit's admission ticket, seated in the desk's brochure stand: paper, in the page's own type.
+      const ticket = new THREE.MeshStandardMaterial({ name: "DeskTicket", map: ticketFace, roughness: 0.85, metalness: 0 });
+      reflect(ticket, 0.6);
+      owned.push(ticket, ticketFace);
+      node.material = ticket;
+      node.castShadow = node.receiveShadow = true;
       return;
     }
     if (node.name === "PrinterLight") {
@@ -370,10 +479,17 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       // Floored, so the darkest grain lines don't turn glossy and catch the window lights at a glance.
       if (tone.grainRoughness && material.map) {
         material.roughnessMap = material.map;
-        material.onBeforeCompile = tone.quiet ? quietOak : floorRoughness;
+        const evening = material.name.startsWith("DeskOak") ? deskOak : material.name.startsWith("OakGrain") ? hallOak : null;
+        if (evening) {
+          material.onBeforeCompile = evening.compile;
+          material.customProgramCacheKey = () => evening.key;
+        } else material.onBeforeCompile = tone.quiet ? quietOak : floorRoughness;
       }
     }
   });
+
+  // The banker's lamp holds the desk's light under its shade, so none of it may block that light.
+  deskTemplate?.getObjectByName("BankersLamp")?.traverse((node) => (node.castShadow = false));
 
   // Soft contact shadows, so furniture and pots sit on the floor instead of hovering over it.
   const contactTexture = radialTexture("rgba(20,16,12,0.62)", "rgba(20,16,12,0)");
@@ -383,6 +499,47 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const deckContactMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.55, depthWrite: false, fog: false });
   const seatMaterial = new THREE.MeshBasicMaterial({ map: contactTexture, transparent: true, opacity: 0.85, depthWrite: false, fog: false });
   owned.push(deckContactMaterial, seatMaterial);
+  // The desk niche's evening wash (see the desk, below).
+  const nicheGeometry = new THREE.PlaneGeometry(NICHE.width, NICHE.spring + 1.2);
+  const nicheCoolTexture = (() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 4;
+    const context = canvas.getContext("2d")!;
+    const gradient = context.createLinearGradient(0, 0, 256, 0);
+    gradient.addColorStop(0, "rgb(214,215,236)"); // Toward the window: cooler, a little plum.
+    gradient.addColorStop(0.62, "rgb(255,255,255)"); // Past the lamp: untouched.
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 256, 4);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  })();
+  const nicheCoolMaterial = new THREE.MeshBasicMaterial({ map: nicheCoolTexture, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, toneMapped: false, fog: false });
+  const nicheWarmTexture = radialTexture("rgba(255,184,116,1)", "rgba(255,170,96,0)");
+  const nicheWarmMaterial = new THREE.MeshBasicMaterial({ map: nicheWarmTexture, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  owned.push(nicheGeometry, nicheCoolTexture, nicheCoolMaterial, nicheWarmTexture, nicheWarmMaterial);
+  const lampPoolTexture = radialTexture("rgba(255,190,120,1)", "rgba(255,170,96,0)");
+  const lampPoolMaterial = new THREE.MeshBasicMaterial({ map: lampPoolTexture, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  owned.push(lampPoolTexture, lampPoolMaterial);
+  // Each case's warm pool on the floor in front of it, painted like the desk's: arriving at an exhibit
+  // means stepping into its light, and the stretches between stay quiet and cool.
+  const casePoolMaterial = new THREE.MeshBasicMaterial({ map: lampPoolTexture, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  owned.push(casePoolMaterial);
+  /** Evening on a niche's back wall, as at the desk: cooler toward the night window (left), and a soft
+   *  warm glow where the exhibit's light lands. Both broad and faint, on the plaster only. */
+  function eveningNiche(x: number, warmX: number | null, warmY = 1.2) {
+    const cool = new THREE.Mesh(nicheGeometry, nicheCoolMaterial);
+    cool.position.set(x, NICHE.spring / 2 + 0.6, NICHE.z + 0.003);
+    cool.renderOrder = 1;
+    scene.add(cool);
+    if (warmX === null) return;
+    const warm = new THREE.Mesh(nicheGeometry, nicheWarmMaterial);
+    warm.position.set(warmX, warmY, NICHE.z + 0.004);
+    warm.scale.set(0.95, 0.42, 1);
+    warm.renderOrder = 1;
+    scene.add(warm);
+  }
   function contact(x: number, z: number, size: number, y = 0.002, depth = size) {
     const shadow = new THREE.Mesh(contactGeometry, contactMaterial);
     shadow.position.set(x, y, z);
@@ -421,16 +578,17 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   owned.push(spillMap, spillMaterial, spillGeometry);
 
   // The room's dressing varies bay by bay, so walking the hall never shows the same corner twice: a
-  // different thing on each window sill, and a plant between every other pair of bays.
+  // different thing on some window sills (others left bare, so the walk between exhibits has quiet
+  // stretches), and a plant between every other pair of bays.
   type Swaying = { node: THREE.Object3D; base: THREE.Euler; phase: number; rate: number; amount: number };
   const swaying: Swaying[] = [];
-  function dress(name: string, x: number, y: number, z: number, scale: number, seed: number, footprint: number) {
+  function dress(name: string, x: number, y: number, z: number, scale: number, seed: number, footprint: number, turn = seed * 1.3) {
     const template = source.getObjectByName(name);
     if (!template) return;
     const item = template.clone(true);
     item.position.set(x, y, z);
     item.scale.setScalar(scale);
-    item.rotation.y = seed * 1.3;
+    item.rotation.y = turn;
     scene.add(item);
     item.traverse((node) => {
       if (!node.name.startsWith("Frond")) return;
@@ -444,8 +602,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     });
     contact(x, z, footprint * scale, y + 0.002);
   }
-  const SILL = ["Pothos", "Fern", "Books", "SnakePlant", "Fern", "Pothos", "Books", "Fern", "SnakePlant", "Pothos"];
-  const CORNER = ["SnakePlant", "Fern", null, "SnakePlant", null, "Fern", null, "SnakePlant", null];
+  const SILL = ["Pothos", "SillPlant", null, "Books", null, "SillPlant", "Books", null, "Pothos", null];
+  const CORNER = ["SnakePlant", "HallPlant", null, "SnakePlant", null, "HallPlant", null, "SnakePlant", null];
 
   // Stops: one bay per exhibit and one for the Information desk, plus a bay at each end so the hall
   // doesn't stop at the frame.
@@ -458,9 +616,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     scene.add(bay);
     const sill = SILL[(i + 1) % SILL.length];
     // The desk bay's sill stays bare: the fatherhood plinth stands under that window.
-    if (i !== deskIndex) dress(sill, x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, sill === "Books" ? 0.9 : 1, i + 2, 0.32);
+    if (sill && i !== deskIndex) dress(sill, x + WINDOW.x, WINDOW.sill, WALL_Z - 0.05, sill === "Books" ? 0.9 : sill === "SillPlant" ? 1.15 : 1, i + 2, 0.32);
     const corner = i < stops ? CORNER[(i + 1) % CORNER.length] : null;
-    if (corner) dress(corner, x + BAY_WIDTH / 2, 0, -0.78, corner === "Fern" ? 1.45 : 1.7, i + 7, 0.3);
+    // The desk bay's corner gets its own plant (the desk pilot), turned to face the visitor's camera.
+    if (corner && i === deskIndex) dress("DeskPlant", x + BAY_WIDTH / 2, 0, -0.78, 1.25, i + 7, 0.34, -0.33);
+    else if (corner) dress(corner, x + BAY_WIDTH / 2, 0, -0.78, corner === "HallPlant" ? 1.3 : 1.7, i + 7, 0.3, corner === "HallPlant" ? -0.3 : undefined);
+    // Every niche but the desk's (which sets its own, below) gets the evening wall; the cases' warm glow
+    // is added with each case.
+    if (i !== deskIndex && (i < 0 || i >= stops)) eveningNiche(x, null);
     // The sconce's painted wall glow costs nothing, so every bay keeps its own.
     const spill = new THREE.Mesh(spillGeometry, spillMaterial);
     spill.position.set(x + SCONCE.x, SCONCE.y + 0.03, WALL_Z + 0.004);
@@ -474,10 +637,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   // `wide` puts the specimen in the wider case (006's still life).
   type Staging = { deck: string; riser: boolean; lift: boolean; scale: number; wide?: boolean };
   const STAGING: Record<string, Staging> = {
-    Skull: { deck: "#d8caae", riser: true, lift: true, scale: 1 }, // linen
-    Samples: { deck: "#c6cdc3", riser: false, lift: false, scale: 1.4 }, // pale lab green
+    // The hall pass: decks a step deeper where the specimen is pale, so ivory, glass and cream read.
+    Skull: { deck: "#a9ae9f", riser: true, lift: true, scale: 1 }, // sage-grey linen: the ivory cast and oak riser stand out
+    Samples: { deck: "#7f9088", riser: false, lift: false, scale: 1.4 }, // deep lab green: the glass and labels read
     KDS: { deck: "#5c6668", riser: false, lift: false, scale: 1.12 }, // slate felt
-    Laptop: { deck: "#e4dac5", riser: false, lift: false, scale: 1.2 }, // cream
+    Laptop: { deck: "#aeb5ae", riser: false, lift: false, scale: 1.2 }, // pale sage-grey: the aluminium, board and red marker read
     Planning: { deck: "#8796a0", riser: false, lift: false, scale: 1.25 }, // dusty blue, so the cork stands out
     AfterHours: { deck: "#a89a86", riser: false, lift: false, scale: 1.1, wide: true }, // warm taupe: the iron and the camera read
   };
@@ -502,6 +666,23 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         scene.add(desk);
       }
       contact(x, CASE_Z, 1.15, 0.002, 0.72);
+      // The lamp's pool, painted onto the leather as well as lit: the real light models the bell, and this
+      // soft additive glow makes the pool read at gallery distance and from a low (phone) camera.
+      const lampPool = new THREE.Mesh(contactGeometry, lampPoolMaterial);
+      lampPool.position.set(x + (DESK.bulb.x + DESK.bell.x) / 2, DESK.top + 0.001, (DESK.bulb.z + DESK.bell.z) / 2 + 0.02);
+      lampPool.scale.set(0.62, 1, 0.42);
+      lampPool.renderOrder = 1;
+      scene.add(lampPool);
+      // Evening on the niche wall behind the desk: broad and faint. A cool, plum-blue multiply that fades in
+      // toward the night window (left), and a soft warm glow on the plaster behind the lamp. Both sit on the
+      // niche's back wall only, so the oak and the plinth's glow under the window keep their color.
+      eveningNiche(x, x + DESK.bulb.x);
+      // The bell sits on the leather, not over it: a small soft contact under its base.
+      const seat = new THREE.Mesh(contactGeometry, seatMaterial);
+      seat.position.set(x + DESK.bell.x, DESK.top + 0.0015, DESK.bell.z);
+      seat.scale.setScalar(0.15);
+      seat.renderOrder = 1;
+      scene.add(seat);
       specimens.push(null);
       captions.push(null);
       drawers.push({ node: null, baseZ: 0, discovery: null });
@@ -509,6 +690,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     const staging = stagingFor(exhibit);
     const cabinet = cabinetFor(exhibit);
+    eveningNiche(x, x + 0.06);
+    const casePool = new THREE.Mesh(contactGeometry, casePoolMaterial);
+    casePool.position.set(x + (cabinet.x0 + cabinet.x1) / 2, 0.0075, CASE_Z + 0.62); // Just above the runner rug (top 6 mm).
+    casePool.scale.set(1.5, 1, 0.8);
+    casePool.renderOrder = 1;
+    scene.add(casePool);
     const display = (staging.wide ? wideTemplate : caseTemplate).clone(true);
     display.position.x = x;
     scene.add(display);
@@ -521,35 +708,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       owned.push(cloth);
     }
     const riser = part(display, "Riser");
-    // The visual benchmark (case 1 only, until the treatment is approved for the whole museum): its
-    // cabinet, drawer and riser take a local satin-oak variant; every other case keeps the shared oak.
-    if (i === 0) {
-      const variants = new Map<THREE.Material, THREE.MeshStandardMaterial>();
-      display.traverse((node) => {
-        if (!(node instanceof THREE.Mesh)) return;
-        const shared = node.material as THREE.MeshStandardMaterial;
-        if (!shared.name.startsWith("OakGrain") || !shared.map) return;
-        let variant = variants.get(shared);
-        if (!variant) {
-          variant = shared.clone();
-          variant.color.set("#ad937c"); // A touch less orange under the warm key.
-          variant.roughness = 1;
-          variant.roughnessMap = shared.map;
-          variant.envMap = environment;
-          variant.envMapIntensity = ENV_INTENSITY * 0.9; // Enough room light for an edge to read as waxed.
-          variant.onBeforeCompile = satinOak;
-          variants.set(shared, variant);
-          owned.push(variant);
-        }
-        node.material = variant;
-      });
-    }
     if (riser) riser.visible = staging.riser;
     const drawer = part(display, "Drawer") ?? null;
     const drawerEntry: Drawer = { node: drawer, baseZ: drawer?.position.z ?? 0, discovery: null };
     drawers.push(drawerEntry);
-    // The curator's things live in the first gallery only.
-    if (i === 0 && propsTemplate) {
+    // The curator's things (a mug, field notebooks) live beside the Origin Specimen only.
+    if (exhibit.specimen === "Skull" && propsTemplate) {
       const props = propsTemplate.clone(true);
       props.position.x += x;
       scene.add(props);
@@ -594,7 +758,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     }
     specimens.push(specimen);
     // The drawer's discovery: on the drawer floor, centred, 9 cm in from its front.
-    const discoveryTemplate = source.getObjectByName(`Discovery${i + 1}`);
+    const discoveryTemplate = exhibit.catalog ? source.getObjectByName(`Discovery${Number(exhibit.catalog)}`) : undefined;
     if (drawer && exhibit.discovery && discoveryTemplate) {
       display.updateMatrixWorld(true); // Box3 and attach read world matrices; the case was just placed.
       const oak = part(drawer, "DrawerOak");
@@ -659,7 +823,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const pool = (opacity: number) => new THREE.MeshBasicMaterial({ map: poolTexture, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const floorPool = pool(0.32);
     const wallPool = pool(0.2);
-    const topPool = pool(0.2);
+    const topPool = pool(0.34);
     owned.push(poolTexture, floorPool, wallPool, topPool);
     const glowAt = (material: THREE.Material, x: number, y: number, z: number, w: number, h: number, flat: boolean) => {
       const glow = new THREE.Mesh(flat ? contactGeometry : new THREE.PlaneGeometry(1, 1), material);
@@ -671,7 +835,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     };
     glowAt(floorPool, plinthX, 0.004, PLINTH.z + 0.12, 1.1, 0.8, true);
     glowAt(wallPool, plinthX, 0.98, WALL_Z + 0.045, 0.8, 1.5, false);
-    glowAt(topPool, plinthX, PLINTH.recess + 0.0015, PLINTH.z, 0.3, 0.3, true); // Pooled in the ivory recess.
+    glowAt(topPool, plinthX, PLINTH.recess + 0.0015, PLINTH.z, 0.28, 0.28, true); // Pooled in the ivory recess.
+    // The toy and its loose rings sit on the lining, not over it: small soft contacts under each
+    // (blender build_plinth_vignette's positions, its y turned to three's -z).
+    for (const [dx, dz, size] of [
+      [0.03, -0.012, 0.1],
+      [-0.052, 0.038, 0.05],
+      [-0.074, 0.004, 0.042],
+    ]) {
+      const seat = new THREE.Mesh(contactGeometry, seatMaterial);
+      seat.position.set(plinthX + dx, PLINTH.recess + 0.0009, PLINTH.z + dz);
+      seat.scale.setScalar(size);
+      seat.renderOrder = 1;
+      scene.add(seat);
+    }
   }
 
   // ---------------------------------------------------------------- the light pool
@@ -719,25 +896,54 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       set.window.position.set(x + WINDOW.x, (WINDOW.sill + WINDOW.top) / 2, WALL_Z + 0.04);
       set.window.lookAt(x + WINDOW.x + 0.5, 0.2, 1.6);
       set.sconce.position.set(x + SCONCE.x, SCONCE.y, SCONCE.z + 0.05);
-      set.key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
-      set.key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
-      set.key.target.updateMatrixWorld();
-      // The benchmark bay's key is a tighter pool, falling off toward the cabinet's front as in the reference.
-      set.key.angle = THREE.MathUtils.degToRad(bay === 0 ? 20 : 25);
       const isStop = bay >= 0 && bay < stops;
+      const { key } = set;
+      if (bay === deskIndex) {
+        // The desk has no overhead key: its pooled key spot becomes the banker's lamp's bulb, just under the
+        // shade, aimed down between the lamp's foot and the bell. A wide, fully soft cone, so the desktop
+        // gets a warm pool that falls off before the counter's front, and the bell its highlight and a
+        // short soft shadow. Same light, so the count (and every shader) stays the same.
+        key.position.set(x + DESK.bulb.x, DESK.bulb.y, DESK.bulb.z);
+        key.target.position.set(x + (DESK.bulb.x + DESK.bell.x) / 2 - 0.02, DESK.top, (DESK.bulb.z + DESK.bell.z) / 2 + 0.03);
+        key.angle = THREE.MathUtils.degToRad(62);
+        key.penumbra = 1;
+        key.color.copy(LAMP);
+        key.userData.base = LAMP_INTENSITY;
+        key.userData.color = LAMP;
+        key.shadow.camera.near = 0.02;
+        key.shadow.camera.far = 1.2;
+        key.shadow.normalBias = 0.0015; // Small things on the desk: keep the bell's shadow attached.
+        key.shadow.radius = 6;
+      } else {
+        key.position.set(x + 0.32, 3.1, CASE_Z + 0.62);
+        key.target.position.set(x, DECK_Y + 0.08, CASE_Z);
+        // The benchmark bay's key is a tighter pool, falling off toward the cabinet's front as in the reference;
+        // a touch broader and fully soft for the hall pass, so the light wraps the plaster cast.
+        const benchmark = exhibits[bay]?.specimen === "Skull";
+        key.angle = THREE.MathUtils.degToRad(benchmark ? 22 : 25);
+        key.penumbra = benchmark ? 1 : 0.9;
+        key.userData.base = KEY_INTENSITY;
+        key.userData.color = AMBER;
+        key.shadow.camera.near = 1.2;
+        key.shadow.camera.far = 3.8;
+        key.shadow.normalBias = 0.006;
+        key.shadow.radius = 10;
+      }
+      key.target.updateMatrixWorld();
+      key.shadow.camera.updateProjectionMatrix();
       set.key.visible = true; // Kept in the count either way; dark bays just get no key.
       set.key.userData.on = isStop;
       if (bay === deskIndex) {
-        set.fill.position.set(x + 0.02, 1.08, CASE_Z + 0.08); // Under the banker's lamp.
+        set.fill.position.set(x + DESK.bulb.x, DESK.bulb.y - 0.03, DESK.bulb.z + 0.04); // Under the banker's lamp.
         set.fill.color.set("#ffc98a");
         set.fill.userData.full = 0.35;
         set.fill.distance = 1.6;
       } else {
         set.fill.position.set(x - 0.04, DECK_Y + 0.07, CASE_Z + 0.16); // Bounced up from the deck.
         set.fill.color.set("#ffd3a0");
-        // The benchmark bay (case 1) gets a stronger bounce: the linen deck's warm light lifting the
+        // The benchmark bay (the Origin Specimen's) gets a stronger bounce: the linen deck's warm light lifting the
         // underside of the cranium, the sockets and the shadowed cheek, as it does in the reference.
-        set.fill.userData.full = bay === 0 ? 0.06 : isStop ? 0.03 : 0;
+        set.fill.userData.full = exhibits[bay]?.specimen === "Skull" ? 0.06 : isStop ? 0.03 : 0;
         set.fill.distance = 0.5;
       }
     });
@@ -755,8 +961,8 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       set.fill.intensity = (set.fill.userData.full as number) * w;
       const on = set.key.userData.on as boolean;
       const g = on ? glow[set.bay] : 0;
-      set.key.intensity = on ? KEY_INTENSITY * (1 + 0.32 * g) * w : 0;
-      set.key.color.copy(AMBER).lerp(AMBER_HOVER, g * 0.6);
+      set.key.intensity = on ? (set.key.userData.base as number) * (1 + 0.32 * g) * w : 0;
+      set.key.color.copy(set.key.userData.color as THREE.Color).lerp(AMBER_HOVER, g * 0.6);
       const shadowed = set.bay >= near && set.bay <= near + 2;
       if (set.key.castShadow !== shadowed) {
         set.key.castShadow = shadowed;
@@ -819,6 +1025,35 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   let width = 1;
   let height = 1;
   const framing = { distance: 3.5, camX: 0, lookX: 0, lookY: SPECIMEN_Y, height: 1.4 };
+  // Each stop's own view, eased in over the walk to it: a small rise, a change of aim and a sideways step
+  // added to the resting camera. The desk (the desk pilot) rises and turns three-quarter, so the visitor
+  // looks down onto the lamplit desktop and the bell's whole silhouette. In the hall, objects on a
+  // platform (002's rack, 006's collection) get a little more of their deck, and the screen and boards
+  // (003's KDS, 004's whiteboard and laptop, 005's planning board) a more frontal view. 001 keeps exactly
+  // the approved resting camera.
+  type View = { lift: number; look: number; side: number };
+  const still: View = { lift: 0, look: 0, side: 0 };
+  let views: View[] = exhibits.map(() => still);
+  const VIEWS: Record<"wide" | "phone", Record<string, View>> = {
+    wide: {
+      Samples: { lift: 0.1, look: 0.0, side: 0 },
+      KDS: { lift: -0.07, look: 0.03, side: 0 },
+      Laptop: { lift: -0.04, look: 0.0, side: 0 },
+      Planning: { lift: -0.07, look: 0.04, side: 0 },
+      AfterHours: { lift: 0.12, look: 0.0, side: 0 },
+      desk: { lift: 0.42, look: 0.06, side: -0.3 },
+    },
+    phone: {
+      Samples: { lift: 0.08, look: 0.0, side: 0 },
+      KDS: { lift: -0.05, look: 0.0, side: 0 },
+      Laptop: { lift: -0.03, look: 0.0, side: 0 },
+      Planning: { lift: -0.05, look: 0.0, side: 0 },
+      AfterHours: { lift: 0.1, look: 0.0, side: 0 },
+      // Phones stand level with the desktop, so it shows edge-on: rise well above it.
+      desk: { lift: 0.62, look: 0.1, side: -0.12 },
+    },
+  };
+  const viewsFor = (size: "wide" | "phone") => exhibits.map((exhibit) => VIEWS[size][exhibit.kind === "desk" ? "desk" : (exhibit.specimen ?? "")] ?? still);
 
   function frame() {
     const aspect = width / height;
@@ -838,12 +1073,14 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       framing.lookX = 0.2 + 0.46 * wide;
       framing.lookY = 0.8;
       framing.height = 1.48;
+      views = viewsFor("wide");
     } else {
       // Phones: the case in the upper half, the label below it.
       framing.distance = Math.max(2.75, 0.55 / halfH);
       framing.camX = framing.lookX = (CABINET.x0 + CABINET.x1) / 2;
       framing.lookY = SPECIMEN_Y - 0.34 * framing.distance * halfV;
       framing.height = framing.lookY + 0.3;
+      views = viewsFor("phone");
     }
   }
 
@@ -852,8 +1089,20 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const x = current * BAY_WIDTH;
     // A touch of lead in the direction of travel, no zoom and no roll: the eye arrives slightly first.
     const lead = THREE.MathUtils.clamp(velocity * BAY_WIDTH * 0.03, -0.18, 0.18);
-    camera.position.set(x + framing.camX, framing.height, CASE_Z + framing.distance);
-    lookAt.set(x + framing.lookX + lead, framing.lookY, CASE_Z);
+    // The two stops either side of the camera, each weighted by how near it is (1 at the stop, 0 a stop away).
+    let lift = 0;
+    let look = 0;
+    let side = 0;
+    for (const i of [Math.floor(current), Math.floor(current) + 1]) {
+      const view = views[i];
+      if (!view) continue;
+      const d = 1 - THREE.MathUtils.smoothstep(Math.abs(current - i), 0, 1);
+      lift += view.lift * d;
+      look += view.look * d;
+      side += view.side * d;
+    }
+    camera.position.set(x + framing.camX + side, framing.height + lift, CASE_Z + framing.distance);
+    lookAt.set(x + framing.lookX + lead, framing.lookY + look, CASE_Z);
     camera.lookAt(lookAt);
   }
 
@@ -1050,8 +1299,12 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   }
 
   const api: MuseumScene = {
-    setTarget(progress) {
+    setTarget(progress, snap = false) {
       target = THREE.MathUtils.clamp(progress, 0, exhibits.length - 1);
+      if (snap) {
+        current = target;
+        velocity = 0;
+      }
       kick();
     },
     setHighlight(index) {
