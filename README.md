@@ -11,8 +11,30 @@ npm run build      # static site in out/
 npm run start      # serve out/ locally
 npm run lint
 npm run typecheck
-npm test           # the hall's stop addresses and walking labels (stops.test.ts); needs Node 22.6+
+npm test           # unit tests: stop addresses, walking labels, label placement math; needs Node 22.6+
+npm run test:layout  # the hall in Chrome at six screen sizes (see below); needs a build in out/
 ```
+
+### Layout check
+
+`tests/layout.mjs` opens the built hall in headless Chrome at 1280×720, 1366×768, 1440×900, 1280×600, 390×844 and 375×667. It visits every exhibit with its drawer closed and open. It fails if:
+
+- a label or note is clipped by the screen, or runs into the header or the walking controls;
+- an open note covers its label on desktop;
+- on a phone, the open note doesn't take the label's place or doesn't take focus;
+- Escape doesn't close the note and leave focus on the drawer button.
+
+It also fails, rather than passing silently, if it can't find the exhibits, the header or the controls, or if the walk doesn't move on.
+
+Run it after any change to the hall's layout, labels, header or copy on the labels:
+
+```bash
+VERCEL_ENV=preview npm run build && npm run test:layout   # with draft studies linked: the tallest labels
+npm run test:layout -- --url <preview URL>                # a deployed preview
+npm run test:layout -- --sizes 1280x720,375x667           # some sizes only
+```
+
+It uses the installed Google Chrome (set `CHROME_PATH` for another Chromium). Screenshots of every state land in `test-results/layout/`. Look at them too: the check catches collisions, not ugliness.
 
 ## Routes
 
