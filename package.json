@@ -11,7 +11,8 @@
     "start": "npx serve out -l 5001",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types 'src/**/*.test.ts'"
+    "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
+    "test:layout": "node tests/layout.mjs"
   },
   "dependencies": {
     "next": "^16.4.5",
@@ -27,6 +28,7 @@
     "@types/three": "0.186.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.5",
+    "playwright-core": "1.65.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3"
   }
