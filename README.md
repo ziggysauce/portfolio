@@ -1,40 +1,101 @@
-# Daniel Nguyen's Portfolio
-> Built with NextJS
+# Daniel Nguyen's portfolio: a small museum
 
+The portfolio is a museum after closing time: a 3D hall of six exhibit cases, one per chapter of the career, ending at an Information desk. Selected work (the case studies), About and Contact are plain reading pages in the museum's ivory, ink and bronze. Live at [danieltnguyen.com](https://www.danieltnguyen.com).
 
-## [Live Portfolio](http://danieltnguyen.com)
-
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
-
-## Getting Started
-
-First, run the development server:
+Next.js static export, TypeScript and three.js. There is no backend: `npm run build` writes plain files to `out/`, so it runs on any static host.
 
 ```bash
-npm run dev
-# or
-yarn dev
+npm install
+npm run dev        # http://localhost:5001
+npm run build      # static site in out/
+npm run start      # serve out/ locally
+npm run lint
+npm run typecheck
+npm test           # the hall's stop addresses and walking labels (stops.test.ts); needs Node 22.6+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Routes
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+| Route | What |
+|---|---|
+| `/` | The museum, opening at the current role. `/#kds`, `/#after-hours` and `/#desk` stand at that stop and focus its label; old `/#case-003` links still land on the same exhibit. |
+| `/work`, `/work/<slug>` | Selected work and each case study |
+| `/about`, `/contact` | About and Contact |
+| `/Daniel_Nguyen_Resume.pdf` | The résumé |
+| `/museum` | Moved: forwards to `/` and keeps the `#case-…` or `#desk` stop |
+| `/item/<slug>`, `/orders`, `/checkout` | The retired ordering-app site: items with a clear successor forward to their study (see `src/app/(reading)/item/[slug]/page.tsx`), `/orders` to About, `/checkout` to Contact. Everything else is a 404. |
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Unknown URLs get the museum's 404, with links to the hall and Selected work. Name, links and the About page live in `src/content/site.ts`; replace the résumé PDF in `public/` and keep its name.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## The museum (`/`)
 
-## Learn More
+The homepage: six cases, the Fatherhood plinth and the Information desk in a small 3D gallery.
 
-To learn more about Next.js, take a look at the following resources:
+| To change | Edit |
+|---|---|
+| Exhibits, labels, walking order | `src/content/exhibits.ts` |
+| Camera, lights, hover, render loop | `src/components/museum/scene.ts` |
+| Labels, scrolling, buttons, swipe, keyboard, fallbacks | `src/components/museum/MuseumHall.tsx` |
+| Label and page styling | `src/components/museum/museum.module.css` |
+| The 3D models themselves | `blender/build_museum.py` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**How it looks.** The museum is lit like a storybook miniature set:
+- amber spotlights on the exhibits, a warm sconce, and cool evening light through each window
+- a blue-green room light, plus soft contact shadows under the furniture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Material tones are set by material name in `scene.ts` (`TONES`), so the mood can be tuned without re-exporting from Blender.
 
-## Deploy on Vercel
+While the hall is on screen, the plants' leaves drift and a little dust floats in each spotlight. With reduced motion, or when the hall is off screen or the tab is hidden, both stop and the page renders only when the visitor moves.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**How it moves.** Scrolling stays ordinary page scrolling. The camera follows it with time-based damping, so it feels the same at 60 or 120 Hz. It also holds still at each case for the first and last part of the scroll between cases. If you stop partway, it finishes the walk in the direction you were going. Previous and Next, left and right arrows, a sideways swipe or trackpad gesture, and tabbing to a label all reach the same positions. With reduced motion, the camera cuts between cases instead of gliding, and nothing lifts.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+**Rebuilding the 3D assets.** Everything is generated by a script in Blender 5.2, with no downloaded models or textures:
+
+```bash
+blender -b --factory-startup --python blender/build_museum.py -- --render
+```
+
+It writes:
+- `blender/museum.blend`, the editable source. Open it in Blender to tweak anything by hand.
+- `blender/textures/*.png`, the generated textures: oak planks and grain, painted plaster and the evening sky in the window.
+- `public/museum/museum.glb`, the web model, with nodes:
+  - `Bay`: wall, wainscot, window and sconce
+  - `Case`: cabinet and glass case
+  - `Skull`
+  - the exhibits, the desk, the plinth, and the plants, whose `Frond*` children sway in the browser
+- `public/museum/hall.jpg`, a Cycles still used when WebGL isn't available.
+
+Leave off `--render` to skip the still. Hand edits in the `.blend` are lost the next time the script runs, so either change the script or stop using it once a model is hand-tuned.
+
+**Adding an exhibit:**
+1. Add a node to the Blender script, for example `Pipette`, and re-export.
+2. Set that exhibit's `specimen` to the node name and its `status` to `"on-view"` in `exhibits.ts`.
+
+Exhibits marked `"planned"` stay out of the hall. Anything listed under `unverified` needs confirming first.
+
+**Attribution.** All 3D models and textures are original, generated by `blender/build_museum.py`. three.js is MIT licensed. Instrument Serif and IBM Plex Mono come from Google Fonts under the SIL Open Font License.
+
+
+## Selected work (`/work`)
+
+Case studies behind the museum: the museum introduces the career, and these pages carry the evidence. They are plain reading pages in the museum's ivory, ink and bronze, and load nothing from the 3D hall.
+
+| To change | Edit |
+|---|---|
+| Which studies exist, their status, index card fields, and which museum case each expands on | `src/content/work.ts` |
+| A study's copy: summary, facts, sections, decisions, figure captions | `src/content/studies/<slug>.ts` |
+| Page layout and type | `src/components/work/StudyParts.tsx`, `src/components/work/work.module.css` |
+| The visuals: annotated KDS screen, order flow, hero | `src/components/work/figures.tsx` |
+| Editorial record and what's next | `docs/case-studies/` |
+
+**Status.**
+- `"published"` studies are public.
+- `"draft"` studies exist only on review builds (Vercel previews and `npm run dev`), marked Draft and `noindex`. A production build leaves them out entirely: no page, no card, no link. To read drafts in a local production build: `VERCEL_ENV=preview npm run build`.
+- `"planned"` ones get no page, card or link.
+
+**Museum links.**
+- `exhibit` is where a study's "Return to the museum" goes, by exhibit id, e.g. `/#kds`.
+- `featuredOn` lists the cases whose labels link to the study. It defaults to `exhibit`; `[]` means none.
+- A label with one study shows "Read the case study". A label with several shows a short "Case studies" list of their `shortTitle`s.
+
+The hall reads that address on arrival: it stands at the case without walking there, and focuses its label. Leaving the hall by one of its own links writes the current stop into the URL, so Back returns to it.

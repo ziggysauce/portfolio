@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   The site-wide base. The museum (src/components/museum/museum.module.css) and the reading pages
+   (src/components/work/work.module.css) bring their own palettes and type; this file only sets what
+   they share: the body face, a default focus ring, and the skip link.
+   ========================================================================== */
+
+@theme inline {
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light; /* Light-only by design: stops OS dark mode half-theming form controls. */
+  --focus: #83633d; /* Bronze. The museum and the reading pages set their own focus colors over this. */
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f6f0e2;
+  color: #2a2117;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 60;
+  background: #2a2117;
+  color: #f6f0e2;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
