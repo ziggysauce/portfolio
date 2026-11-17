@@ -119,9 +119,9 @@ function TicketToScreen({ alt }: { alt?: string }) {
 function KdsFlow() {
   const steps: [string, string?][] = [
     ["Order placed", "by a guest or at the POS"],
-    ["On the station’s screen", "it checks for new orders on its own"],
-    ["Claim", "tap the card"],
-    ["Finish", "tap twice; it moves to Closed"],
+    ["On every station’s screen", "each screen checks for changes on its own"],
+    ["Claim", "tap the card; other screens show it’s being made"],
+    ["Finish", "tap twice; it moves to Closed on every screen"],
     ["Closed", "recall it, or reprint its ticket"],
   ];
   return (
@@ -136,35 +136,36 @@ function KdsFlow() {
   );
 }
 
-/** Self-serve onboarding: setup in a sandbox runs alongside approval, then both meet at go-live. */
+/** Self-serve onboarding: anyone can create a location, which starts in sandbox mode; setup there runs alongside
+ *  the payment application, and approval is what switches on live payments. */
 function OnboardingLanes() {
   return (
     <div className={styles.lanes}>
       <div className={styles.laneStart}>
-        <strong>Sign up</strong>
-        <span>verify a phone number, pass screening</span>
+        <strong>Create a location</strong>
+        <span>open to anyone; it starts in sandbox mode</span>
       </div>
       <div className={styles.laneRows}>
-        <div className={styles.lane}>
-          <p className={styles.laneTitle}>Getting approved</p>
+        <div className={`${styles.lane} ${styles.laneSandbox}`}>
+          <p className={styles.laneTitle}>Setting up, in sandbox mode</p>
           <ol>
-            <li>Staff approval</li>
-            <li>Payment application</li>
-            <li>Processor verification</li>
+            <li>Menus</li>
+            <li>Taxes, tips and hours</li>
+            <li>Test payments only</li>
           </ol>
         </div>
-        <div className={`${styles.lane} ${styles.laneSandbox}`}>
-          <p className={styles.laneTitle}>Getting set up, in a sandbox</p>
+        <div className={styles.lane}>
+          <p className={styles.laneTitle}>Getting approved for live payments</p>
           <ol>
-            <li>Menu: the assistant drafts, the operator confirms</li>
-            <li>Taxes, tips and hours</li>
-            <li>Test payments, capped</li>
+            <li>Payment application</li>
+            <li>Processor verification</li>
+            <li>Approval</li>
           </ol>
         </div>
       </div>
       <div className={styles.laneEnd}>
         <strong>Go live</strong>
-        <span>real payments switch on in one step</span>
+        <span>once approved, live payments switch on in one step</span>
       </div>
     </div>
   );
@@ -248,7 +249,7 @@ const LOOP: [string, string, string][] = [
   ["Build", "Code on its own branch; live tests on a copy of the database", "Read the change"],
   ["Review", "Verdict, findings and a ready-to-post comment, plus a second reviewer with no context", "Decide what to post"],
   ["Apply feedback", "Fix, already fixed, or disagree, and check similar code for the same defect", "Mark it ready, merge it"],
-  ["Learn", "A week after release, look for changes that needed a later fix and propose a rule", "Approve or reject the rule"],
+  ["Retro", "A week after release, look for changes that needed a later fix and propose a rule", "Approve or reject the rule"],
 ];
 
 /** The loop: what the AI prepares at each step, and the decision that stays with me. */
@@ -322,7 +323,7 @@ function ReviewOutput() {
       </table>
       <p className={styles.draftComment}>
         <span>Draft comment, not posted</span>
-        From Claude: On retry, the request is rebuilt from defaults rather than the operator’s edits, so a timed-out save can overwrite them.
+        On retry, the request is rebuilt from defaults rather than the operator’s edits, so a timed-out save can overwrite them.
       </p>
     </div>
   );

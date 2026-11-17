@@ -8,12 +8,15 @@ export const menus: Study = {
   title: "Making complex menus easier to manage",
   shortTitle: "Menus",
   summary:
-    "Restaurants needed different menus for different times, places and guests without keeping several copies of their catalog. I led development of Menus: named, scheduled menus built on top of one shared catalog.",
+    "A holiday preorder menu shouldn’t mean copying a restaurant’s whole catalog. I led development of Menus: distinct, scheduled menus built on top of one shared catalog, so each menu can have its own dates, places and guests while products stay in one place.",
   status: "draft",
   role: "Software developer",
   timeframe: "2018–2021",
   tags: ["Operator tools", "Data model", "Menus"],
-  exhibit: "marker",
+  // The work is dated 2018–2021, when Daniel was a software developer, so Return to the museum goes to that
+  // role. His résumé lists Menus under Engineering Manager (2021–2026), so the label there links here too.
+  exhibit: "kds",
+  featuredOn: ["kds", "marker"],
   length: "full",
   hero: {
     figure: "menus-hero",
@@ -23,7 +26,7 @@ export const menus: Study = {
   facts: [
     {
       label: "My role",
-      value: "Software developer on a small team. I built much of the operator dashboard from 2018, and led development of Menus with our product lead and teammates.",
+      value: "Software developer. I built much of the operator dashboard from 2018, and led development of Menus with our product lead and teammates.",
     },
     { label: "When", value: "2018 to 2021. Menus launched in November 2020." },
     { label: "Status", value: "In production. Menus is still core to GoTab’s product." },
@@ -35,11 +38,11 @@ export const menus: Study = {
       blocks: [
         {
           type: "p",
-          text: "Restaurant operators manage their ordering in GoTab’s dashboard. When I joined in 2018 it was small, and over the next two years I built many of its screens: products, categories, ordering areas, kitchen devices, refunds, sales and a log of who changed what.",
+          text: "Each venue had one catalog in GoTab’s dashboard. Operators could put schedules on categories and products, and show different things in different areas of a venue. That handles “closed after lunch.”",
         },
         {
           type: "p",
-          text: "Each venue had one catalog. Operators could put schedules on categories and products, and could show different things in different areas of a venue. That handles “closed after lunch.” It doesn’t handle a holiday menu guests can order from in October for pickup in late November, or a menu only one group of guests (a segment) can see. Our product lead asked for menus.",
+          text: "It doesn’t handle a holiday preorder: a menu guests can order from in October for pickup in late November, with its own items, its own dates and its own place on the ordering page, while regular service carries on beside it. With one catalog, the only way to offer that was to bend the everyday schedules around it or duplicate products, and then keep the copies’ prices and details in sync by hand. Menus that only one group of guests (a segment) should see had the same problem.",
         },
       ],
     },
@@ -49,7 +52,7 @@ export const menus: Study = {
       blocks: [
         {
           type: "p",
-          text: "I led development of Menus. I built the operator’s Menus page, the guest side, the schedule rules and the options around them (tag filters, guest segments, QR codes, and switching between menus), and I worked with teammates who wrote some of the database logic underneath. Earlier, I’d also done most of the work restructuring the dashboard’s code, which made room for features like this.",
+          text: "I led development of Menus. I built the operator’s Menus page, the guest side, the schedule rules and the options around them: tag filters, guest segments, QR codes, and switching between menus. Earlier, I’d built many of the dashboard screens Menus sits among.",
         },
       ],
     },
@@ -62,9 +65,9 @@ export const menus: Study = {
           items: [
             {
               title: "Build menus on top of the catalog, not as copies of it",
-              body: "The first sketch stored a list of categories on each menu. I changed it to links between menus and categories, and between menus and the areas they serve. Each link carries its own label, description and order, so a menu can present a category its own way.",
+              body: "Instead of copying products into each menu, a menu links to categories in the catalog and to the areas it serves. Each link carries its own label, description and order, so the holiday menu can present a category its own way without changing the everyday one.",
               alternative: "Copying categories and products into each menu.",
-              tradeoff: "Products stay in one place. A price change applies to every menu, and nothing drifts out of sync between copies.",
+              tradeoff: "Products stay in one place. A price change applies to every menu that includes the product, and nothing drifts out of sync between copies.",
             },
             {
               title: "Give each location one source of truth for availability",
@@ -73,7 +76,7 @@ export const menus: Study = {
             },
             {
               title: "Keep ordering fast as menus multiplied",
-              body: "The first version loaded every menu and its products on each page view. We moved menu switching into the browser, loading one full menu at a time, keeping a light list of the others, and remembering what’s already loaded. The back button still returns to the previous menu.",
+              body: "The first version loaded every menu and its products on each page view. We changed it to load one full menu at a time, keep a light list of the others, and remember what’s already loaded, so a guest can switch menus quickly and the back button still returns to the previous one.",
             },
           ],
         },
@@ -85,26 +88,16 @@ export const menus: Study = {
       ],
     },
     {
-      id: "dashboard",
-      heading: "Making room in the dashboard",
-      blocks: [
-        {
-          type: "p",
-          text: "Menus landed in a dashboard that had outgrown its structure. Every operator feature added its server code to one shared file that many engineers edited at once. In 2020 I did most of the work of splitting it by feature area, one area at a time, starting with the parts that changed least so open work wasn’t disrupted. We could keep shipping features during the move, and the structure was still the dashboard’s layout six years later.",
-        },
-      ],
-    },
-    {
       id: "result",
       heading: "What changed",
       blocks: [
         {
           type: "p",
-          text: "Operators could run lunch, holiday, event or members-only menus from one catalog, each with its own schedule, places and audience, without copying products. Menus was a deciding factor for some prospective clients at launch, and its core is still part of GoTab’s product, with later additions from teammates such as menus shared across locations.",
+          text: "Operators could run a holiday preorder next to everyday lunch, or an event or members-only menu, all from one catalog, each with its own schedule, places and audience, and without copying a single product. The core of Menus is still part of GoTab’s product.",
         },
         {
           type: "p",
-          text: "It wasn’t a clean finish. In the months after launch, about a third of the menu-related changes were fixes and adjustments. A later rework also broke the rule that hid segment-only menus, so they showed to everyone until a support report surfaced it and a teammate fixed it.",
+          text: "It wasn’t a clean finish. In the months after launch, about a third of the menu-related changes were fixes and adjustments.",
         },
       ],
     },
@@ -114,11 +107,7 @@ export const menus: Study = {
       blocks: [
         {
           type: "p",
-          text: "Name the old thing before introducing the new one. The dashboard’s catalog pages were already called “Menu Management,” so for months “menu” meant two things, and the new switch needed its own name. I’d rename the catalog first.",
-        },
-        {
-          type: "p",
-          text: "Write the access test before the refactor. One test on who can see a segment-only menu would have caught that regression before it shipped.",
+          text: "Name the old thing before introducing the new one. The dashboard’s catalog pages were already called “Menu Management,” so for months “menu” meant two different things: the catalog, and the new scheduled menus built on it. People talking about “the menu” often meant different things without noticing, and the new switch needed its own name. I’d rename the catalog first.",
         },
         {
           type: "p",

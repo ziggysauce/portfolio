@@ -3,9 +3,10 @@
 // from that entry.
 //
 // `status` decides where a study shows:
-//   "published"  listed on /work, has a page, linked from the museum
-//   "draft"      the same, but marked Draft and kept out of search engines. Not cleared for publication:
-//                its facts are waiting on Daniel's review (see docs/case-studies/).
+//   "published"  listed on /work, has a page, linked from the museum. Only Daniel sets this, after review.
+//   "draft"      review builds only (Vercel preview deployments and local development): listed, with a page
+//                and links, marked Draft and kept out of search engines. A production build leaves drafts
+//                out entirely (no page, no card, no link), because noindex alone doesn't hide a page.
 //   "planned"    recorded here only. No page, no card, no link.
 //
 // Each study's copy lives in its own file under src/content/studies/, so it can be edited without touching
@@ -106,8 +107,13 @@ export type Study = {
 // Index order: the four main studies, then the shorter supporting one.
 export const studies: Study[] = [kitchenDisplay, merchantOnboarding, menus, reviewLoop, dailyInsights];
 
-/** Studies with a page: published ones, and drafts in review. Planned ones never appear. */
-export const listedStudies = studies.filter((study) => study.status !== "planned");
+/** Whether this build is for review. Vercel sets VERCEL_ENV on every build ("production" or "preview");
+ *  anything else (a production build elsewhere, or a local `next build`) counts as production, so a draft
+ *  can't reach the public site by accident. For a local review build: VERCEL_ENV=preview npm run build. */
+export const reviewBuild = process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV === "development";
+
+/** Studies with a page: published ones, plus drafts on a review build. Planned ones never appear. */
+export const listedStudies = studies.filter((study) => study.status === "published" || (study.status === "draft" && reviewBuild));
 
 export function getStudy(slug: string) {
   return listedStudies.find((study) => study.slug === slug);
@@ -115,10 +121,11 @@ export function getStudy(slug: string) {
 
 export const studyHref = (study: Pick<Study, "slug">) => `/work/${study.slug}`;
 
-/** The museum's address for a case: /museum#case-003. The hall walks there on arrival. */
+/** The museum's address for a case, on the homepage, by its stable id: /#kds. The hall stands there on
+ *  arrival. (Old /#case-003 links still work; see src/components/museum/stops.ts.) */
 export function museumHref(exhibitId: string | undefined) {
   const exhibit = exhibits.find((item) => item.id === exhibitId);
-  return exhibit ? `/museum#case-${exhibit.number}` : "/museum";
+  return exhibit ? `/#${exhibit.id}` : "/";
 }
 
 export function exhibitFor(study: Study) {
