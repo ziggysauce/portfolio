@@ -6,3 +6,9 @@ next-env.d.ts
 .DS_Store
 .env*
 .vercel
+
+# Blender autosave backups
+*.blend1
+
+# Python bytecode from the Blender build scripts
+__pycache__/

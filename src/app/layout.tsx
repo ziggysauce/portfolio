@@ -1,17 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Onest } from "next/font/google";
-import { BottomNav } from "@/components/BottomNav";
-import { AddedToast, CartDrawer } from "@/components/CartDrawer";
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
 import { site } from "@/content/site";
 import "./globals.css";
 
-// One variable font for the whole site. Weight carries the hierarchy, from
-// 400 for reading to 800 for the hero.
+// The body face for the museum's labels and the reading pages (headings use Instrument Serif and IBM Plex
+// Mono, from src/lib/fonts.ts).
 const onest = Onest({ subsets: ["latin"], variable: "--font-onest" });
 
-const title = `${site.name}: ${site.tagline}`;
+const title = site.name;
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -28,7 +24,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
-export const viewport: Viewport = { themeColor: "#ffffff", viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#f6f0e2", viewportFit: "cover" }; // The reading pages' paper.
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -41,12 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="skip-link">
           Skip to content
         </a>
-        <Header />
-        <main id="main">{children}</main>
-        <Footer />
-        <AddedToast />
-        <BottomNav />
-        <CartDrawer />
+        {children}
       </body>
     </html>
   );
