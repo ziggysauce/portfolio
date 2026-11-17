@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/kitchen-display.ts`, at `/work/kitchen-display`.
-- **Museum:** case 003 links here; Return to museum goes to case 003.
+- **Museum:** The First KDS (`kds`) links here, and Return to the museum goes there.
 - **Daniel's role and period:** software developer, Dec 2018 – mid-2019. He built the first release and was on site at launch.
 
 **Sources**
@@ -16,7 +16,7 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 
 | Claim as published | Source | Support |
 |---|---|---|
-| Printed ticket per station printer; a ticket can't show wait, cross-station state, or be marked done | PDF p.13 | S |
+| Printed ticket per station printer; a ticket can't show wait or cross-station state. A hand mark stays on one station's copy | PDF p.13; Daniel's correction, 2026-11-16 | S. The earlier "can't be marked done" was wrong and is gone from the page. |
 | Had to run on tablets kitchens already owned | PDF p.13 | S |
 | Started Dec 2018 in a new app a teammate set up; built from a designer's mockups; teammate reviewed; merged about two months later | PDF p.12–13, p.16 (first commit 2018-12-07, merged 2019-02-06, 61 days) | S |
 | Fun and exciting; in a restaurant making changes in real time at launch; really cool to see it used | The brief | S (paraphrase) |
@@ -49,3 +49,10 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 
 1. Is the "What I learned" first paragraph true to your experience of being on site? It's the one line not in a source.
 2. Was the restaurant launch the February 2019 release, or a later one? The page doesn't date it.
+
+## Revision, 2026-11-16
+
+- **Centered on the launch:** the page now opens with the on-site launch, from Daniel's recollection. "I didn't have to wait for a report… I could see the kitchen using it and change it while they did" rewords that recollection (**I**).
+- **Corrected paper claim:** the hero caption and body no longer say a ticket "can't be marked done". A cook can mark a ticket by hand, but the mark stays on one station's copy. The advantage is shared, automatically updated order progress across stations. The KDS flow figure labels were updated to match.
+- **Trimmed:** the teammate who set up the app and reviewed the release, the "Team" fact, and the server-load half of the polling tradeoff.
+- **Open question 1** (the "fastest feedback" line) still stands.

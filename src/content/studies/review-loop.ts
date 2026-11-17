@@ -8,13 +8,13 @@ export const reviewLoop: Study = {
   title: "Building a better review loop",
   shortTitle: "Review loop",
   summary:
-    "As an engineering manager who still reviews and ships code, I turned the review and follow-through work I kept repeating into a set of AI-assisted procedures. The AI reads, drafts and checks; I decide what gets posted, merged or changed.",
+    "As a director of technical product management who still reviews and ships code, I turned the review work I kept repeating into a set of AI-assisted procedures. An independent reviewer caught issues my own checks missed, and a retro process I created, and am still refining, turns each miss into a change that helps prevent bugs and regressions in later work. The AI reads, drafts and checks; I decide what gets posted, merged or changed.",
   status: "draft",
-  role: "Designer, builder and main user",
+  role: "Director of Technical Product Management; designer and main user of the workflow",
   timeframe: "2026",
   tags: ["AI-assisted engineering", "Code review", "Process"],
   exhibit: "plans",
-  featuredOn: ["marker", "plans"],
+  featuredOn: ["plans"], // July to November 2026: the director years, not the engineering-manager ones.
   length: "full",
   hero: {
     figure: "loop-hero",
@@ -24,10 +24,10 @@ export const reviewLoop: Study = {
   facts: [
     {
       label: "My role",
-      value: "I designed and built it, and I’m its main user. I wrote the procedures, scripts and standing rules, and I make the calls that matter: what gets posted, marked ready or merged.",
+      value: "Director of Technical Product Management at GoTab, still reviewing and shipping code. I designed and built the workflow and I’m its main user. The calls that matter stay with me: what gets posted, marked ready or merged.",
     },
-    { label: "When", value: "July to November 2026, still changing" },
-    { label: "Built with", value: "Claude Code, as a personal setup rather than a team tool" },
+    { label: "When", value: "2026, still changing" },
+    { label: "Status", value: "In daily use, as a personal setup rather than a team tool" },
   ],
   sections: [
     {
@@ -36,15 +36,15 @@ export const reviewLoop: Study = {
       blocks: [
         {
           type: "p",
-          text: "Review was our team’s bottleneck: I flag any pull request open longer than three days. I’d been using Claude Code for reviews since July, but every session started from nothing, so I was doing the same setup by hand each time.",
+          text: "Review was our team’s bottleneck. I’d been using an AI coding assistant for reviews, but every session started from nothing, so I was doing the same setup by hand each time.",
         },
         {
           type: "p",
-          text: "Before building anything, I went through a month of my own prompts, about 560 of them. The repeats were specific. I was pasting another AI tool’s reviews into Claude by hand, retyping the same review checklist (does it do what was asked, does it break anything, is it ready to merge), and asking the same follow-ups: “is this mergeable?” about 30 times in two weeks, and “commit and push” about 60 times in four.",
+          text: "Before building anything, I went back through my own requests to see what actually repeated. The same review checklist came up again and again (does it do what was asked, does it break anything, is it ready to merge), along with the same follow-ups after every review. I was also copying another tool’s reviews across by hand.",
         },
         {
           type: "p",
-          text: "I treated it like a product. The product was our development workflow, the users were me and the developers whose work I review, and the measures were review rounds and time to merge, with problems that reach production as the counterweight.",
+          text: "I treated it like a product. The users were me and the developers whose work I review, and the measures were review rounds and time to merge, with problems that reach production as the counterweight.",
         },
       ],
     },
@@ -54,7 +54,7 @@ export const reviewLoop: Study = {
       blocks: [
         {
           type: "p",
-          text: "I built only what those counts showed repeating, as short procedures with a fixed output. A typical change goes through the same steps, and each step has a line between what the AI prepares and what I decide.",
+          text: "I built only what repeated, as short procedures with a fixed output. A typical change goes through the same steps, and each step has a line between what the AI prepares and what I decide.",
         },
         {
           type: "list",
@@ -62,10 +62,10 @@ export const reviewLoop: Study = {
           leads: true,
           items: [
             "Restate the ask. The AI turns a ticket into one sentence, plus what it won’t build. I confirm the scope before any code exists.",
-            "Build in isolation. Each change gets its own copy of the code on its own branch, and live tests run against a disposable copy of the database.",
+            "Build in isolation. Each change gets its own copy of the code, and live tests run against a disposable copy of the database.",
             "Review in a fixed shape. Every review ends the same way: a one-line verdict, numbered findings with severity and location, and the exact comment ready to post. I read it and decide what to post.",
             "Apply feedback once. Each review comment is marked fix, already fixed, or disagree, and the same defect is looked for in similar code before anything is pushed.",
-            "Learn from what slips through. A week after changes reach production, a script looks for any that needed a later fix, which I call an escape. The AI proposes one rule change per miss, and nothing changes until I approve it.",
+            "Run a retro on what slips through. A week after changes reach production, the retro looks for any that needed a later fix. The AI proposes one rule change per miss, and nothing changes until I approve it, so each miss makes bugs and regressions less likely in the next round of work.",
           ],
         },
         {
@@ -76,37 +76,37 @@ export const reviewLoop: Study = {
         },
         {
           type: "p",
-          text: "Some things never happen without me. The AI never posts to GitHub or Slack, marks a pull request ready, or merges anything unless I say so. Every comment the AI drafts is labeled as coming from Claude. Pushing a draft pull request is the one step I automated outright, with a list of exceptions that always stop for me: database migrations, shared-database changes and infrastructure config.",
+          text: "Some things never happen without me. The AI never posts comments, marks a pull request ready, or merges anything unless I say so.",
         },
       ],
     },
     {
       id: "mistakes",
-      heading: "How mistakes improved it",
+      heading: "What the independent reviewer caught",
       blocks: [
         {
           type: "p",
-          text: "The loop changed most when it missed something. Each miss became a specific rule.",
+          text: "The loop changed most when it missed something, and the clearest lesson came from a second reviewer.",
         },
         {
           type: "decisions",
           items: [
             {
               title: "A fresh reviewer on every one of my own changes",
-              body: "On one change, a review by the same AI at its highest effort setting called it ready to merge. A second reviewer with no context, given only the diff and the ask, found three real defects: a retry that sent default values, a race in a duplicate check, and numbers in the description that the data contradicted.",
-              tradeoffLabel: "What changed",
-              tradeoff: "Self-review is anchored by what it already believes. Now a context-free reviewer runs on every change I make, and riskier changes also get a checklist pass.",
+              body: "On one change, a thorough self-review by the same AI called it ready to merge. A second reviewer with no context, given only the diff and the original ask, found three real defects: a retry that sent default values, a race in a duplicate check, and numbers in the description that the data contradicted.",
+              tradeoffLabel: "What I changed",
+              tradeoff: "A review that already knows the reasoning behind a change tends to agree with it. Now an independent reviewer runs on every change I make, and I verify what it finds before acting on it.",
             },
             {
               title: "Measure before calling something slow",
               body: "I once flagged a report query as slow based on the database’s cost estimate. Timed on a copy of the data, the original took about 3 seconds once warm, and the rewrites I’d suggested took 40 to 60.",
-              tradeoffLabel: "What changed",
+              tradeoffLabel: "What I changed",
               tradeoff: "A speed finding now needs real timings, old against new, before it goes in a review.",
             },
             {
               title: "A ceiling on autonomy",
-              body: "I tried a scheduled job that swept my open pull requests on its own. After one run it had left unfinished merges in several working copies, more work than I wanted, so I turned it off.",
-              tradeoffLabel: "What changed",
+              body: "I tried a scheduled job that worked through my open pull requests on its own. After one run it had left unfinished work in several places, more cleanup than it saved, so I turned it off.",
+              tradeoffLabel: "What I changed",
               tradeoff: "It now prepares fixes and waits for my approval. Steps that change shared state stay manual.",
             },
           ],
@@ -119,11 +119,11 @@ export const reviewLoop: Study = {
       blocks: [
         {
           type: "p",
-          text: "The procedures are in daily use. In its first screenings, the escape check found three changes that needed a later fix in production. Each fix landed within about a day, and each miss became a rule. I don’t have an earlier baseline to compare against.",
+          text: "The workflow is in daily use. In its first screenings, the retro found three changes that needed a later fix in production; each was fixed within about a day, and each became a rule. I created the retro process and I’m still refining it, adjusting what it looks for as each round shows what slipped through.",
         },
         {
           type: "p",
-          text: "My own changes merged faster after the switch, and I shipped more of them. My role and the kind of work changed over the same months, so I don’t read that as proof the workflow improved anything. I can’t show that review rounds fell for other developers either: after September, too few of their changes reached me to compare.",
+          text: "I haven’t isolated its effect on delivery speed. My role and the kind of work I did changed over the same months, and too few other developers’ changes reached me to compare review rounds, so I don’t claim it made anyone faster.",
         },
       ],
     },
@@ -133,11 +133,11 @@ export const reviewLoop: Study = {
       blocks: [
         {
           type: "p",
-          text: "Count first, then recount. Every rule started from a count of what I kept repeating, but for most of them I only have the before number. I should have rerun the same count a few weeks after each change.",
+          text: "Don’t let the reviewer share the author’s assumptions. The most useful check was the one that knew the least about why the change was written.",
         },
         {
           type: "p",
-          text: "I built it for myself first. Next time I’d pilot the pre-review check with two developers and measure their review rounds from day one.",
+          text: "Count first, then recount. Every rule started from what I kept repeating, but I only have the before picture for most of them. Next time I’d repeat the same count a few weeks after each change, and pilot the pre-review check with two developers from day one.",
         },
       ],
     },
