@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/daily-insights.ts`, at `/work/daily-insights`.
-- **Museum:** no label links here. Return to museum goes to case 003, the same era.
+- **Museum:** no label links here. Return to the museum goes to The First KDS (`kds`), the same era.
 - **Daniel's role and period:** new software developer, June – October 2018. He owned the SQL, the template and the send logic; two teammates reviewed.
 
 **Sources:** `DTN case studies.pdf`, chapter on pp. 41–46.
@@ -40,3 +40,8 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 ## Open questions
 
 None that affect the copy.
+
+## Revision, 2026-11-16
+
+- **Shortened** to two sections: why the existing email, and what lasted. The inbox-constraints list, the weekly version and the three-weeks-to-merge detail were dropped.
+- **Stated a reason** at Daniel's request: "Rather than start a new report they'd have to remember to open, I added to the email they already received." The PDF flags the reasons as reconstructed, so this is **C**: Daniel to confirm it's why.
