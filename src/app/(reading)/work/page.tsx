@@ -29,8 +29,9 @@ export default function WorkIndex() {
         <p className={styles.eyebrow}>Case studies</p>
         <h1 className={styles.pageTitle}>Selected work</h1>
         <p className={styles.lede}>
-          The museum introduces my career. These pages tell the stories behind it: the problem we were solving, my part in it, what we built,
-          and what I learned.
+          Most of my work is software for restaurants and bars: the screen a kitchen cooks from, the tools operators use to manage their menus,
+          and the steps a new venue goes through before it can take payments. Here are a few of those projects, with the product decisions
+          behind them and what it took to build them.
         </p>
       </header>
 
@@ -82,7 +83,7 @@ export default function WorkIndex() {
                 {exhibit ? (
                   <p className={styles.cardExhibit}>
                     <Link href={museumHref(study.exhibit)} prefetch={false}>
-                      See case {exhibit.number}, {exhibit.title}, in the museum
+                      See {exhibit.title} in the museum
                     </Link>
                   </p>
                 ) : null}

@@ -121,10 +121,11 @@ export function getStudy(slug: string) {
 
 export const studyHref = (study: Pick<Study, "slug">) => `/work/${study.slug}`;
 
-/** The museum's address for a case, on the homepage: /#case-003. The hall stands there on arrival. */
+/** The museum's address for a case, on the homepage, by its stable id: /#kds. The hall stands there on
+ *  arrival. (Old /#case-003 links still work; see src/components/museum/stops.ts.) */
 export function museumHref(exhibitId: string | undefined) {
   const exhibit = exhibits.find((item) => item.id === exhibitId);
-  return exhibit ? `/#case-${exhibit.number}` : "/";
+  return exhibit ? `/#${exhibit.id}` : "/";
 }
 
 export function exhibitFor(study: Study) {

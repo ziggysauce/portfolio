@@ -14,7 +14,7 @@ export const reviewLoop: Study = {
   timeframe: "2026",
   tags: ["AI-assisted engineering", "Code review", "Process"],
   exhibit: "plans",
-  featuredOn: ["marker", "plans"],
+  featuredOn: ["plans"], // July to November 2026: the director years, not the engineering-manager ones.
   length: "full",
   hero: {
     figure: "loop-hero",

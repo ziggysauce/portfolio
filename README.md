@@ -11,13 +11,14 @@ npm run build      # static site in out/
 npm run start      # serve out/ locally
 npm run lint
 npm run typecheck
+npm test           # the hall's stop addresses and walking labels (stops.test.ts); needs Node 22.6+
 ```
 
 ## Routes
 
 | Route | What |
 |---|---|
-| `/` | The museum. `/#case-003` and `/#desk` stand at that stop and focus its label. |
+| `/` | The museum, opening at the current role. `/#kds`, `/#after-hours` and `/#desk` stand at that stop and focus its label; old `/#case-003` links still land on the same exhibit. |
 | `/work`, `/work/<slug>` | Selected work and each case study |
 | `/about`, `/contact` | About and Contact |
 | `/Daniel_Nguyen_Resume.pdf` | The résumé |
@@ -93,7 +94,7 @@ Case studies behind the museum: the museum introduces the career, and these page
 - `"planned"` ones get no page, card or link.
 
 **Museum links.**
-- `exhibit` is where a study's "Return to museum" goes, e.g. `/#case-003`.
+- `exhibit` is where a study's "Return to the museum" goes, by exhibit id, e.g. `/#kds`.
 - `featuredOn` lists the cases whose labels link to the study. It defaults to `exhibit`; `[]` means none.
 - A label with one study shows "Read the case study". A label with several shows a short "Case studies" list of their `shortTitle`s.
 

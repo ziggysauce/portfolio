@@ -2,7 +2,7 @@
 
 - **Status:** draft, not fact-approved.
 - **Page:** `src/content/studies/kitchen-display.ts`, at `/work/kitchen-display`.
-- **Museum:** case 003 links here; Return to museum goes to case 003.
+- **Museum:** The First KDS (`kds`) links here, and Return to the museum goes there.
 - **Daniel's role and period:** software developer, Dec 2018 – mid-2019. He built the first release and was on site at launch.
 
 **Sources**

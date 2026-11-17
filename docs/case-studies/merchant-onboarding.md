@@ -2,7 +2,7 @@
 
 - **Status:** draft, revised 2026-11-16 with Daniel's correction on sandbox locations. Not yet approved for publication.
 - **Page:** `src/content/studies/merchant-onboarding.ts`, at `/work/merchant-onboarding`.
-- **Museum:** case 005 links here; Return to museum goes to case 005.
+- **Museum:** The Nearly Dry Marker (`marker`) and Plans & Pull Requests (`plans`) link here, since the work spans both roles; Return to the museum goes to `plans`.
 - **Daniel's role and period, 2019–2026:**
   - Engineer, 2019–20: wrote the Paysafe merchant forms.
   - EM, 2021–22: scoped and sliced the rebuild, built the shell, reviewed the pages.
@@ -32,7 +32,7 @@ Key: **S** = stated in a source. **I** = inferred or reworded. **C** = Daniel to
 | Decision: creating a location is separate from taking live payments; sandbox with test payments only; approval unlocks live payments; one-step go-live | PDF p.6, 9; Daniel's correction | S. Phone verification, screening holds and staff-approval mechanics are no longer stated on the page. |
 | Decision: assistant drafts, operator confirms with preview, main app re-validates and imports with nothing turned on; the stray-menu incident led to the "adds nothing unasked" rule; "a wrong price…" line | PDF p.7 | S. The page describes how it works and its testing history only. It makes **no availability claim** for AI menu drafting (see open questions). |
 | Signup runs as its own service; the main app re-validates and owns records; it's *designed* so it can't flood the main app and keeps taking signups when the main app is down | PDF p.6–7 (design reasons, not tested outcomes) | S. The Cloudflare Worker is not named. |
-| ~~Assisted-flow venue, activation and retention figures~~ | Removed 2026-11-16 | Unconfirmed; omitted at Daniel's request. |
+| ~~Assisted-flow venue, activation and retention figures~~ | Removed 2026-11-16 | Unconfirmed; omitted at Daniel's request. Checked again 2026-11-16: the only sources are the résumé (`build_resume.py`, from a ChatGPT-drafted résumé), which is repeated copy, not verification. The résumé already ties the figures to the **assisted** flow and lists self-serve separately, so it doesn't credit them to self-serve. The production database has no table that maps directly to "application" or "activation", so any figure pulled from it would rest on a definition we chose. Left unchanged on both sides. |
 | ~~Self-serve is internal-only / not available to merchants yet~~ | Removed 2026-11-16 | Wrong: Daniel's correction says anyone can create a location, limited to sandbox mode. Removed from the summary, status, timeline, diagram, captions and this record. |
 | Lessons: slice by goal; test launch against outside systems (the screening provider couldn't be reached from the new service) | PDF p.9–10 | S |
 

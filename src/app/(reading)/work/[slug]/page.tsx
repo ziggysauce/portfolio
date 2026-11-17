@@ -57,14 +57,14 @@ export default async function StudyPage({ params }: Props) {
             {exhibit ? (
               <li>
                 <Link href={back} prefetch={false}>
-                  Return to museum, case {exhibit.number}
+                  Return to the museum: {exhibit.title}
                 </Link>
               </li>
             ) : null}
           </ol>
         </nav>
         <p className={styles.eyebrow}>
-          Case study{exhibit ? ` · from case ${exhibit.number}, ${exhibit.title}` : ""}
+          Case study{exhibit ? ` · from ${[exhibit.title, exhibit.lines[0]].filter(Boolean).join(", ")}` : ""}
           {study.status === "draft" ? <span className={styles.draft}>Draft</span> : null}
         </p>
         <h1 className={styles.studyTitle}>{study.title}</h1>
@@ -108,7 +108,7 @@ export default async function StudyPage({ params }: Props) {
       <footer className={styles.studyFoot}>
         {exhibit ? (
           <Link href={back} prefetch={false} className={styles.returnLink}>
-            <span aria-hidden="true">←</span> Return to museum, case {exhibit.number}: {exhibit.title}
+            <span aria-hidden="true">←</span> Return to the museum: {exhibit.title}
           </Link>
         ) : null}
         <Link href="/work">All selected work</Link>
