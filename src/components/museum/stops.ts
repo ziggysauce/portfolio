@@ -23,7 +23,8 @@ export function hashForStop(i: number, exhibits: Pick<StopExhibit, "id">[]) {
 }
 
 /**
- * What the walking control that goes from stop `from` to stop `to` says. Within the career (newest first,
+ * Where the walking control that goes from stop `from` to stop `to` leads, for its accessible name (its
+ * visible text is always "Prev" or "Next"). Within the career (newest first,
  * so walking on goes back in time) it names the direction: "Earlier role" and "Later role", or just
  * "Earlier" and "Later" when the step lands on a degree. Steps out of the career, to the personal room or
  * the desk, name where they go. `label` is the visible text, `short` its narrow-screen form, and `name` the
@@ -45,12 +46,31 @@ export function stepLabel(from: number, to: number, exhibits: StopExhibit[]): { 
   return { label: "Back to the career", short: "Career", name: `Back to the career: ${title}` };
 }
 
-/** What the counter says at stop i: the place in the career, or the room's name. */
-export function positionLabel(i: number, exhibits: StopExhibit[]) {
-  if (i >= exhibits.length) return "Information desk";
+/** A stop's short code, the same in the field guide, its floor plan and the pager: the career and
+ *  education numbered in walking order ("001"), the personal room "AH", the desk "i". */
+export function stopCode(i: number, exhibits: StopExhibit[]) {
+  if (i >= exhibits.length) return "i";
   const exhibit = exhibits[i];
-  if (exhibit.kind === "personal") return "Off the clock";
-  const career = exhibits.filter((item) => item.kind !== "personal");
-  const at = career.indexOf(exhibit);
-  return at === 0 ? `Current role · 1 of ${career.length}` : `Career · ${at + 1} of ${career.length}`;
+  if (exhibit.kind === "personal") return "AH";
+  const numbered = exhibits.filter((item) => item.kind !== "personal");
+  return String(numbered.indexOf(exhibit) + 1).padStart(3, "0");
+}
+
+/** The placard's kicker, one format at every stop: "001 · Current role", "002 · Career",
+ *  "004 · Education", "AH · Off the clock", "i · Before you go". */
+export function kicker(i: number, exhibits: StopExhibit[]) {
+  const code = stopCode(i, exhibits);
+  if (i >= exhibits.length) return `${code} · Before you go`;
+  const exhibit = exhibits[i];
+  if (exhibit.kind === "personal") return `${code} · Off the clock`;
+  if (exhibit.kind === "education") return `${code} · Education`;
+  return `${code} · ${exhibits.findIndex((item) => item.kind === "role") === i ? "Current role" : "Career"}`;
+}
+
+/** The pager's middle: "001 / 005" in the numbered rooms, then "AH" and "DESK". */
+export function pagerLabel(i: number, exhibits: StopExhibit[]) {
+  if (i >= exhibits.length) return "DESK";
+  const code = stopCode(i, exhibits);
+  if (code === "AH") return code;
+  return `${code} / ${String(exhibits.filter((item) => item.kind !== "personal").length).padStart(3, "0")}`;
 }

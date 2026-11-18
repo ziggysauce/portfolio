@@ -9,8 +9,9 @@ export const site = {
   github: "https://github.com/ziggysauce",
   resume: "/Daniel_Nguyen_Resume.pdf",
   url: "https://www.danieltnguyen.com",
-  /** Under the hall's title on the homepage: who this is, in one line. */
-  identity: "Daniel Nguyen · Technical product leader and hands-on engineer at GoTab",
+  /** Under the hall's title on the homepage (the field guide's lockup): what Daniel does, in one line. The
+   *  hall's own name, just above it, already says who. */
+  identity: "Technical product leader and hands-on engineer at GoTab",
   ogImage: {
     url: "/og.png",
     width: 1200,

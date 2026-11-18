@@ -12,3 +12,6 @@ next-env.d.ts
 
 # Python bytecode from the Blender build scripts
 __pycache__/
+
+# Screenshots from npm run test:layout
+test-results/
