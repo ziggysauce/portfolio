@@ -261,6 +261,25 @@ for (const [size, options, rail] of runs) {
       const g = await scan(page, placard(n));
       const pager = g.bottom.length ? Math.min(...g.bottom.map((c) => c.y)) : -Infinity;
       if (!back || back.y < 0 || back.y + back.height > pager + 1) problems.push("Back to exhibit is out of reach");
+      // The placard's three parts: content above the footer (never under it), solid paper, and a filled
+      // primary action wherever the drawer has one to take.
+      const parts = await page.evaluate((sel) => {
+        const card = document.querySelector(sel);
+        const view = card.querySelector('[id$="-drawer"]');
+        const foot = card.querySelector("[class*=drawerFooter]");
+        const action = view.querySelector("[class*=drawerAction]:not([data-tone])");
+        return {
+          overlap: foot ? view.getBoundingClientRect().bottom - foot.getBoundingClientRect().top : null,
+          inside: foot ? foot.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 0.5 : false,
+          opacity: getComputedStyle(card).opacity,
+          action: action && action.getAttribute("aria-disabled") !== "true" ? getComputedStyle(action).backgroundColor : "none",
+        };
+      }, placard(n));
+      if (parts.overlap === null) problems.push("no footer");
+      else if (parts.overlap > 0.5) problems.push(`content runs ${Math.round(parts.overlap)}px under the footer`);
+      if (!parts.inside) problems.push("footer outside the card");
+      if (parts.opacity !== "1") problems.push(`placard ${parts.opacity} opaque`);
+      if (parts.action !== "none" && parts.action !== "rgb(31, 58, 51)") problems.push(`primary action not filled (${parts.action})`);
       report(`${name}: ${title}, drawer controls`, problems);
       await shot(page, `${name}-${n}-drawer`);
       await playDrawer(page, n, drawerChecks);
@@ -303,6 +322,12 @@ if (!only) {
       await page.waitForTimeout(1400);
       report(`${name}: scrolling ${label}`, inPlace(await scan(page)), await counter(page));
     };
+    // Resting a little off a stop (the hall leaves you there on purpose): the placard is still solid paper.
+    await page.evaluate(() => scrollBy(0, innerHeight * 0.08));
+    await page.waitForTimeout(1500);
+    const solid = await page.evaluate(() => getComputedStyle(document.querySelector("ol[aria-label] > li:nth-child(1) article")).opacity);
+    report(`${name}: placard solid just off a stop`, solid === "1" ? [] : [`opacity ${solid}`]);
+    await toStart(page);
     await walk("down (vertical wheel)", 0, 120, 40);
     await walk("up (vertical wheel)", 0, -120, 40);
     await walk("on (horizontal trackpad)", 90, 0, 60);

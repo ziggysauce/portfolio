@@ -60,7 +60,7 @@ export function DrawerContents({ drawer, step, onAct, busy = false, id }: Props)
       return (
         <>
           {interactive ? (
-            <button type="button" className={styles.drawerAction} aria-disabled={spent || busy} onClick={spent ? undefined : act}>
+            <button type="button" className={styles.drawerAction} aria-disabled={spent || busy} data-busy={(busy && !spent) || undefined} onClick={spent ? undefined : act}>
               {spent ? "No more tickets" : "Ring the bell"}
             </button>
           ) : null}
@@ -92,7 +92,7 @@ export function DrawerContents({ drawer, step, onAct, busy = false, id }: Props)
         <>
           <p className={styles.drawerHeading}>{drawer.cover}</p>
           {interactive ? (
-            <button type="button" className={styles.drawerAction} aria-expanded={open} aria-controls={`${id}-inside`} onClick={act}>
+            <button type="button" className={styles.drawerAction} aria-expanded={open} aria-controls={`${id}-inside`} data-tone={open ? "secondary" : undefined} onClick={act}>
               {open ? "Close the card" : "Read the card"}
             </button>
           ) : null}
@@ -127,7 +127,7 @@ export function DrawerContents({ drawer, step, onAct, busy = false, id }: Props)
             )}
           </ol>
           {interactive ? (
-            <button type="button" className={styles.drawerAction} aria-disabled={finished || busy} onClick={finished ? undefined : act}>
+            <button type="button" className={styles.drawerAction} aria-disabled={finished || busy} data-busy={(busy && !finished) || undefined} onClick={finished ? undefined : act}>
               {finished ? "Stamp retired" : "Stamp done"}
             </button>
           ) : null}
@@ -171,7 +171,7 @@ function ReadingList({ drawer, step, onAct, busy }: { drawer: Extract<Discovery,
           ))}
         </p>
       )}
-      <button type="button" className={styles.drawerAction} aria-disabled={busy} onClick={act}>
+      <button type="button" className={styles.drawerAction} aria-disabled={busy} data-busy={busy || undefined} data-tone={spilled ? "secondary" : undefined} onClick={act}>
         {spilled ? drawer.makeRoom : drawer.more}
       </button>
       <p className="sr-only" aria-live="polite">

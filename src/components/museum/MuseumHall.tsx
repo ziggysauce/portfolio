@@ -36,7 +36,7 @@ type Props = {
 const RAIL_OPEN = 340;
 const RAIL_FOLDED = 72;
 /** On a phone, the least height an open drawer's sheet gets before the picture slides up to make room. */
-const PHONE_SHEET_MIN = 260;
+const PHONE_SHEET_MIN = 340;
 const RAIL_KEY = "museum-guide"; // Also read by the inline script in app/page.tsx.
 
 // The guide's state lives on <html data-rail>, set before first paint (app/page.tsx): the remembered choice,
@@ -309,14 +309,18 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           })
         : [];
       // scrollHeight, not the rendered height: a label capped to fit a short screen still knows its full height.
-      for (const node of labels.current) if (node) {
-          heights.set(node, node.scrollHeight);
+      for (const [i, node] of labels.current.entries()) if (node) {
+          // An open drawer's content scrolls inside the placard (header and footer stay put), so its full
+          // height is the placard's plus whatever of the content is scrolled out of view.
+          const view = notes.current[i];
+          const hidden = view && !view.hidden ? view.scrollHeight - view.clientHeight : 0;
+          heights.set(node, node.scrollHeight + hidden);
           widths.set(node, node.offsetWidth);
         }
     };
     const sizes = new ResizeObserver(measure);
     const watchSizes = () => {
-      for (const node of labels.current) if (node) sizes.observe(node);
+      for (const node of [...labels.current, ...notes.current]) if (node) sizes.observe(node);
       window.addEventListener("resize", measure);
       measure();
     };
@@ -413,7 +417,9 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         }
         label.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
         if (open && room) makeRoom(room, w, portrait);
-        const opacity = anchor.visible ? Math.max(0, 1 - distance * 1.8) : 0;
+        // Solid near its stop (the hall leaves you a little off a case on purpose, see NEAR), then fading as
+        // you walk away; transparent paper let the window and the plant show through the text.
+        const opacity = anchor.visible ? Math.min(1, Math.max(0, 1 - (distance - 0.15) * 2.4)) : 0;
         // The specimen's own caption, pinned to it: shown while its case is the one you're at.
         const caption = captions.current[i];
         if (caption) {
@@ -776,10 +782,11 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     const node = stage.current;
     if (!node || status !== "ready") return;
     const canScroll = (panel: Element, dy: number) => (dy > 0 ? panel.scrollTop + panel.clientHeight < panel.scrollHeight - 1 : dy < 0 ? panel.scrollTop > 0 : false);
+    // Over an open drawer's placard, the part that scrolls is its content region.
     const openPlacard = (target: EventTarget | null) => {
       const open = openRef.current;
       const label = open === null ? null : labels.current[open];
-      return label && target instanceof Node && label.contains(target) ? label : null;
+      return label && target instanceof Node && label.contains(target) ? (notes.current[open!] ?? label) : null;
     };
     function onWheel(event: WheelEvent) {
       if (event.ctrlKey) return;
@@ -923,6 +930,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                     tabIndex={0}
                     aria-labelledby={`${exhibit.id}-title`}
                     className={`${styles.label} ${exhibit.status === "in-preparation" ? styles.pending : ""}`}
+                    data-drawer={openNote === i ? "open" : undefined}
                     onFocus={() => {
                       scene.current?.setHighlight(i);
                       // Always walk, even if this case is the one on screen: mid-walk, "on screen" still
@@ -1001,8 +1009,13 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                         <p className={styles.noteKicker}>From the drawer</p>
                         <DrawerContents drawer={exhibit.drawer} step={steps[i]} busy={busy === i} onAct={() => act(i)} id={exhibit.id} />
                         <DrawerExtra note={exhibit.drawerNote} work={exhibit.kind === "role" ? links.work : null} />
-                        {/* The one way back: shuts the drawer and brings the placard back as it was. */}
-                        <button type="button" className={`${styles.pill} ${styles.backButton}`} onClick={() => closeNote(i)}>
+                      </div>
+                    ) : null}
+                    {exhibit.drawer && !fallback && openNote === i ? (
+                      // The one way back, in its own footer outside the drawer's content (which is where focus
+                      // lands, ring and all): shuts the drawer and brings the placard back as it was.
+                      <div className={styles.drawerFooter}>
+                        <button type="button" className={styles.backButton} onClick={() => closeNote(i)}>
                           <span aria-hidden="true">←</span> Back to exhibit<span className="sr-only">: {exhibit.title}</span>
                         </button>
                       </div>
