@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Discovery } from "@/content/exhibits";
-import { createDiscovery, type DrawerDiscovery } from "./discoveries";
+import { createDiscovery, STEP_MS, type DrawerDiscovery } from "./discoveries";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -143,6 +143,10 @@ export type LabelAnchor = {
   drawer: { x: number; y: number };
   /** Where the specimen's own caption (an HTML plaque or tag) is pinned, if it has one. */
   caption: { x: number; y: number; visible: boolean } | null;
+  /** The screen area the drawer's discovery needs, over its whole sequence (the tooth on its cushion, the
+   *  chart, the bell and its chits, the card opening, the stamp and tray, the books toppling), with the
+   *  drawer pulled open. Overlays keep out of it. Null for a case without one. */
+  discovery: { left: number; top: number; right: number; bottom: number } | null;
 };
 
 /** Where the fatherhood plinth's card goes, in CSS pixels, and how much of it shows (0 when out of view). */
@@ -166,13 +170,44 @@ export type MuseumScene = {
   setDiscoveryStep(index: number, step: number): void;
   /** Which open drawer's interactive prop (the bell, the stamp) is under this point, if any. */
   pickProp(clientX: number, clientY: number): number | null;
-  /** How much of the canvas's left edge is covered (by the field guide), in CSS pixels. The picture
-   *  slides right by that much, as if the canvas started there, so the case stays centred in the part you
-   *  can see; it eases there over 0.4 s unless `snap` (or reduced motion). Labels and picking follow. */
-  setInset(pixels: number, snap?: boolean): void;
+  /** Slides the picture across the canvas, in CSS pixels: right by `x` (the field guide's width, less any
+   *  room an open drawer's placard needs) and up by `y` (room under the discovery on a phone). A pure
+   *  slide, no zoom. It eases there over 0.4 s unless `snap` (or reduced motion); labels and picking follow. */
+  setOffset(x: number, y: number, snap?: boolean): void;
+  /** The slide applied right now (mid-ease, between setOffset's start and goal). */
+  offset(): { x: number; y: number };
   resize(): void;
   dispose(): void;
 };
+
+/** The last step of a discovery (0 for one that only reveals itself). Mirrors stepsFor in DrawerContents. */
+function lastStep(spec: NonNullable<SceneExhibit["discovery"]>) {
+  if (spec.kind === "bell") return spec.tickets.length;
+  if (spec.kind === "stamp") return spec.cards.length - 1;
+  if (spec.kind === "card") return 1;
+  if (spec.kind === "books") return STEP_MS.books.length - 1;
+  return 0;
+}
+
+/**
+ * The space a drawer's discovery takes over its whole sequence: every step posed at its end (reduced
+ * motion jumps straight there), the bounds of the drawer and its contents taken at each, then everything
+ * put back and hidden as if the drawer had never opened. Measured once, when the hall is built.
+ */
+function envelopeOf(drawer: THREE.Object3D, discovery: DrawerDiscovery, spec: NonNullable<SceneExhibit["discovery"]>) {
+  const box = new THREE.Box3();
+  const last = lastStep(spec);
+  for (let step = 0; step <= last; step++) {
+    discovery.setStep(step);
+    discovery.update(5, 1, true, true);
+    drawer.updateMatrixWorld(true);
+    box.union(new THREE.Box3().setFromObject(drawer, true)); // Precise: the chits' vertices move, their cached bounds don't.
+  }
+  discovery.setStep(0);
+  discovery.update(5, 0, false, true);
+  drawer.updateMatrixWorld(true);
+  return box;
+}
 
 type Options = {
   canvas: HTMLCanvasElement;
@@ -657,7 +692,15 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const dust: { points: THREE.Points; seeds: Float32Array; origin: THREE.Vector3 }[] = [];
   const specimens: (THREE.Object3D | null)[] = [];
   const captions: (THREE.Vector3 | null)[] = [];
-  type Drawer = { node: THREE.Object3D | null; baseZ: number; discovery: DrawerDiscovery | null };
+  /** envelopes: the drawer and everything its discovery ever shows, in world space with the drawer shut,
+   *  measured on first use, for wide and portrait screens (the bell's chits spill tighter on a phone). */
+  type Drawer = {
+    node: THREE.Object3D | null;
+    baseZ: number;
+    discovery: DrawerDiscovery | null;
+    spec: SceneExhibit["discovery"] | null;
+    envelopes: { wide?: THREE.Box3; portrait?: THREE.Box3 };
+  };
   const drawers: Drawer[] = [];
 
   exhibits.forEach((exhibit, i) => {
@@ -689,7 +732,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       scene.add(seat);
       specimens.push(null);
       captions.push(null);
-      drawers.push({ node: null, baseZ: 0, discovery: null });
+      drawers.push({ node: null, baseZ: 0, discovery: null, spec: null, envelopes: {} });
       return;
     }
     const staging = stagingFor(exhibit);
@@ -714,7 +757,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     const riser = part(display, "Riser");
     if (riser) riser.visible = staging.riser;
     const drawer = part(display, "Drawer") ?? null;
-    const drawerEntry: Drawer = { node: drawer, baseZ: drawer?.position.z ?? 0, discovery: null };
+    const drawerEntry: Drawer = { node: drawer, baseZ: drawer?.position.z ?? 0, discovery: null, spec: exhibit.discovery ?? null, envelopes: {} };
     drawers.push(drawerEntry);
     // The curator's things (a mug, field notebooks) live beside the Origin Specimen only.
     if (exhibit.specimen === "Skull" && propsTemplate) {
@@ -773,7 +816,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         drawer,
         anchor: new THREE.Vector3(centre, DRAWER.y0 + 0.016, DRAWER.front - 0.088),
         specimen,
-        compact: () => width / height < 0.8,
+        compact: () => (measuringForm ? measuringForm === "portrait" : width / height < 0.8),
       });
     }
     // A caption pinned to the specimen (006's plaque), fixed in the world once placed.
@@ -1028,11 +1071,13 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const nod = exhibits.map(() => -1); // Seconds since the specimen's reaction began; -1 when at rest.
   let width = 1;
   let height = 1;
-  // The covered left edge: where it is now, and where it's easing to (see setInset).
-  let inset = 0;
-  let insetFrom = 0;
-  let insetTo = 0;
-  let insetT = 1;
+  // While measuring discovery envelopes: the screen form to pose them for (see discoveryRect).
+  let measuringForm: "wide" | "portrait" | null = null;
+  // The picture's slide (see setOffset): where it is now, and where it's easing to.
+  const slide = { x: 0, y: 0 };
+  const slideFrom = { x: 0, y: 0 };
+  const slideTo = { x: 0, y: 0 };
+  let slideT = 1;
   const framing = { distance: 3.5, camX: 0, lookX: 0, lookY: SPECIMEN_Y, height: 1.4 };
   // Each stop's own view, eased in over the walk to it: a small rise, a change of aim and a sideways step
   // added to the resting camera. The desk (the desk pilot) rises and turns three-quarter, so the visitor
@@ -1067,7 +1112,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   /** The picture shifted right by the covered edge: a pure slide, no zoom, so nothing reframes as the
    *  guide opens and folds. */
   function offset() {
-    if (inset > 0.5) camera.setViewOffset(width, height, -inset, 0, width, height);
+    if (Math.abs(slide.x) > 0.5 || Math.abs(slide.y) > 0.5) camera.setViewOffset(width, height, -slide.x, slide.y, width, height);
     else camera.clearViewOffset();
   }
   function frame() {
@@ -1145,8 +1190,43 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         const point = toScreen(anchorPoint.copy(at));
         caption = { x: point.x, y: point.y, visible: inFront && Math.abs(point.ndc) < 1.05 };
       }
-      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y }, caption };
+      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y }, caption, discovery: discoveryRect(i) };
     });
+  }
+
+  /** The discovery's envelope on screen, with the drawer pulled all the way open. */
+  function discoveryRect(i: number): LabelAnchor["discovery"] {
+    const entry = drawers[i];
+    if (!entry?.node || !entry.discovery || !entry.spec) return null;
+    const form = width / height < 0.8 ? "portrait" : "wide";
+    // Both forms are measured together, the first time, with the drawer shut (never re-posed in use), so
+    // turning a phone with a drawer open still has its form's envelope.
+    if (!entry.envelopes[form] && drawerOpen[i] === 0 && drawerGoal[i] === 0) {
+      const z = entry.node.position.z;
+      entry.node.position.z = entry.baseZ;
+      for (const each of ["wide", "portrait"] as const) {
+        measuringForm = each;
+        entry.envelopes[each] = envelopeOf(entry.node, entry.discovery, entry.spec);
+      }
+      measuringForm = null;
+      entry.node.position.z = z;
+    }
+    const box = entry.envelopes[form];
+    if (!box) return null;
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const cx of [box.min.x, box.max.x])
+      for (const cy of [box.min.y, box.max.y])
+        for (const cz of [box.min.z, box.max.z + DRAWER.travel]) {
+          const point = toScreen(anchorPoint.set(cx, cy, cz));
+          left = Math.min(left, point.x);
+          right = Math.max(right, point.x);
+          top = Math.min(top, point.y);
+          bottom = Math.max(bottom, point.y);
+        }
+    return { left, top, right, bottom };
   }
 
   const hidden: PlinthAnchor = { x: 0, y: 0, opacity: 0 };
@@ -1164,10 +1244,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   /** Advances everything by dt seconds. Returns true while the camera or a highlight is still moving. */
   function update(dt: number) {
     let moving = false;
-    if (insetT < 1) {
-      insetT = reduced ? 1 : Math.min(1, insetT + dt / 0.4);
-      const e = insetT < 0.5 ? 2 * insetT * insetT : 1 - (-2 * insetT + 2) ** 2 / 2; // ease in-out, like the CSS
-      inset = insetFrom + (insetTo - insetFrom) * e;
+    if (slideT < 1) {
+      slideT = reduced ? 1 : Math.min(1, slideT + dt / 0.4);
+      const e = slideT < 0.5 ? 2 * slideT * slideT : 1 - (-2 * slideT + 2) ** 2 / 2; // ease in-out, like the CSS
+      slide.x = slideFrom.x + (slideTo.x - slideFrom.x) * e;
+      slide.y = slideFrom.y + (slideTo.y - slideFrom.y) * e;
       offset();
       moving = true;
     }
@@ -1343,13 +1424,19 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       visible = value;
       kick();
     },
-    setInset(pixels, snap = false) {
-      if (pixels === insetTo && (snap ? inset === pixels : true)) return;
-      insetFrom = inset;
-      insetTo = pixels;
-      insetT = snap || reduced ? 1 : 0;
-      if (insetT === 1) {
-        inset = pixels;
+    offset() {
+      return { x: slide.x, y: slide.y };
+    },
+    setOffset(x, y, snap = false) {
+      if (x === slideTo.x && y === slideTo.y && (!snap || (slide.x === x && slide.y === y))) return;
+      slideFrom.x = slide.x;
+      slideFrom.y = slide.y;
+      slideTo.x = x;
+      slideTo.y = y;
+      slideT = snap || reduced ? 1 : 0;
+      if (slideT === 1) {
+        slide.x = x;
+        slide.y = y;
         offset();
       }
       kick();

@@ -164,7 +164,13 @@
   position: sticky;
   top: 0;
   height: 100svh;
-  overflow: hidden;
+  overflow: hidden; /* For browsers without clip (Safari before 16). */
+  /* Clipped, not just hidden: an overflow:hidden box can still be scrolled by focus and script, and the
+     placards of other stops sit far off to the side. Focusing one (Tab, or the hall moving focus when a
+     drawer shuts behind you) used to scroll this box sideways, dragging the whole gallery off screen and
+     leaving the bare background. A clip box can't be scrolled at all. Sticky still works: it's set on
+     this element, against the window. */
+  overflow: clip;
 }
 /* Shade behind the sign and the controls, so text stays readable over lit plaster. */
 .viewport::before,
@@ -395,35 +401,37 @@
   }
 }
 
-/* ---------------------------------------------------------------- drawer cards */
+/* ---------------------------------------------------------------- an open drawer, in its placard */
 
-/* What's in the drawer: the placard's cream and shadow, tilted a degree (the tilt is in the transform
-   MuseumHall sets, after the position, so it doesn't turn the position too). */
-.note {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-  width: 300px;
-  translate: 0 -40%;
+/* What's in the drawer, in the placard's body while it's open: under the title, the same cream, then the
+   one way back. The discovery itself stays in view beside (or above) the placard. */
+.drawerView {
   display: grid;
   gap: 12px;
-  padding: 22px 24px 22px;
-  background: var(--paper), var(--cream);
-  color: var(--ink);
-  border-radius: 2px;
-  box-shadow: var(--card-shadow);
-  pointer-events: auto;
-  overflow-y: auto; /* Only when a short screen caps its height. */
-  overscroll-behavior: contain;
-  animation: note-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+  animation: drawer-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.note[hidden] {
-  display: none; /* Stays in the page (so the toggle's aria-controls resolves), out of sight and reach. */
+.drawerView[hidden] {
+  display: none; /* Stays in the page (so the button's aria-controls resolves), out of sight and reach. */
 }
-.note p {
+.drawerView:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
+.drawerView p {
   margin: 0;
   font: 400 15px/1.5 var(--sans);
+}
+/* Kept in reach at the placard's foot when a short screen makes the placard scroll: a cream ring masks
+   the text passing behind it. */
+.backButton {
+  position: sticky;
+  bottom: 0;
+  gap: 8px;
+  margin-top: 2px;
+  background: var(--cream);
+  box-shadow: 0 0 0 10px var(--cream);
 }
 /* The drawer's story and its line about the real work: body text, in the sans like everything else. */
 .drawerStory,
@@ -436,10 +444,10 @@
   text-transform: uppercase;
   color: var(--brass-ink);
 }
-.note .drawerHeading {
+.drawerView .drawerHeading {
   font: italic 400 21px/1.25 var(--serif);
 }
-.note .drawerFine {
+.drawerView .drawerFine {
   font-size: 13px;
   color: var(--ink-muted);
 }
@@ -589,10 +597,10 @@
 .signature::before {
   content: "— ";
 }
-@keyframes note-in {
+@keyframes drawer-in {
   from {
     opacity: 0;
-    translate: -8px -36%;
+    translate: 0 6px;
   }
 }
 
@@ -1256,20 +1264,23 @@
 /* ---------------------------------------------------------------- portrait screens and phones */
 
 @media (max-aspect-ratio: 4/5) {
-  .label,
-  .note {
+  .label {
     width: min(88vw, 380px);
     translate: -50% 0;
   }
-  .note {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  @keyframes note-in {
-    from {
-      opacity: 0;
-      translate: -50% 10px;
-    }
+  /* An open drawer's placard is a compact sheet under the discovery, scrolling inside itself; Back to
+     exhibit stays at its foot. */
+  .drawerView .backButton {
+    position: sticky;
+    bottom: -18px;
+    justify-self: stretch;
+    justify-content: center;
+    min-height: 48px;
+    margin: 0 -20px -18px;
+    border-width: 1px 0 0;
+    border-color: var(--hairline);
+    border-radius: 0;
+    background: var(--cream);
   }
 }
 /* Phones: the placard runs full width above the pager, a little tighter, same hierarchy. */
@@ -1286,8 +1297,7 @@
   .subtitle {
     font-size: 32px;
   }
-  .label,
-  .note {
+  .label {
     width: calc(100vw - 32px);
   }
   .label {
@@ -1295,29 +1305,16 @@
     padding: 22px 20px 18px;
   }
   .title {
+    margin-bottom: 0;
     font-size: 28px;
+  }
+  .org {
+    margin-top: -6px !important;
   }
   .quote,
   .farewell {
     font-size: 18px;
     padding-top: 10px;
-  }
-  /* On a phone the drawer card covers the placard, so it carries the placard's Close drawer button, kept
-     in reach at its foot while the card scrolls. */
-  .note {
-    padding-bottom: 0;
-  }
-  .note > .pill {
-    position: sticky;
-    bottom: 0;
-    justify-self: stretch;
-    justify-content: center;
-    margin: 0 -24px;
-    border-width: 1px 0 0;
-    border-color: var(--hairline);
-    border-radius: 0;
-    background: var(--cream);
-    min-height: 48px;
   }
 }
 /* Short phones: the title block tightens, so the placard keeps its room. */
@@ -1418,7 +1415,7 @@
   .root[data-guide] .top {
     transition: none;
   }
-  .note {
+  .drawerView {
     animation: none;
   }
 }
