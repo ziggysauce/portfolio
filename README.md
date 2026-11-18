@@ -12,21 +12,22 @@ npm run start      # serve out/ locally
 npm run lint
 npm run typecheck
 npm test           # unit tests: stop addresses, walking labels, label placement math; needs Node 22.6+
-npm run test:layout  # the hall in Chrome at six screen sizes (see below); needs a build in out/
+npm run test:layout  # the hall in Chrome at seven screen sizes (see below); needs a build in out/
 ```
 
 ### Layout check
 
-`tests/layout.mjs` opens the built hall in headless Chrome at 1280×720, 1366×768, 1440×900, 1280×600, 390×844 and 375×667. It visits every exhibit with its drawer closed and open. It fails if:
+`tests/layout.mjs` opens the built hall in headless Chrome at 1280×744, 1280×720, 1366×768, 1440×900, 1280×600, 390×844 and 375×667. On the wide sizes it runs twice, with the field guide open and folded. It visits every exhibit with its drawer closed and open. It fails if:
 
-- a label or note is clipped by the screen, or runs into the header or the walking controls;
-- an open note covers its label on desktop;
-- on a phone, the open note doesn't take the label's place or doesn't take focus;
-- Escape doesn't close the note and leave focus on the drawer button.
+- a placard or drawer card is clipped by the screen, or runs into the title block, the navigation, the field guide, the pager or the phone's guide handle;
+- an open drawer card covers its placard on desktop;
+- a drawer has more or fewer than one close control (the placard's button, or on a phone the card's own, since the card covers the placard);
+- on a phone, the drawer card doesn't take the placard's place or doesn't take focus;
+- Escape doesn't close the drawer and leave focus on the placard's button.
 
-It also fails, rather than passing silently, if it can't find the exhibits, the header or the controls, or if the walk doesn't move on.
+It also fails, rather than passing silently, if it can't find the exhibits, the navigation or the pager, or if the walk doesn't move on.
 
-Run it after any change to the hall's layout, labels, header or copy on the labels:
+Run it after any change to the hall's layout, placards, field guide, header or copy on the placards:
 
 ```bash
 VERCEL_ENV=preview npm run build && npm run test:layout   # with draft studies linked: the tallest labels

@@ -32,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       data-scroll-behavior="smooth" // Smooth for #anchors, instant between pages.
       className={onest.variable}
+      suppressHydrationWarning // The homepage sets data-rail (the field guide's state) before React hydrates.
     >
       <body>
         <a href="#main" className="skip-link">

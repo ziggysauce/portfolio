@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Exhibit } from "@/content/exhibits";
 import type { LabelAnchor, MuseumScene, PlinthAnchor } from "./scene";
 import { STEP_MS } from "./discoveries";
 import { DrawerContents, stepsFor } from "./DrawerContents";
-import { ceilingFor, clearOf, fitBetween, type Obstacle } from "./layout";
-import { hashForStop, positionLabel, stepLabel, stopFromHash } from "./stops";
+import { ceilingFor, fitBetween, type Obstacle } from "./layout";
+import { GuideRail, GuideSheet } from "./GuideRail";
+import { hashForStop, kicker, pagerLabel, stepLabel, stopFromHash } from "./stops";
 import styles from "./museum.module.css";
 
 type Status = "loading" | "ready" | "fallback";
@@ -18,9 +19,7 @@ type Props = {
   identity: string;
   /** In walking order: the career newest first, then personal rooms. */
   exhibits: Exhibit[];
-  /** Each exhibit's label number (its place in the career walk), by id; personal rooms have none. */
-  numbers: Record<string, string | null>;
-  links: { work: string; about: string; resume: string; contact: string; linkedin: string; github: string };
+  links: { work: string; about: string; resume: string; contact: string; email: string; linkedin: string; github: string };
   /** Cases with a case study to read, keyed by exhibit id. */
   studies: Record<string, { href: string; title: string; shortTitle: string }[]>;
   desk: { summary: string; farewell: string };
@@ -33,6 +32,54 @@ type Props = {
  * near a case, so it stays framed while you read, and a little faster between cases. No dead zones and
  * no plateaus, so fine input gives fine movement and steady scrolling gives steady travel.
  */
+/** The field guide's widths, open and folded, in CSS pixels (the stylesheet matches). */
+const RAIL_OPEN = 340;
+const RAIL_FOLDED = 72;
+const RAIL_KEY = "museum-guide"; // Also read by the inline script in app/page.tsx.
+
+// The guide's state lives on <html data-rail>, set before first paint (app/page.tsx): the remembered choice,
+// or folded under 900px wide. After that it changes only when the visitor folds or opens it.
+const GUIDE_EVENT = "museum-guide";
+const guideFolded = () => {
+  const stored = document.documentElement.dataset.rail;
+  return stored ? stored === "folded" : window.innerWidth < 900;
+};
+/** The same as app/page.tsx's inline script, for arriving from another page by a client-side link, which
+ *  doesn't run that script: the stylesheet needs <html data-rail>. */
+function ensureGuideState() {
+  const root = document.documentElement;
+  if (root.dataset.rail) return;
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(RAIL_KEY);
+  } catch {
+    // Blocked storage: fall back to the width rule.
+  }
+  root.dataset.rail = stored === "folded" || stored === "open" ? stored : window.innerWidth < 900 ? "folded" : "open";
+  window.dispatchEvent(new Event(GUIDE_EVENT));
+}
+function setGuideFolded(folded: boolean) {
+  document.documentElement.dataset.rail = folded ? "folded" : "open";
+  try {
+    localStorage.setItem(RAIL_KEY, folded ? "folded" : "open");
+  } catch {
+    // Private windows and blocked storage: the guide still folds, it just isn't remembered.
+  }
+  window.dispatchEvent(new Event(GUIDE_EVENT));
+}
+function onGuideChange(callback: () => void) {
+  window.addEventListener(GUIDE_EVENT, callback);
+  return () => window.removeEventListener(GUIDE_EVENT, callback);
+}
+const PHONE = "(max-width: 639px)";
+const isPhone = () => window.matchMedia(PHONE).matches;
+function onPhoneChange(callback: () => void) {
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+const noSubscribe = () => () => {};
+
 const HOLD = 0.3; // Camera speed is 1 - HOLD at a case and 1 + HOLD halfway between.
 function walk(progress: number) {
   const i = Math.floor(progress);
@@ -71,7 +118,7 @@ function supportsWebGL() {
 // "Return to the museum" link uses it, and leaving the hall by one of its own links writes it, so Back lands
 // on the same case. These are not element ids: the browser leaves them alone and the hall walks there itself.
 
-export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fatherhood, studies }: Props) {
+export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, studies }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLElement | null)[]>([]);
@@ -95,13 +142,23 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
     window.clearTimeout(busyTimer.current);
     setBusy(null);
   }, []);
-  const [directoryOpen, setDirectoryOpen] = useState(false);
-  const directoryToggle = useRef<HTMLButtonElement>(null);
-  /** Folds the directory away. If focus was inside it, focus moves to its toggle instead of vanishing. */
-  const closeDirectory = useCallback(() => {
-    setDirectoryOpen(false);
-    const toggle = directoryToggle.current;
-    if (toggle && toggle.offsetParent !== null && toggle.parentElement?.contains(document.activeElement)) toggle.focus();
+  // The field guide: open (340px) or folded to a strip (72px) down the left on a wide screen, a bottom
+  // sheet on a phone. The scene and its labels slide over by the guide's width (scene.setInset), so the case
+  // stays centred in what's visible. The choice is remembered; an inline script in the page applies it
+  // before first paint (see app/page.tsx), so the hall never jumps after loading.
+  const folded = useSyncExternalStore(onGuideChange, guideFolded, () => false);
+  const sheet = useSyncExternalStore(onPhoneChange, isPhone, () => false);
+  const mounted = useSyncExternalStore(noSubscribe, () => true, () => false); // Until then the stylesheet alone decides how the guide looks.
+  const inset = sheet ? 0 : folded ? RAIL_FOLDED : RAIL_OPEN;
+  const insetRef = useRef(inset);
+  useLayoutEffect(ensureGuideState, []);
+  // Folding or opening hides the form of the guide that had focus (the stop rows, or the strip's Guide
+  // button), so focus moves to the handle instead of dropping to the top of the page.
+  const toggleRail = useCallback(() => {
+    const guide = document.getElementById("field-guide");
+    const hadFocus = !!guide?.contains(document.activeElement);
+    setGuideFolded(!guideFolded());
+    if (hadFocus) requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-controls="field-guide"]')?.focus());
   }, []);
   const scene = useRef<MuseumScene | null>(null);
   const reduced = useRef(false);
@@ -233,12 +290,14 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
       const layer = labels.current[0]?.closest("ol");
       const header = layer?.parentElement?.querySelector("header");
       const origin = layer?.getBoundingClientRect().top ?? 0;
-      const bottomBar = [document.querySelector('nav[aria-label="Gallery directory"] > button'), layer?.parentElement?.querySelector(`.${styles.controls}`)];
-      const tops = bottomBar.flatMap((node) => (node ? [node.getBoundingClientRect().top - origin] : []));
+      const bottomBar = [layer?.parentElement?.querySelector(`.${styles.sheetHandle}`), layer?.parentElement?.querySelector(`.${styles.controls}`)];
+      // Only what's showing: the phone's guide handle is in the page on a wide screen too, just hidden.
+      const shown = (node: Element | null | undefined): node is Element => !!node && node.getClientRects().length > 0;
+      const tops = bottomBar.filter(shown).map((node) => node.getBoundingClientRect().top - origin);
       floor = tops.length ? Math.min(...tops) - 12 : Infinity;
       ceiling = header ? header.getBoundingClientRect().bottom - origin + 8 : 0;
       obstacles = header
-        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].map((node) => {
+        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].filter(shown).map((node) => {
             const box = node.getBoundingClientRect();
             return { left: box.left, right: box.right, bottom: box.bottom - origin };
           })
@@ -263,7 +322,9 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
       const card = plinthCard.current;
       if (card) {
         card.style.transform = `translate3d(${plinth.x.toFixed(1)}px, ${plinth.y.toFixed(1)}px, 0)`;
-        card.style.opacity = plinth.opacity.toFixed(3);
+        // Not while it's behind the field guide: it would peek out from under the guide's edge.
+        const covered = plinth.x - card.offsetWidth / 2 < insetRef.current + 8;
+        card.style.opacity = covered ? "0" : plinth.opacity.toFixed(3);
         card.style.visibility = "visible";
       }
       anchors.forEach((anchor, i) => {
@@ -319,27 +380,26 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
           const fit = fitBetween(anchor.drawer.y + 28, heights.get(note) ?? 0, ceiling, room);
           const top = fit.top;
           note.style.maxHeight = `${(fit.maxHeight ?? room - top).toFixed(0)}px`;
-          note.style.transform = `translate3d(${(window.innerWidth / 2).toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
+          note.style.transform = `translate3d(${((insetRef.current + window.innerWidth) / 2).toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
         } else {
-          // Beside the drawer, centred a little above it (the stylesheet lifts it by 40% of its height and
-          // nudges it 18px right), but never over the case's label, the controls or the header; a few pixels
-          // spare for its tilt.
+          // Over the cabinet, below and to the left of the placard, the same spot at every stop, so it never
+          // covers the plant or the next case. Kept clear of the field guide, the header and the pager; if the
+          // guide leaves no room to the left, it drops below the placard instead. A few pixels spare for its tilt.
           const h = (heights.get(note) ?? 0) + 8;
           const w = (widths.get(note) ?? 0) + 8;
-          // Fitted between header and controls first, then moved right if that spot covers the label, then
-          // fitted again for the new columns.
           const labelHeight = parseFloat(label.style.maxHeight) || (heights.get(label) ?? 0);
           const bottom = Number.isFinite(floor) ? floor : window.innerHeight - 16;
-          const want = anchor.drawer.y - 0.4 * h;
-          let left = anchor.drawer.x + 18;
-          let fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
-          const moved = clearOf({ left, top: fit.top, width: w, height: fit.maxHeight ?? h }, { left: anchor.x, top, width: widths.get(label) ?? 0, height: labelHeight }, window.innerWidth);
-          if (moved !== left) {
-            left = moved;
-            fit = fitBetween(want, h, ceilingFor(left, left + w, obstacles), bottom);
+          let left = anchor.x - w - 16;
+          const leftmost = insetRef.current + 16;
+          let lowest = ceilingFor(left, left + w, obstacles);
+          if (left < leftmost) {
+            left = leftmost;
+            if (left + w > anchor.x) lowest = Math.max(lowest, top + labelHeight + 12); // Would meet the placard: go under it.
           }
+          const want = Math.max(anchor.drawer.y - 0.4 * h, top + 40); // Starts below the placard's top.
+          const fit = fitBetween(want, h, lowest, bottom);
           note.style.maxHeight = fit.maxHeight === null ? "" : `${(fit.maxHeight - 8).toFixed(0)}px`;
-          note.style.transform = `translate3d(${(left - 18).toFixed(1)}px, ${(fit.top + 0.4 * (fit.maxHeight ?? h)).toFixed(1)}px, 0) rotate(1.5deg)`;
+          note.style.transform = `translate3d(${left.toFixed(1)}px, ${(fit.top + 0.4 * (fit.maxHeight ?? h)).toFixed(1)}px, 0) rotate(${i % 2 ? 1 : -1}deg)`;
         }
       });
     }
@@ -544,18 +604,14 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
   }
 
-  // A click anywhere outside the open directory folds it away.
+  // The scene slides with the field guide: at once when the hall first appears, eased after that.
+  const insetShown = useRef(false);
   useEffect(() => {
-    if (!directoryOpen) return;
-    function onDown(event: PointerEvent) {
-      const nav = directoryToggle.current?.parentElement;
-      if (nav?.contains(event.target as Node)) return;
-      if (nav?.contains(document.activeElement)) directoryToggle.current?.focus(); // Don't strand focus in a hidden list.
-      setDirectoryOpen(false);
-    }
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [directoryOpen]);
+    insetRef.current = inset;
+    if (status !== "ready" || !scene.current) return;
+    scene.current.setInset(inset, !insetShown.current);
+    insetShown.current = true;
+  }, [inset, status]);
 
   // The curator's drawer follows the open note. (Walking on to another case closes the note: see onScroll.)
   useEffect(() => {
@@ -609,24 +665,21 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
   useEffect(() => {
     if (status !== "ready") return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && directoryOpen) {
-        closeDirectory();
-        return;
-      }
       if (event.key === "Escape" && openNote !== null) {
         closeNote(openNote);
         return;
       }
       const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
       if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
-      if (event.key === "ArrowRight") go(heading() + 1);
+      if (event.key === "[" && !sheet) toggleRail();
+      else if (event.key === "ArrowRight") go(heading() + 1);
       else if (event.key === "ArrowLeft") go(heading() - 1);
       else return;
       event.preventDefault();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [status, heading, go, openNote, closeNote, directoryOpen, closeDirectory]);
+  }, [status, heading, go, openNote, closeNote, sheet, toggleRail]);
 
   // A sideways swipe or trackpad gesture moves one case; vertical scrolling stays the browser's.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -686,7 +739,11 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
   const fallback = status === "fallback";
 
   return (
-    <div className={`${styles.root} ${fallback ? styles.static : ""}`} onClickCapture={rememberStop}>
+    <div
+      className={`${styles.root} ${fallback ? styles.static : ""}`}
+      data-guide={fallback || !mounted ? undefined : sheet ? "sheet" : folded ? "folded" : "open"}
+      onClickCapture={rememberStop}
+    >
       <main id="main">
         <section
           ref={stage}
@@ -699,27 +756,26 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
           onWheel={onWheel}
         >
           <div className={styles.viewport}>
+            {/* First in the page, as on screen: the field guide down the left. Both forms are in the page; the
+                stylesheet shows the rail on a wide screen and the sheet on a phone. */}
+            {fallback ? null : (
+              <>
+                <GuideRail hall={hall} identity={identity} exhibits={exhibits} index={index} onGo={go} links={links} folded={folded} onToggle={toggleRail} />
+                <GuideSheet exhibits={exhibits} index={index} onGo={go} links={links} />
+              </>
+            )}
             {/* Inside the pinned viewport, so the sign leaves with the gallery instead of floating over the desk. */}
             <header className={styles.top}>
+                {/* The title block. With the field guide open, the guide carries it instead (its lockup). */}
                 <div className={styles.sign}>
                   <p className={styles.hallName}>{hall.name}</p>
                   <h1 className={styles.subtitle}>{hall.subtitle}</h1>
                   <p className={styles.identity}>{identity}</p>
-                  {/* The premise, in one small ticket stub: the museum has closed, and you're a guest. */}
-                  <p className={styles.ticket}>
-                    <span className={styles.admission}>After-hours admission</span>
-                    <span className={styles.guest}>Guest of Dan</span>
-                  </p>
                 </div>
+                {/* In the hall no item is current: each lights up only on its own page. */}
                 <nav aria-label="Main" className={styles.nav}>
-                  <Link href={links.work} className={styles.navWork}>
-                    Selected work
-                  </Link>
+                  <Link href={links.work}>Selected work</Link>
                   <Link href={links.about}>About</Link>
-                  <a href={links.resume} target="_blank" rel="noreferrer">
-                    Résumé<span className="sr-only"> (PDF, opens in a new tab)</span>
-                  </a>
-                  <Link href={links.contact}>Contact</Link>
                 </nav>
               </header>
             {fallback ? (
@@ -763,17 +819,12 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
                     onPointerEnter={() => scene.current?.setHighlight(i)}
                     onPointerLeave={() => scene.current?.setHighlight(null)}
                   >
-                    <p className={styles.number}>
-                      {numbers[exhibit.id] ? (i === 0 ? `${numbers[exhibit.id]} · Current role` : numbers[exhibit.id]) : "Off the clock"}
-                    </p>
+                    <Kicker text={kicker(i, exhibits)} />
                     <h2 id={`${exhibit.id}-title`} className={styles.title}>
                       {exhibit.title}
                     </h2>
-                    {exhibit.lines.map((line) => (
-                      <p key={line} className={styles.line}>
-                        {line}
-                      </p>
-                    ))}
+                    {exhibit.lines[0] ? <p className={styles.line}>{exhibit.lines[0]}</p> : null}
+                    {exhibit.lines[1] ? <p className={styles.org}>{exhibit.lines[1]}</p> : null}
                     {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
                     {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
                     {/* The evidence behind the case, one click away: no drawer, bell or animation needed. */}
@@ -812,7 +863,6 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
                         aria-controls={`${exhibit.id}-drawer`}
                         onClick={() => (openNote === i ? closeNote(i) : changeDrawer(i))}
                       >
-                        <span aria-hidden="true" className={styles.drawerIcon} />
                         {openNote === i ? "Close drawer" : "Open drawer"}
                         <span className="sr-only">: {exhibit.title}</span>
                       </button>
@@ -837,11 +887,16 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
                       tabIndex={-1}
                       aria-label={`Drawer: ${exhibit.title}`}
                     >
+                      <p className={styles.noteKicker}>From the drawer</p>
                       <DrawerContents drawer={exhibit.drawer} step={steps[i]} busy={busy === i} onAct={() => act(i)} id={exhibit.id} />
                       <DrawerExtra note={exhibit.drawerNote} work={exhibit.kind === "role" ? links.work : null} />
-                      <button type="button" className={styles.noteClose} onClick={() => closeNote(i)}>
-                        Close the drawer
-                      </button>
+                      {/* The placard's button is the drawer's one close control. On a phone this card covers the
+                          placard, so the same button comes with it. */}
+                      {sheet ? (
+                        <button type="button" className={styles.pill} aria-expanded="true" aria-controls={`${exhibit.id}-drawer`} onClick={() => closeNote(i)}>
+                          Close drawer<span className="sr-only">: {exhibit.title}</span>
+                        </button>
+                      ) : null}
                     </aside>
                   ) : null}
                   {exhibit.caption && !fallback ? (
@@ -886,7 +941,7 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
                   onPointerEnter={() => scene.current?.setHighlight(deskIndex)}
                   onPointerLeave={() => scene.current?.setHighlight(null)}
                 >
-                  <p className={styles.number}>Before you go</p>
+                  <Kicker text={kicker(deskIndex, exhibits)} />
                   <h2 id="desk-title" className={styles.title}>
                     Information desk
                   </h2>
@@ -920,67 +975,14 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
             </ol>
 
             {fallback ? null : (
-              <nav className={styles.directory} aria-label="Gallery directory" data-open={directoryOpen || undefined}>
-                <button
-                  ref={directoryToggle}
-                  type="button"
-                  className={styles.directoryToggle}
-                  aria-expanded={directoryOpen}
-                  aria-controls="gallery-directory"
-                  onClick={() => setDirectoryOpen((open) => !open)}
-                >
-                  <span>Directory</span>
-                  {/* Where you are, always visible, even with the directory folded away. */}
-                  <span className={styles.dirCurrent}>
-                    <span className="sr-only">, you are at </span>
-                    {index === deskIndex ? "Desk" : (numbers[exhibits[index]?.id] ?? "Off the clock")}
-                  </span>
-                </button>
-                <div id="gallery-directory" className={styles.directoryList}>
-                  <p className={styles.directoryTitle} aria-hidden="true">
-                    Gallery directory
-                  </p>
-                  {/* Two groups, so the numbers count the career only: then the rooms outside it. */}
-                  <p className={styles.directoryGroup} id="directory-career">
-                    Career, newest first
-                  </p>
-                  <ol aria-labelledby="directory-career">
-                    {exhibits.map((item, at) =>
-                      item.kind === "personal" ? null : <DirectoryStop key={item.id} number={numbers[item.id]} title={item.title} here={at === index} onGo={() => { go(at); closeDirectory(); }} />,
-                    )}
-                  </ol>
-                  <p className={styles.directoryGroup} id="directory-more">
-                    Also here
-                  </p>
-                  <ul aria-labelledby="directory-more">
-                    {exhibits.map((item, at) =>
-                      item.kind === "personal" ? <DirectoryStop key={item.id} number={null} title={item.title} here={at === index} onGo={() => { go(at); closeDirectory(); }} /> : null,
-                    )}
-                    <DirectoryStop key="desk" number={null} title="Information desk" here={index === deskIndex} onGo={() => { go(deskIndex); closeDirectory(); }} />
-                  </ul>
-                </div>
-              </nav>
-            )}
-
-            {fallback ? null : (
+              // Prev and Next never change their words or width; where they lead is in their accessible names.
               <div className={styles.controls}>
-                <StepButton
-                  exhibits={exhibits}
-                  from={index}
-                  to={index - 1}
-                  onGo={() => go(heading() - 1)}
-                  edge={{ label: "Later role", short: "Later", name: "Later role: none, this is the current role" }}
-                />
+                <StepButton exhibits={exhibits} from={index} to={index - 1} onGo={() => go(heading() - 1)} edge="Previous: none, this is the first stop" />
                 <p className={styles.counter} aria-live="polite">
-                  <Position text={positionLabel(index, exhibits)} />
+                  <span className="sr-only">Stop </span>
+                  {pagerLabel(index, exhibits)}
                 </p>
-                <StepButton
-                  exhibits={exhibits}
-                  from={index}
-                  to={index + 1}
-                  onGo={() => go(heading() + 1)}
-                  edge={{ label: "End of the hall", short: "End", name: "End of the hall" }}
-                />
+                <StepButton exhibits={exhibits} from={index} to={index + 1} onGo={() => go(heading() + 1)} edge="Next: none, this is the last stop" />
               </div>
             )}
 
@@ -1000,48 +1002,26 @@ export function MuseumHall({ hall, identity, exhibits, numbers, links, desk, fat
   );
 }
 
-type StepText = { label: string; short: string; name: string };
+/** The placard's kicker: the stop's code as written (the desk's "i" stays lowercase), the section in caps. */
+function Kicker({ text }: { text: string }) {
+  const [code, section] = text.split(" · ");
+  return (
+    <p className={styles.number}>
+      <span className={styles.code}>{code}</span>
+      {` · ${section}`}
+    </p>
+  );
+}
 
-/** One walking control: names the way it goes (see stepLabel), or, disabled, the end it has reached. */
-function StepButton({ exhibits, from, to, onGo, edge }: { exhibits: Exhibit[]; from: number; to: number; onGo: () => void; edge: StepText }) {
+/** One walking control: "Prev" or "Next", always; disabled at either end of the hall. */
+function StepButton({ exhibits, from, to, onGo, edge }: { exhibits: Exhibit[]; from: number; to: number; onGo: () => void; edge: string }) {
   const back = to < from;
   const end = to < 0 || to > exhibits.length;
-  const { label, short, name } = end ? edge : stepLabel(from, to, exhibits);
+  const where = end ? edge : `${back ? "Previous" : "Next"}: ${stepLabel(from, to, exhibits).name}`;
   return (
-    <button type="button" onClick={onGo} disabled={end} aria-label={name}>
-      {back ? <span aria-hidden="true">←</span> : null}
-      <span className={styles.stepLong}>{label}</span>
-      <span className={styles.stepShort} aria-hidden="true">
-        {short}
-      </span>
-      {back ? null : <span aria-hidden="true">→</span>}
+    <button type="button" onClick={onGo} disabled={end} aria-label={where}>
+      {back ? "← Prev" : "Next →"}
     </button>
-  );
-}
-
-/** The counter's text. On a narrow screen "Current role · 1 of 5" keeps just "1 of 5". */
-function Position({ text }: { text: string }) {
-  const [lead, count] = text.includes(" · ") ? text.split(" · ") : [null, text];
-  return (
-    <>
-      {lead ? <span className={styles.counterLead}>{lead} · </span> : null}
-      {count}
-    </>
-  );
-}
-
-/** A stop in the gallery directory. */
-function DirectoryStop({ number, title, here, onGo }: { number: string | null; title: string; here: boolean; onGo: () => void }) {
-  return (
-    <li>
-      <button type="button" aria-current={here ? "location" : undefined} onClick={onGo}>
-        <span className={styles.dirNumber} aria-hidden={number ? undefined : true}>
-          {number ?? "·"}
-        </span>
-        <span className={styles.dirTitle}>{title}</span>
-        {here ? <span className={styles.here}>You are here</span> : null}
-      </button>
-    </li>
   );
 }
 

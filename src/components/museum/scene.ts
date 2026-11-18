@@ -166,6 +166,10 @@ export type MuseumScene = {
   setDiscoveryStep(index: number, step: number): void;
   /** Which open drawer's interactive prop (the bell, the stamp) is under this point, if any. */
   pickProp(clientX: number, clientY: number): number | null;
+  /** How much of the canvas's left edge is covered (by the field guide), in CSS pixels. The picture
+   *  slides right by that much, as if the canvas started there, so the case stays centred in the part you
+   *  can see; it eases there over 0.4 s unless `snap` (or reduced motion). Labels and picking follow. */
+  setInset(pixels: number, snap?: boolean): void;
   resize(): void;
   dispose(): void;
 };
@@ -1024,6 +1028,11 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const nod = exhibits.map(() => -1); // Seconds since the specimen's reaction began; -1 when at rest.
   let width = 1;
   let height = 1;
+  // The covered left edge: where it is now, and where it's easing to (see setInset).
+  let inset = 0;
+  let insetFrom = 0;
+  let insetTo = 0;
+  let insetT = 1;
   const framing = { distance: 3.5, camX: 0, lookX: 0, lookY: SPECIMEN_Y, height: 1.4 };
   // Each stop's own view, eased in over the walk to it: a small rise, a change of aim and a sideways step
   // added to the resting camera. The desk (the desk pilot) rises and turns three-quarter, so the visitor
@@ -1055,11 +1064,17 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   };
   const viewsFor = (size: "wide" | "phone") => exhibits.map((exhibit) => VIEWS[size][exhibit.kind === "desk" ? "desk" : (exhibit.specimen ?? "")] ?? still);
 
+  /** The picture shifted right by the covered edge: a pure slide, no zoom, so nothing reframes as the
+   *  guide opens and folds. */
+  function offset() {
+    if (inset > 0.5) camera.setViewOffset(width, height, -inset, 0, width, height);
+    else camera.clearViewOffset();
+  }
   function frame() {
     const aspect = width / height;
     camera.aspect = aspect;
     camera.fov = aspect < 0.8 ? 40 : 31;
-    camera.updateProjectionMatrix();
+    offset(); // Also updates the projection matrix.
     const halfV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const halfH = halfV * aspect;
     if (aspect >= 0.8) {
@@ -1149,6 +1164,13 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   /** Advances everything by dt seconds. Returns true while the camera or a highlight is still moving. */
   function update(dt: number) {
     let moving = false;
+    if (insetT < 1) {
+      insetT = reduced ? 1 : Math.min(1, insetT + dt / 0.4);
+      const e = insetT < 0.5 ? 2 * insetT * insetT : 1 - (-2 * insetT + 2) ** 2 / 2; // ease in-out, like the CSS
+      inset = insetFrom + (insetTo - insetFrom) * e;
+      offset();
+      moving = true;
+    }
     if (reduced) {
       current = target;
       velocity = 0;
@@ -1319,6 +1341,17 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     },
     setVisible(value) {
       visible = value;
+      kick();
+    },
+    setInset(pixels, snap = false) {
+      if (pixels === insetTo && (snap ? inset === pixels : true)) return;
+      insetFrom = inset;
+      insetTo = pixels;
+      insetT = snap || reduced ? 1 : 0;
+      if (insetT === 1) {
+        inset = pixels;
+        offset();
+      }
       kick();
     },
     pick(clientX, clientY) {
