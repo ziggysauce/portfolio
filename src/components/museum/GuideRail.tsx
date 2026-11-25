@@ -20,6 +20,8 @@ type Props = {
   links: GuideLinks;
   folded: boolean;
   onToggle: () => void;
+  /** Open over the hall (constrained screens): a modal dialog while it lasts. */
+  overlay?: boolean;
 };
 
 /** The year a row shows: the first year on the exhibit's second line ("GoTab · 2021–2026" → 2021). */
@@ -39,11 +41,11 @@ function stopsOf(exhibits: Exhibit[]) {
   ];
 }
 
-export function GuideRail({ hall, identity, exhibits, index, onGo, links, folded, onToggle }: Props) {
+export function GuideRail({ hall, identity, exhibits, index, onGo, links, folded, onToggle, overlay = false }: Props) {
   const stops = stopsOf(exhibits);
   return (
     <>
-      <aside id="field-guide" className={styles.rail} aria-label="Field guide">
+      <aside id="field-guide" className={styles.rail} aria-label="Field guide" role={overlay ? "dialog" : undefined} aria-modal={overlay || undefined}>
         {/* Both states are in the page, and the stylesheet shows one (from the remembered choice, before
             the page has even hydrated), so the guide is right from the first paint. */}
         <div className={styles.strip}>

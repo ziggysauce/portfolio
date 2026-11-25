@@ -1412,17 +1412,35 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
   const ambient = () => !reduced && visible && document.visibilityState === "visible";
   let raf = 0;
   let last = 0;
+  // One render loop, ever. A kick during a frame (onFrame placing labels can slide the picture, which kicks)
+  // asks this frame to schedule the next one instead of starting a second loop: each extra loop used to
+  // live on forever with the ambient motion, until the main thread starved (the camera stalled mid-walk
+  // and clicks never completed).
+  let ticking = false;
+  let again = false;
   function tick(now: number) {
     raf = 0;
-    const dt = Math.min((now - last) / 1000, 0.1);
-    last = now;
-    const moving = update(dt);
-    renderer.render(scene, camera);
-    options.onFrame?.(anchors(), current, plinthAnchor());
-    if (options.frameLog) options.frameLog.push(dt * 1000);
-    if (moving || ambient()) raf = requestAnimationFrame(tick);
+    ticking = true;
+    again = false;
+    let moving = false;
+    try {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      moving = update(dt);
+      renderer.render(scene, camera);
+      options.onFrame?.(anchors(), current, plinthAnchor());
+      if (options.frameLog) options.frameLog.push(dt * 1000);
+    } finally {
+      // Even if a frame throws, the next kick can start the loop again.
+      ticking = false;
+    }
+    if (moving || again || ambient()) raf = requestAnimationFrame(tick);
   }
   function kick() {
+    if (ticking) {
+      again = true;
+      return;
+    }
     if (raf) return;
     last = performance.now();
     raf = requestAnimationFrame(tick);

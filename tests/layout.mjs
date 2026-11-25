@@ -14,6 +14,10 @@
 //     clear of the header, placard and bottom bar, and big enough to recognise, before anything is opened;
 //     Read exhibit unfolds the rest of the placard with the case still in view, scrolls inside itself
 //     without walking the hall, and folds again on Escape.
+//  7. Constrained screens (short landscape, or under 1000px wide): the open guide overlays the hall. Focus
+//     stays in it, the hall can't be walked behind it, Escape and the scrim close it, focus goes back to
+//     what opened it, and the stop, an open drawer and unfolded details are just as they were. Choosing a
+//     stop closes it and walks there. Turning or resizing with it open lands in each size's own form.
 //
 // Where each discovery is on screen comes from the hall itself (?debug, see MuseumHall placeLabels), so
 // the check measures the 3D objects' space, not just the HTML. Look at the screenshots as well.
@@ -225,13 +229,44 @@ async function toStart(page) {
   }
   throw new Error(`couldn't get back to the first stop (at "${await counter(page)}")`);
 }
-async function next(page) {
+/**
+ * The hall at rest: the camera on a stop (whole-number progress) and the picture's slide unchanged for a
+ * quarter second, from the hall's own state (?debug). An observable settled state, not a fixed wait: a slow
+ * or stalled walk fails here instead of being measured halfway.
+ */
+const settle = (page, from = null) =>
+  page.waitForFunction(
+    (from) => {
+      const hall = window.__hall;
+      const api = window.__museumApi;
+      if (!hall || !api) return false;
+      const slide = api.offset();
+      const key = `${hall.progress.toFixed(3)}|${slide.x.toFixed(1)}|${slide.y.toFixed(1)}`;
+      const seen = (window.__settle ??= { key: "", since: 0 });
+      const now = performance.now();
+      if (seen.key !== key) {
+        seen.key = key;
+        seen.since = now;
+        return false;
+      }
+      // After a step, at rest somewhere else: a hall still at rest where it was hasn't started yet.
+      const moved = from === null || Math.round(hall.progress) !== from;
+      return moved && Math.abs(hall.progress - Math.round(hall.progress)) < 0.002 && now - seen.since > 250;
+    },
+    from,
+    { timeout: 8000, polling: 50 },
+  );
+const stopNow = (page) => page.evaluate(() => Math.round(window.__hall?.progress ?? 0));
+async function step(page, name) {
   const before = await counter(page);
-  await page.locator("[class*=controls]").getByRole("button", { name: /^Next/ }).click({ timeout: 5000 });
-  await page.waitForTimeout(1800);
+  const from = await stopNow(page);
+  await page.locator("[class*=controls]").getByRole("button", { name }).click({ timeout: 5000 });
+  await settle(page, from);
   const now = await counter(page);
-  if (now === before) throw new Error(`the walk didn't move on from "${now}"`);
+  if (now === before) throw new Error(`the walk didn't move from "${now}"`);
 }
+const next = (page) => step(page, /^Next/);
+const prev = (page) => step(page, /^Previous/);
 /** Opens stop n's drawer from its placard button, as a keyboard visitor would. */
 async function openDrawer(page, n) {
   await page.locator(openButton(n)).focus();
@@ -307,11 +342,9 @@ async function readDetails(page, n, name, title, small) {
   report(`${name}: ${title}, Read exhibit`, problems);
 }
 
-// Phones have no rail. Short landscape screens start with it folded (under 900px wide) and are checked that
-// way: the open rail (340px) leaves them no room for a placard, which is a known, separate problem.
-const runs = Object.entries(SIZES).flatMap(([size, options]) =>
-  options.viewport.width < 640 ? [[size, options, null]] : options.viewport.height <= 500 ? [[size, options, "folded"]] : [[size, options, "open"], [size, options, "folded"]],
-);
+// Phones have no rail. Wide screens are checked with the guide remembered open and folded; on a short
+// landscape screen a remembered "open" still shows the strip (the open guide overlays the hall there, see 7).
+const runs = Object.entries(SIZES).flatMap(([size, options]) => (options.viewport.width < 640 ? [[size, options, null]] : [[size, options, "open"], [size, options, "folded"]]));
 
 // ---------------------------------------------------------------- 1. every stop, every size
 for (const [size, options, rail] of runs) {
@@ -406,6 +439,63 @@ for (const [size, options, rail] of runs) {
       report(`${name}: Information desk`, [...fits(g), ...inPlace(g), ...(small ? exhibitClear(g, 7, 0.5) : [])]);
       await shot(page, `${name}-7-label`);
       await readDetails(page, 7, name, "Information desk", small);
+      // Back through every stop with Prev: each one's placard fits and (phones) its exhibit shows.
+      const back = [];
+      for (let n = 6; n >= 1; n--) {
+        await prev(page);
+        const at = await scan(page, placard(n));
+        const problems = [...fits(at), ...inPlace(at), ...(small ? exhibitClear(at, n, 0.5) : exhibitClear(at, n, 0.15))];
+        if (problems.length) back.push(`stop ${n}: ${problems.join(", ")}`);
+      }
+      report(`${name}: back to the start with Prev`, back, await counter(page));
+      if (small) {
+        // The phone's guide sheet, from the bar: on screen, its stop rows in their own type (serif titles,
+        // left-aligned, not the bar's mono capitals), and Escape closes it back to its button.
+        await page.locator("[aria-controls=guide-sheet]").click();
+        await page.waitForFunction(() => !document.querySelector("#guide-sheet")?.hidden);
+        const sheet = await page.evaluate(() => {
+          const panel = document.querySelector("#guide-sheet");
+          const row = panel.querySelector("button[aria-current]") ?? panel.querySelector("button");
+          const title = row.querySelector("[class*=stopTitle]");
+          const r = panel.getBoundingClientRect();
+          return { transform: getComputedStyle(row).textTransform, align: getComputedStyle(row).textAlign, serif: /serif/i.test(getComputedStyle(title).fontFamily) && !/mono/i.test(getComputedStyle(title).fontFamily), top: r.top, bottom: r.bottom };
+        });
+        await shot(page, `${name}-guide-sheet`);
+        await page.keyboard.press("Escape");
+        await page.waitForFunction(() => document.querySelector("#guide-sheet")?.hidden);
+        const back = await page.evaluate(() => document.activeElement?.getAttribute("aria-controls"));
+        const s = [];
+        if (sheet.transform !== "none" || sheet.align !== "left" || !sheet.serif) s.push(`stop rows styled ${JSON.stringify(sheet)}`);
+        if (sheet.top < 0) s.push(`the sheet runs off the top (${Math.round(sheet.top)})`);
+        if (back !== "guide-sheet") s.push(`Escape left focus on ${back}`);
+        report(`${name}: the guide sheet`, s);
+      }
+      // The Fatherhood plinth between After Hours and the desk: somewhere on the walk there, its card shows in
+      // full, clear of every visible placard, the header and the bar. The camera is parked at each tenth of
+      // the way (the hall's own debug hook) and measured after it has drawn that frame.
+      const sightings = [];
+      for (let k = 1; k <= 9; k++) {
+        const at = 5 + k / 10;
+        await page.evaluate((at) => window.__museumApi.setTarget(at, true), at);
+        await page.waitForFunction((at) => Math.abs((window.__hall?.progress ?? 0) - at) < 0.001, at, { timeout: 5000 });
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+        const seen = await page.evaluate(() => {
+          const card = document.querySelector("[class*=plinthCard]");
+          const b = card.getBoundingClientRect();
+          const box = { x: b.left, y: b.top, r: b.right, b: b.bottom };
+          const covered = [...document.querySelectorAll("ol[aria-label^='Exhibits'] article")]
+            .filter((a) => Number(getComputedStyle(a).opacity) > 0.5)
+            .some((a) => { const r = a.getBoundingClientRect(); return r.left < box.r && r.right > box.x && r.top < box.b && r.bottom > box.y; });
+          return { opacity: Number(card.style.opacity || 0), box, covered };
+        });
+        const g = await scan(page);
+        const under = [...g.header, ...g.bottom].some((c) => meets(seen.box, c));
+        const onScreen = seen.box.x >= 0 && seen.box.r <= g.vw && seen.box.y >= 0 && seen.box.b <= g.vh;
+        if (seen.opacity >= 0.9 && !seen.covered && !under && onScreen) sightings.push(at.toFixed(1));
+        if (k === 5) await shot(page, `${name}-fatherhood`);
+      }
+      const p = sightings.length ? [] : ["never seen in full and uncovered between After Hours and the desk"];
+      report(`${name}: the Fatherhood plinth on the way to the desk`, p, `clear at ${sightings.join(", ")}`);
     } catch (error) {
       report(`${name}: Information desk`, [error.message.split("\n")[0]]);
     }
@@ -416,7 +506,7 @@ for (const [size, options, rail] of runs) {
 
 if (!only) {
   // ---------------------------------------------------------------- 2. walking by scrolling
-  for (const [size, rail] of [["1280x744", "open"], ["1280x744", "folded"], ["1440x900", "open"], ["390x844", null]]) {
+  for (const [size, rail] of [["1280x744", "open"], ["1280x744", "folded"], ["1440x900", "open"], ["390x844", null], ["667x375", "folded"], ["844x390", "open"]]) {
     const name = rail ? `${size} guide ${rail}` : size;
     const context = await browser.newContext(SIZES[size]);
     const { page, errors } = await open(context, rail);
@@ -442,6 +532,25 @@ if (!only) {
     await walk("back (horizontal trackpad)", -90, 0, 60);
     await walk("on (diagonal)", 70, 60, 50);
     await walk("back (diagonal)", -70, -60, 50);
+    // The keyboard: right arrow to the desk, left arrow back, one stop per press.
+    await toStart(page);
+    await page.evaluate(() => document.activeElement?.blur());
+    const keyed = [];
+    for (let k = 1; k <= 6; k++) {
+      const from = await stopNow(page);
+      await page.keyboard.press("ArrowRight");
+      await settle(page, from).catch(() => keyed.push(`right ${k}: never settled`));
+      if ((await stopNow(page)) !== from + 1) keyed.push(`right ${k}: from stop ${from} to ${await stopNow(page)}, not one stop`);
+    }
+    if (!(await counter(page)).includes("DESK")) keyed.push(`right arrow ended at "${await counter(page)}"`);
+    for (let k = 1; k <= 6; k++) {
+      const from = await stopNow(page);
+      await page.keyboard.press("ArrowLeft");
+      await settle(page, from).catch(() => keyed.push(`left ${k}: never settled`));
+      if ((await stopNow(page)) !== from - 1) keyed.push(`left ${k}: from stop ${from} to ${await stopNow(page)}, not one stop`);
+    }
+    if (!(await counter(page)).includes("001")) keyed.push(`left arrow ended at "${await counter(page)}"`);
+    report(`${name}: walking by keyboard, to the desk and back`, [...keyed, ...inPlace(await scan(page))]);
     // The fling that used to drag the gallery off screen: focus in an open drawer, then a quick scroll on.
     for (const n of [1, 3]) {
       await toStart(page);
@@ -532,6 +641,168 @@ if (!only) {
       await shot(page, `turned-${size}`);
     }
     report("no page errors while turning", errors.map((e) => e.slice(0, 120)));
+    await context.close();
+  }
+
+  // ---------------------------------------------------------------- 7. the guide as an overlay
+  for (const [size, rail] of [["844x390", "open"], ["667x375", "folded"], ["900x700", "open"], ["999x800", "open"], ["1000x800", "open"]]) {
+    const [width, height] = size.split("x").map(Number);
+    const options = SIZES[size] ?? { viewport: { width, height } };
+    const context = await browser.newContext(options);
+    const { page, errors } = await open(context, rail);
+    const name = `${size} guide remembered ${rail}`;
+    const guide = () =>
+      page.evaluate(() => ({
+        mode: document.querySelector("[data-guide]")?.dataset.guide,
+        width: document.querySelector("#field-guide").getBoundingClientRect().width,
+        scrim: !!document.querySelector("[class*=scrim]"),
+        expanded: document.querySelector("[aria-controls=field-guide]").getAttribute("aria-expanded"),
+        y: scrollY,
+      }));
+    const closed = await guide();
+    if (width >= 1000 && height > 500) {
+      // Room enough: the docked rail, as before.
+      report(`${name}: the docked rail, not an overlay`, closed.mode === "open" && Math.round(closed.width) === 340 && !closed.scrim ? [] : [JSON.stringify(closed)]);
+      await context.close();
+      continue;
+    }
+    // Closed: the strip, whatever was remembered, and the hall at its full width beside it.
+    report(`${name}: closed, the strip`, closed.mode === "overlay" && Math.round(closed.width) === 72 && closed.expanded === "false" ? [] : [JSON.stringify(closed)]);
+    await next(page);
+    await next(page);
+    // With a drawer open and (where compact) the details read: the overlay keeps both.
+    await openDrawer(page, 3);
+    const opener = page.getByRole("button", { name: "Open the field guide" });
+    await opener.focus();
+    await page.keyboard.press("Enter");
+    const mode = (want) => page.waitForFunction((want) => document.querySelector("[data-guide]")?.dataset.guide === want, want, { timeout: 3000 });
+    // Open: the panel at its full width (its width eases), the scrim up, focus inside.
+    await mode("overlay-open");
+    await page.waitForFunction(() => document.querySelector("#field-guide").getBoundingClientRect().width >= 300 && !!document.activeElement?.closest("#field-guide"), null, { timeout: 3000 }).catch(() => {});
+    const opened = await guide();
+    const problems = [];
+    if (Math.round(opened.width) < 300 || !opened.scrim || opened.expanded !== "true") problems.push(`not open as an overlay: ${JSON.stringify(opened)}`);
+    if (!(await page.evaluate(() => document.activeElement?.getAttribute("aria-current") === "location"))) problems.push("focus didn't start on the stop you're at");
+    if (!(await page.evaluate(() => document.querySelector("header").inert && document.querySelector("ol[aria-label^='Exhibits']").inert && document.querySelector("canvas").inert && document.querySelector("[class*=controls]").inert))) problems.push("the hall behind isn't inert");
+    // The handle (its close control) on screen; the list scrolls inside the panel.
+    const handle = await page.locator("[aria-controls=field-guide]").boundingBox();
+    if (!handle || handle.y < 0 || handle.y + handle.height > height || handle.x + handle.width > width) problems.push("the close control is off screen");
+    const list = await page.evaluate(() => {
+      const panel = [...document.querySelectorAll("#field-guide > div")].find((d) => d.getClientRects().length);
+      return { scrolls: panel.scrollHeight > panel.clientHeight + 1, overflow: getComputedStyle(panel).overflowY };
+    });
+    if (list.scrolls && list.overflow !== "auto") problems.push("the guide's list overflows without scrolling");
+    report(`${name}: opens over the hall`, problems);
+    await shot(page, `${name}-overlay-open`);
+    // Containment: Tab and Shift+Tab never leave the guide; wheel and keys don't move the hall. Both ends of
+    // the trap: Shift+Tab from the first control lands on the last (the handle), Tab from there on the first.
+    const ends = await page.evaluate(() => {
+      const panel = [...document.querySelectorAll("#field-guide > div")].find((d) => d.getClientRects().length);
+      const first = panel.querySelector("a[href], button:not(:disabled)");
+      first.focus();
+      return first.textContent.trim().slice(0, 20);
+    });
+    await page.keyboard.press("Shift+Tab");
+    const wrapBack = await page.evaluate(() => document.activeElement?.getAttribute("aria-controls"));
+    await page.keyboard.press("Tab");
+    const wrapOn = await page.evaluate(() => document.activeElement?.textContent.trim().slice(0, 20));
+    const out = [];
+    if (wrapBack !== "field-guide") out.push(`Shift+Tab from the first control went to ${wrapBack}`);
+    if (wrapOn !== ends) out.push(`Tab from the handle went to "${wrapOn}", not "${ends}"`);
+    for (let k = 0; k < 30; k++) {
+      await page.keyboard.press(k % 5 === 4 ? "Shift+Tab" : "Tab");
+      const inside = await page.evaluate(() => !!document.activeElement?.closest("#field-guide, [aria-controls=field-guide]"));
+      if (!inside) out.push(await page.evaluate(() => `${document.activeElement?.tagName} ${document.activeElement?.textContent?.slice(0, 20)}`));
+    }
+    await page.mouse.move(width - 30, height / 2);
+    for (let k = 0; k < 6; k++) await page.mouse.wheel(0, 300);
+    for (let k = 0; k < 4; k++) await page.mouse.wheel(300, 0);
+    // Keys that walk or scroll the hall, from the stop you're at in the guide (not Space or Enter: on a stop
+    // those choose it, which is meant to close the guide and walk).
+    await page.evaluate(() => [...document.querySelectorAll('#field-guide [aria-current="location"]')].find((b) => b.getClientRects().length)?.focus());
+    for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "PageDown", "End"]) await page.keyboard.press(key);
+    await page.waitForTimeout(900);
+    const held = await guide();
+    report(`${name}: focus stays in the guide, the hall stays put`, [
+      ...out.map((o) => (/^(Shift\+)?Tab /.test(o) ? o : `focus left to ${o}`)),
+      ...(held.y !== opened.y ? [`the hall moved (${opened.y} to ${held.y})`] : []),
+      ...((await counter(page)).includes("003") ? [] : [`now at "${await counter(page)}"`]),
+    ]);
+    // Escape: closed, focus back on the Guide button, the stop, drawer and scroll position as they were.
+    await page.keyboard.press("Escape");
+    // Closed and settled: the strip back at its width (it eases), focus somewhere real.
+    await mode("overlay").catch(() => {});
+    await page.waitForFunction(() => document.querySelector("#field-guide").getBoundingClientRect().width <= 72.5 && document.activeElement && document.activeElement !== document.body, null, { timeout: 3000 }).catch(() => {});
+    const after = await guide();
+    const kept = await page.evaluate((sel) => ({
+      drawer: !!document.querySelector(`${sel} [id$="-drawer"]:not([hidden])`),
+      focus: document.activeElement?.getAttribute("aria-label") ?? (document.activeElement?.getAttribute("aria-controls") === "field-guide" ? "the handle" : document.activeElement?.tagName),
+    }), placard(3));
+    const escape = [];
+    if (after.mode !== "overlay" || after.scrim) escape.push(`still open: ${JSON.stringify(after)}`);
+    // Back to what opened it, or the handle (the close control) if that's where focus was.
+    if (kept.focus !== "Open the field guide" && kept.focus !== "the handle") escape.push(`focus went to ${kept.focus}`);
+    if (!kept.drawer) escape.push("the drawer shut");
+    if (after.y !== opened.y) escape.push(`the hall moved (${opened.y} to ${after.y})`);
+    if (!(await counter(page)).includes("003")) escape.push(`now at "${await counter(page)}"`);
+    const g = await scan(page, placard(3));
+    escape.push(...fits(g), ...discoveryClear(g, 3), ...inPlace(g));
+    report(`${name}: Escape closes it, everything as it was`, escape);
+    await page.keyboard.press("Escape"); // The drawer.
+    await page.waitForTimeout(800);
+    // Compact sizes: the details unfolded survive the overlay too.
+    if (height <= 500) {
+      const read = page.locator(`${placard(3)} button[aria-controls$="-details"]`);
+      await read.click();
+      await page.waitForFunction((sel) => document.querySelector(sel)?.getAttribute("aria-expanded") === "true", `${placard(3)} button[aria-controls$="-details"]`);
+      await page.locator("[aria-controls=field-guide]").click();
+      await mode("overlay-open");
+      await page.locator("[class*=scrim]").click({ position: { x: width - 40, y: height / 2 } });
+      await mode("overlay").catch(() => {});
+      const still = await read.getAttribute("aria-expanded");
+      const closedByScrim = (await guide()).mode === "overlay";
+      report(`${name}: the scrim closes it, details still unfolded`, still === "true" && closedByScrim ? [] : [`details ${still}, guide ${(await guide()).mode}`]);
+      await read.click();
+      await page.waitForTimeout(500);
+    }
+    // Choosing a stop in the overlay closes it and walks there.
+    await opener.click();
+    await mode("overlay-open");
+    const from = await stopNow(page);
+    await page.locator("#field-guide").getByRole("button", { name: /^AH|After Hours/ }).first().click();
+    await settle(page, from);
+    const chosen = await guide();
+    const landed = await page.evaluate(() => document.activeElement?.getAttribute("aria-controls"));
+    report(`${name}: choosing a stop closes it and walks there`, chosen.mode === "overlay" && (await counter(page)).includes("AH") && landed === "field-guide" ? [] : [`guide ${chosen.mode}, at "${await counter(page)}", focus on ${landed}`]);
+    // Opened from a placard (focus there, then the [ key) and closed by choosing a stop: the hall stays at
+    // the chosen stop (focusing that placard again would walk back to it).
+    await page.locator(placard(6)).focus();
+    await page.keyboard.press("[");
+    await mode("overlay-open");
+    const from2 = await stopNow(page);
+    await page.locator("#field-guide").getByRole("button", { name: /Information desk/ }).first().click();
+    await settle(page, from2);
+    await page.waitForTimeout(400); // Long enough for a stray walk back to begin, which settle would then miss.
+    report(`${name}: opened from a placard, a stop chosen, no walk back`, (await counter(page)).includes("DESK") ? [] : [`now at "${await counter(page)}"`]);
+    const here = await stopNow(page);
+    const hereName = await counter(page);
+    // Turning or resizing with it open: each size's own form, and the overlay never left open by itself.
+    await opener.click();
+    await mode("overlay-open");
+    const turns = [];
+    for (const [w, h, want] of [[390, 844, "sheet"], [width, height, "overlay"], [1280, 744, null], [width, height, "overlay"]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.waitForTimeout(1200);
+      const now = await guide();
+      if (want && now.mode !== want) turns.push(`at ${w}x${h} the guide is "${now.mode}", not "${want}"`);
+      if (!want && now.mode === "overlay-open") turns.push(`at ${w}x${h} the overlay stayed open`);
+      if (now.scrim && now.mode !== "overlay-open") turns.push(`at ${w}x${h} a scrim with no overlay`);
+      if ((await counter(page)) !== hereName) turns.push(`at ${w}x${h} now at "${await counter(page)}", not "${hereName}"`);
+      const at = await scan(page, placard(here + 1));
+      turns.push(...fits(at).map((p) => `${w}x${h}: ${p}`), ...inPlace(at).map((p) => `${w}x${h}: ${p}`));
+    }
+    report(`${name}: turned and resized with it open`, turns);
+    report(`${name}: no page errors`, errors.map((e) => e.slice(0, 120)));
     await context.close();
   }
 

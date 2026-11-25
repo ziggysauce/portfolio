@@ -81,6 +81,16 @@ function onPhoneChange(callback: () => void) {
   return () => query.removeEventListener("change", callback);
 }
 const noSubscribe = () => () => {};
+/** Too little room for the open guide beside the hall: narrow (the hall would keep under 660px) or short
+ *  (landscape phones). There the hall keeps the folded strip, and the open guide overlays it. Matches the
+ *  stylesheet's "constrained" rules. Phones (under 640px) have the bottom sheet instead. */
+const CONSTRAINED = "(min-width: 640px) and (max-width: 999px), (min-width: 640px) and (max-height: 500px)";
+const isConstrained = () => window.matchMedia(CONSTRAINED).matches;
+function onConstrainedChange(callback: () => void) {
+  const query = window.matchMedia(CONSTRAINED);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
 /** Where placards are compact (Read exhibit): the stylesheet's phone and short-landscape rules. */
 const COMPACT = "(max-width: 639px), (max-height: 500px)";
 
@@ -169,18 +179,111 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   // before first paint (see app/page.tsx), so the hall never jumps after loading.
   const folded = useSyncExternalStore(onGuideChange, guideFolded, () => false);
   const sheet = useSyncExternalStore(onPhoneChange, isPhone, () => false);
+  const constrained = useSyncExternalStore(onConstrainedChange, isConstrained, () => false);
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false); // Until then the stylesheet alone decides how the guide looks.
-  const inset = sheet ? 0 : folded ? RAIL_FOLDED : RAIL_OPEN;
+  // On a constrained screen the open guide is an overlay: a moment's visit, never remembered, and the hall
+  // keeps the strip's inset underneath. Its own state, apart from the remembered open/folded choice.
+  const [overlay, setOverlay] = useState(false);
+  const overlayRef = useRef(false);
+  const opener = useRef<HTMLElement | null>(null); // What had focus when the overlay opened, to return it to.
+  const inset = sheet ? 0 : constrained || folded ? RAIL_FOLDED : RAIL_OPEN;
   const insetRef = useRef(inset);
   useLayoutEffect(ensureGuideState, []);
+  const closeOverlay = useCallback(() => {
+    if (!overlayRef.current) return;
+    overlayRef.current = false;
+    setOverlay(false);
+  }, []);
   // Folding or opening hides the form of the guide that had focus (the stop rows, or the strip's Guide
   // button), so focus moves to the handle instead of dropping to the top of the page.
   const toggleRail = useCallback(() => {
+    if (isConstrained()) {
+      if (overlayRef.current) closeOverlay();
+      else {
+        opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+        overlayRef.current = true;
+        setOverlay(true);
+      }
+      return;
+    }
     const guide = document.getElementById("field-guide");
     const hadFocus = !!guide?.contains(document.activeElement);
     setGuideFolded(!guideFolded());
     if (hadFocus) requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-controls="field-guide"]')?.focus({ preventScroll: true }));
-  }, []);
+  }, [closeOverlay]);
+  // Leaving the constrained sizes (a resize or a turn) closes the overlay: a wide screen shows the guide by
+  // its remembered choice, and a phone has its sheet.
+  useEffect(() => {
+    if (!constrained) closeOverlay();
+  }, [constrained, closeOverlay]);
+  // While the overlay is open: the hall behind it can't be scrolled (so it can't be walked, and its place is
+  // kept), focus starts on the stop you're at, and Escape closes it. Closing returns focus to whatever opened
+  // it (the strip's Guide button, the handle, the [ key's target), or the handle.
+  useEffect(() => {
+    if (!overlay) return;
+    const root = document.documentElement;
+    const saved = { overflow: root.style.overflow, gutter: root.style.scrollbarGutter };
+    root.style.overflow = "hidden";
+    root.style.scrollbarGutter = "stable";
+    const panel = () => document.querySelector<HTMLElement>(`#field-guide .${styles.railOpen}`);
+    const handle = () => document.querySelector<HTMLElement>('[aria-controls="field-guide"]');
+    // Everything focusable in the open guide, then its handle (the close control), in Tab order.
+    const stops = () => [...(panel()?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)") ?? []), handle()].filter((node): node is HTMLElement => !!node && node.getClientRects().length > 0);
+    requestAnimationFrame(() => {
+      const list = panel();
+      (list?.querySelector<HTMLElement>('[aria-current="location"]') ?? list?.querySelector<HTMLElement>("button, a[href]"))?.focus({ preventScroll: true });
+    });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        event.preventDefault();
+        closeOverlay();
+        return;
+      }
+      // Tab and Shift+Tab go round the guide and its handle, never out to the page (the page's skip link,
+      // at its top, would scroll the hall back to the first stop).
+      if (event.key !== "Tab") return;
+      const list = stops();
+      if (!list.length) return;
+      const at = list.indexOf(document.activeElement as HTMLElement);
+      const next = at === -1 ? (event.shiftKey ? list.length - 1 : 0) : event.shiftKey ? (at === 0 ? list.length - 1 : -1) : at === list.length - 1 ? 0 : -1;
+      if (next === -1) return; // Inside the guide, not at an end: the browser's own order.
+      event.preventDefault();
+      list[next].focus({ preventScroll: true });
+    };
+    // Focus that lands outside anyway (a screen reader's own cursor, a click on browser chrome and back)
+    // comes back to the guide, without moving the hall. Where the hall is: kept up to date through a resize,
+    // which moves the scroll offset to keep the stop (the hall's own resize handler runs first).
+    let y = window.scrollY;
+    const onResize = () => requestAnimationFrame(() => (y = window.scrollY));
+    // The rest of the page (the skip link, anything outside the hall) is out of reach too: a modal dialog.
+    const outside = [...document.body.children].filter((node): node is HTMLElement => node instanceof HTMLElement && !node.contains(document.getElementById("field-guide")) && !node.inert);
+    outside.forEach((node) => (node.inert = true));
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest?.("#field-guide, [aria-controls=field-guide]")) return;
+      stops()[0]?.focus({ preventScroll: true });
+      if (window.scrollY !== y) window.scrollTo({ top: y, behavior: "instant" });
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("focusin", onFocus);
+      outside.forEach((node) => (node.inert = false));
+      root.style.overflow = saved.overflow;
+      root.style.scrollbarGutter = saved.gutter;
+      const guide = document.getElementById("field-guide");
+      const focus = document.activeElement;
+      if (!focus || focus === document.body || guide?.contains(focus)) {
+        const back = opener.current && opener.current.isConnected && opener.current.getClientRects().length ? opener.current : null;
+        (back ?? document.querySelector<HTMLElement>('[aria-controls="field-guide"]'))?.focus({ preventScroll: true });
+      }
+      opener.current = null;
+    };
+  }, [overlay, closeOverlay]);
   const scene = useRef<MuseumScene | null>(null);
   const reduced = useRef(false);
   const [status, setStatus] = useState<Status>("loading");
@@ -844,6 +947,8 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
       }
       const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
       if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
+      // The overlay is a moment in the guide: the hall behind it doesn't walk.
+      if (overlayRef.current && event.key !== "[") return;
       if (event.key === "[" && !sheet) toggleRail();
       else if (event.key === "ArrowRight") go(heading() + 1);
       else if (event.key === "ArrowLeft") go(heading() - 1);
@@ -873,7 +978,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   /** The guide, the phone's sheet, or the placard of an open drawer: panels that scroll themselves. */
   const insidePanel = useCallback((target: EventTarget | null) => {
     if (!(target instanceof Element)) return false;
-    if (target.closest("#field-guide, #guide-sheet")) return true;
+    if (target.closest(`#field-guide, #guide-sheet, .${styles.scrim}`)) return true;
     const open = openRef.current ?? readingRef.current;
     return open !== null && !!labels.current[open]?.contains(target);
   }, []);
@@ -985,7 +1090,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   return (
     <div
       className={`${styles.root} ${fallback ? styles.static : ""}`}
-      data-guide={fallback || !mounted ? undefined : sheet ? "sheet" : folded ? "folded" : "open"}
+      data-guide={fallback || !mounted ? undefined : sheet ? "sheet" : constrained ? (overlay ? "overlay-open" : "overlay") : folded ? "folded" : "open"}
       onClickCapture={rememberStop}
     >
       <main id="main">
@@ -1003,11 +1108,34 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                 it, and the guide is a sheet that opens from the bottom bar (with the pager, below). */}
             {fallback ? null : (
               <>
-                <GuideRail hall={hall} identity={identity} exhibits={exhibits} index={index} onGo={go} links={links} folded={folded} onToggle={toggleRail} />
+                <GuideRail
+                  hall={hall}
+                  identity={identity}
+                  exhibits={exhibits}
+                  index={index}
+                  onGo={(stop) => {
+                    // From the overlay: it closes, then the hall walks there as from anywhere else. Focus goes
+                    // to the guide's handle, not back to what opened it: that might be another stop's placard,
+                    // and focusing a placard walks to it.
+                    if (overlayRef.current) {
+                      opener.current = null;
+                      closeOverlay();
+                    }
+                    go(stop);
+                  }}
+                  links={links}
+                  folded={constrained ? !overlay : folded}
+                  onToggle={toggleRail}
+                  overlay={overlay}
+                />
+                {overlay ? (
+                  // Behind the open overlay: dims the hall, and a tap or click on it closes the guide.
+                  <div className={styles.scrim} aria-hidden="true" onClick={closeOverlay} />
+                ) : null}
               </>
             )}
             {/* Inside the pinned viewport, so the sign leaves with the gallery instead of floating over the desk. */}
-            <header className={styles.top}>
+            <header className={styles.top} inert={overlay}>
                 {/* The title block. With the field guide open, the guide carries it instead (its lockup). */}
                 <div className={styles.sign}>
                   <p className={styles.hallName}>{hall.name}</p>
@@ -1031,6 +1159,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
               />
             ) : (
               <canvas
+                inert={overlay}
                 ref={canvas}
                 className={styles.canvas}
                 role="img"
@@ -1041,7 +1170,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
               />
             )}
 
-            <ol className={styles.labels} aria-label="Exhibits and the information desk">
+            <ol className={styles.labels} aria-label="Exhibits and the information desk" inert={overlay}>
               {exhibits.map((exhibit, i) => (
                 <li key={exhibit.id}>
                   <article
@@ -1274,7 +1403,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
               // Prev and Next never change their words or width; where they lead is in their accessible names.
               // On a phone this is the one bar along the bottom: Prev, the field guide (which opens above it)
               // and Next. The stop number is then in the guide's button, and the counter is for screen readers.
-              <div className={styles.controls}>
+              <div className={styles.controls} inert={overlay}>
                 <StepButton exhibits={exhibits} from={index} to={index - 1} onGo={() => go(heading() - 1)} edge="Previous: none, this is the first stop" />
                 <p className={styles.counter} aria-live="polite">
                   <span className="sr-only">Stop </span>
