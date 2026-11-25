@@ -84,8 +84,9 @@ export function GuideRail({ hall, identity, exhibits, index, onGo, links, folded
   );
 }
 
-/** The phone's field guide: a handle along the bottom that opens into the same list and contact links. */
-export function GuideSheet({ exhibits, index, onGo, links }: Pick<Props, "exhibits" | "index" | "onGo" | "links">) {
+/** The phone's field guide: the middle of the bottom bar, "Guide · 003", which opens into the lockup (the
+ *  hall's name, title and who this is), the stops and the contact links. */
+export function GuideSheet({ hall, identity, exhibits, index, onGo, links }: Pick<Props, "hall" | "identity" | "exhibits" | "index" | "onGo" | "links">) {
   const [open, setOpen] = useState(false);
   const handle = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -124,12 +125,15 @@ export function GuideSheet({ exhibits, index, onGo, links }: Pick<Props, "exhibi
   return (
     <div className={styles.sheet} data-open={open || undefined} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <button ref={handle} type="button" className={styles.sheetHandle} aria-expanded={open} aria-controls="guide-sheet" onClick={() => (open ? close() : setOpen(true))}>
-        <span className={styles.sheetGrip} aria-hidden="true" />
+        <span className={styles.guideIcon} aria-hidden="true" />
         <span>
-          Guide · <span className={styles.sheetCode}>{stopCode(index, exhibits)}</span>
+          Guide<span aria-hidden="true"> · </span>
+          <span className="sr-only">, at stop </span>
+          <span className={styles.sheetCode}>{stopCode(index, exhibits)}</span>
         </span>
       </button>
       <div ref={panel} id="guide-sheet" className={styles.sheetPanel} hidden={!open} aria-label="Field guide" role="region">
+        <Lockup hall={hall} identity={identity} />
         <StopList
           idPrefix="sheet"
           stops={stops}

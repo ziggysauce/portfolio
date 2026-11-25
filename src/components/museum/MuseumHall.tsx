@@ -81,6 +81,8 @@ function onPhoneChange(callback: () => void) {
   return () => query.removeEventListener("change", callback);
 }
 const noSubscribe = () => () => {};
+/** Where placards are compact (Read exhibit): the stylesheet's phone and short-landscape rules. */
+const COMPACT = "(max-width: 639px), (max-height: 500px)";
 
 const HOLD = 0.3; // Camera speed is 1 - HOLD at a case and 1 + HOLD halfway between.
 function walk(progress: number) {
@@ -133,6 +135,16 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   const captions = useRef<(HTMLElement | null)[]>([]);
   const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
   const [openNote, setOpenNote] = useState<number | null>(null);
+  // Small screens show a compact placard (kicker, title, role and the two buttons); "Read exhibit" opens the
+  // rest (dates, description, quote, case studies) in a region that scrolls on its own. Which one is open.
+  const [reading, setReadingState] = useState<number | null>(null);
+  const readingRef = useRef<number | null>(null);
+  const details = useRef<(HTMLElement | null)[]>([]);
+  const readToggles = useRef<(HTMLButtonElement | null)[]>([]);
+  const setReading = useCallback((next: number | null) => {
+    readingRef.current = next;
+    setReadingState(next);
+  }, []);
   // Each drawer discovery's progress (bell rings, stamped cards, the card opened), and which drawer is
   // still animating its last step: input to it is ignored until then, never queued.
   const [steps, setSteps] = useState<number[]>(() => exhibits.map(() => 0));
@@ -144,6 +156,9 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   const changeDrawer = useCallback((next: number | null) => {
     openRef.current = next;
     setOpenNote(next);
+    // An open drawer takes the placard's body, and Back to exhibit returns to the compact placard.
+    readingRef.current = null;
+    setReadingState(null);
     setSteps((prev) => (prev.every((step) => step === 0) ? prev : prev.map(() => 0)));
     window.clearTimeout(busyTimer.current);
     setBusy(null);
@@ -289,9 +304,17 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     const heights = new Map<Element, number>();
     const widths = new Map<Element, number>();
     let floor = Infinity;
+    // The bottom bar's pieces, by their edges: on a wide screen a placard that isn't above the pager may run
+    // down to the screen's foot (short landscape screens put the pager to the left to allow it).
+    let bars: { left: number; right: number; top: number }[] = [];
     let ceiling = 0; // Just under the whole header: on a phone, where a label spans the screen, it stops here.
     let obstacles: Obstacle[] = []; // The header's pieces, one by one: on a wide screen a label clears only those above it.
+    // A phone (under 640px wide): the placard docks above the bottom bar, and the exhibit gets the band
+    // between the header and the tallest compact placard, framed by the camera (scene.setFrame).
+    let docked = false;
+    const compact = new Map<Element, number>(); // Each placard's compact height (nothing expanded, drawer shut).
     const measure = () => {
+      docked = isPhone();
       // Measured within the pinned viewport, where labels are placed, so it holds while the hall scrolls in.
       const layer = labels.current[0]?.closest("ol");
       const header = layer?.parentElement?.querySelector("header");
@@ -299,28 +322,46 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
       const bottomBar = [layer?.parentElement?.querySelector(`.${styles.sheetHandle}`), layer?.parentElement?.querySelector(`.${styles.controls}`)];
       // Only what's showing: the phone's guide handle is in the page on a wide screen too, just hidden.
       const shown = (node: Element | null | undefined): node is Element => !!node && node.getClientRects().length > 0;
-      const tops = bottomBar.filter(shown).map((node) => node.getBoundingClientRect().top - origin);
-      floor = tops.length ? Math.min(...tops) - 12 : Infinity;
+      bars = bottomBar.filter(shown).map((node) => {
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right, top: box.top - origin };
+      });
+      const tops = bars.map((bar) => bar.top);
+      floor = tops.length ? Math.min(...tops) - (docked ? 8 : 12) : Infinity;
       ceiling = header ? header.getBoundingClientRect().bottom - origin + 8 : 0;
+      // Visually hidden pieces (the phone keeps the hall's name in the page for screen readers) take no room.
+      const seen = (node: Element) => shown(node) && node.getBoundingClientRect().width > 1;
       obstacles = header
-        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].filter(shown).map((node) => {
+        ? [...header.querySelectorAll(":scope > div > *, :scope > nav")].filter(seen).map((node) => {
             const box = node.getBoundingClientRect();
             return { left: box.left, right: box.right, bottom: box.bottom - origin };
           })
         : [];
       // scrollHeight, not the rendered height: a label capped to fit a short screen still knows its full height.
       for (const [i, node] of labels.current.entries()) if (node) {
-          // An open drawer's content scrolls inside the placard (header and footer stay put), so its full
-          // height is the placard's plus whatever of the content is scrolled out of view.
+          // An open drawer's content scrolls inside the placard (header and footer stay put), and so do a
+          // compact placard's unfolded details, so its full height is the placard's plus whatever of that
+          // region is scrolled out of view.
           const view = notes.current[i];
-          const hidden = view && !view.hidden ? view.scrollHeight - view.clientHeight : 0;
+          const unfolded = node.hasAttribute("data-reading") ? details.current[i] : null;
+          const hidden = (view && !view.hidden ? view.scrollHeight - view.clientHeight : 0) + (unfolded ? unfolded.scrollHeight - unfolded.clientHeight : 0);
           heights.set(node, node.scrollHeight + hidden);
           widths.set(node, node.offsetWidth);
+          if (!node.hasAttribute("data-drawer") && !node.hasAttribute("data-reading")) compact.set(node, node.scrollHeight);
         }
+      if (docked && Number.isFinite(floor)) {
+        const reserve = Math.max(0, ...labels.current.map((node) => (node ? (compact.get(node) ?? 0) : 0)));
+        // Never less than a third of the screen for the exhibit, even with very large text.
+        const bottom = Math.max(floor - reserve - 8, ceiling + (floor - ceiling) / 3);
+        scene.current?.setFrame({ top: ceiling - 4, bottom });
+      } else scene.current?.setFrame(null);
     };
     const sizes = new ResizeObserver(measure);
     const watchSizes = () => {
-      for (const node of [...labels.current, ...notes.current]) if (node) sizes.observe(node);
+      for (const node of [...labels.current, ...notes.current, ...details.current]) if (node) sizes.observe(node);
+      // The header too: crossing 640px it changes between its compact and full forms, and placards keep below it.
+      const header = labels.current[0]?.closest("ol")?.parentElement?.querySelector("header");
+      if (header) sizes.observe(header);
       window.addEventListener("resize", measure);
       measure();
     };
@@ -332,7 +373,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
      * it's first moved back to where it would be with no extra slide: the slide is a pure 2D shift, so
      * that's exact, and the answer doesn't depend on the slide already applied.
      */
-    function makeRoom(room: NonNullable<LabelAnchor["discovery"]>, placardWidth: number, portrait: boolean) {
+    function makeRoom(room: NonNullable<LabelAnchor["discovery"]>, placardWidth: number, portrait: boolean, sheetTop?: number, sideways = true, most = Infinity) {
       const applied = scene.current?.offset() ?? { x: insetRef.current, y: 0 };
       const dx = insetRef.current - applied.x; // How far left of its unshifted place the picture is now (negative: right).
       const dy = applied.y; // How far up.
@@ -341,21 +382,24 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
       if (portrait) {
         const bottom = room.bottom + dy;
         const top = room.top + dy;
-        const free = (Number.isFinite(floor) ? floor : window.innerHeight - 16) - (bottom + 8);
-        y = Math.max(0, Math.min(PHONE_SHEET_MIN - free, top - ceiling));
+        // Up just far enough to clear the placard's top (a sheet of PHONE_SHEET_MIN unless told), never
+        // so far that the top of what's protected goes under the header.
+        const sheet = sheetTop ?? (Number.isFinite(floor) ? floor : window.innerHeight - 16) - PHONE_SHEET_MIN;
+        y = Math.max(0, Math.min(bottom + 8 - sheet, top - ceiling));
         // Sideways too, if the discovery runs off an edge (the toppled books are wider than a small phone's
         // view of the cabinet): the least slide that brings it on screen, centred if it's wider still.
         const left = room.left + dx;
         const right = room.right + dx;
         const edge = 8;
-        if (right - left > window.innerWidth - 2 * edge) x = (left + right) / 2 - window.innerWidth / 2;
+        if (!sideways) x = 0;
+        else if (right - left > window.innerWidth - 2 * edge) x = (left + right) / 2 - window.innerWidth / 2;
         else if (left < edge) x = left - edge;
         else if (right > window.innerWidth - edge) x = right - (window.innerWidth - edge);
       } else {
         const left = room.left + dx;
         const right = room.right + dx;
         const over = right + 16 + placardWidth + 16 - window.innerWidth;
-        x = Math.max(0, Math.min(over, left - (insetRef.current + 16)));
+        x = Math.max(0, Math.min(over, left - (insetRef.current + 16), most));
       }
       x = Math.round(x);
       y = Math.round(y);
@@ -367,7 +411,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
 
     function placeLabels(anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) {
       // ?debug: where each discovery is on screen, for the layout check (tests/layout.mjs).
-      if (debug) (window as unknown as { __hall: unknown }).__hall = { discoveries: anchors.map((anchor) => anchor.discovery), open: openRef.current, progress };
+      if (debug) (window as unknown as { __hall: unknown }).__hall = { discoveries: anchors.map((anchor) => anchor.discovery), subjects: anchors.map((anchor) => anchor.subject), open: openRef.current, progress };
       // The fatherhood card stays with its plinth and shows whenever the plinth is in view: a quiet
       // discovery on the way to the desk, never a stop, so nothing to tab to or click.
       const card = plinthCard.current;
@@ -378,6 +422,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         card.style.opacity = covered ? "0" : plinth.opacity.toFixed(3);
         card.style.visibility = "visible";
       }
+      let roomed = false; // Whether a placard asked the picture to slide this frame.
       anchors.forEach((anchor, i) => {
         const label = labels.current[i];
         if (!label) return;
@@ -397,7 +442,30 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         const w = widths.get(label) ?? 0;
         let x = anchor.x;
         let y: number;
-        if (portrait) {
+        if (docked) {
+          // A phone: docked above the bottom bar, full width, its height its own up to a cap; only the cap
+          // differs. Compact, it never takes the exhibit's band. Reading, the case keeps its own height
+          // above it (sliding up into the band if it must). With the drawer open, the discovery keeps its
+          // space and the sheet takes what's left, at least PHONE_SHEET_MIN (or less, if that's all it needs).
+          x = window.innerWidth / 2;
+          const natural = heights.get(label) ?? 0;
+          const span = bottom - ceiling;
+          let cap = span - 120;
+          if (open && room) {
+            makeRoom(room, w, true, bottom - Math.min(natural, PHONE_SHEET_MIN));
+            roomed = true;
+            cap = bottom - Math.max(ceiling, Math.min(room.bottom + 8, bottom - 120));
+          } else if (readingRef.current === i) {
+            const keep = Math.min(Math.max(anchor.subject.bottom - anchor.subject.top + 24, 150), span * 0.45);
+            cap = span - keep;
+            if (distance < 0.5) {
+              makeRoom(anchor.subject, w, true, bottom - Math.min(natural, cap), false);
+              roomed = true;
+            }
+          }
+          y = bottom - Math.min(natural, cap);
+          label.style.maxHeight = `${cap.toFixed(0)}px`;
+        } else if (portrait) {
           if (open && room) {
             // Centred on the screen, not the case: the picture may slide sideways to fit the discovery.
             x = (insetRef.current + window.innerWidth) / 2;
@@ -410,13 +478,29 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           }
         } else {
           if (open && room) x = Math.min(Math.max(anchor.x, room.right + 16), window.innerWidth - w - 16);
+          // A short landscape screen: at the right edge, where the case can't reach it (the picture slides
+          // left to make room, below). Elsewhere never off the right edge either.
+          else if (window.innerHeight <= 500) x = window.innerWidth - w - 12;
+          else x = Math.min(x, window.innerWidth - w - 16);
           const h = heights.get(label) ?? 0;
-          const fit = fitBetween(anchor.y - h / 2, h, ceilingFor(x, x + w, obstacles, 12, 16, 120), bottom);
+          // Down to the pager if it's underneath, otherwise to the foot of the screen.
+          const under = bars.filter((bar) => bar.left < x + w && bar.right > x);
+          const foot = under.length ? Math.min(...under.map((bar) => bar.top)) - 12 : window.innerHeight - 16;
+          const fit = fitBetween(anchor.y - h / 2, h, ceilingFor(x, x + w, obstacles, 12, 16, 120), Number.isFinite(bottom) ? foot : bottom);
           y = fit.top + (fit.maxHeight ?? h) / 2; // The stylesheet centres it on this point.
           label.style.maxHeight = fit.maxHeight === null ? "" : `${fit.maxHeight.toFixed(0)}px`;
         }
         label.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-        if (open && room) makeRoom(room, w, portrait);
+        if (open && room && !docked) {
+          makeRoom(room, w, portrait);
+          roomed = true;
+        } else if (!docked && !portrait && window.innerHeight <= 500 && distance < 0.15) {
+          // A short landscape screen: a wide case can reach the placard at the right edge, so the picture
+          // slides left as far as it needs to (never under the guide), as it does for an open drawer. Only
+          // when standing at the stop (mid-walk, the next case is still off to the side), and never far.
+          makeRoom(anchor.subject, w, false, undefined, true, 120);
+          roomed = true;
+        }
         // Solid near its stop (the hall leaves you a little off a case on purpose, see NEAR), then fading as
         // you walk away; transparent paper let the window and the plant show through the text.
         const opacity = anchor.visible ? Math.min(1, Math.max(0, 1 - (distance - 0.15) * 2.4)) : 0;
@@ -434,6 +518,11 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         label.style.visibility = "visible";
         label.style.pointerEvents = opacity > 0.05 ? "auto" : "none";
       });
+      // Nothing needs the room any more (the details folded, or the visitor walked on): the picture goes back.
+      if (!roomed && openRef.current === null && (extra.current.x || extra.current.y)) {
+        extra.current = { x: 0, y: 0 };
+        scene.current?.setOffset(insetRef.current, 0);
+      }
     }
 
     import("./scene")
@@ -548,6 +637,13 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           changeDrawer(null);
           if (hadFocus) labels.current[nearest]?.focus({ preventScroll: true });
         }
+        // So do a placard's expanded details.
+        const read = readingRef.current;
+        if (read !== null && read !== nearest) {
+          const hadFocus = !!details.current[read]?.contains(document.activeElement);
+          setReading(null);
+          if (hadFocus) labels.current[nearest]?.focus({ preventScroll: true });
+        }
       }
     }
     function onResize() {
@@ -611,7 +707,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
       window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("keydown", onScrollKey);
     };
-  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer, exhibits, deskIndex]);
+  }, [status, count, offsetFor, caseHeight, go, stopGlide, changeDrawer, setReading, exhibits, deskIndex]);
 
   // A new stop typed or pasted into the address bar while the hall is open is a same-page navigation:
   // walk there like the directory does. (The hall's own replaceState calls don't fire this.)
@@ -683,6 +779,16 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     steps.forEach((step, i) => scene.current?.setDiscoveryStep(i, step));
   }, [steps, status]);
   useEffect(() => () => window.clearTimeout(busyTimer.current), []);
+  // Growing out of the compact placard (a resize or a turn) leaves nothing unfolded behind: a wide placard
+  // shows everything, and a stale "reading" would keep treating it as a panel that scrolls itself.
+  useEffect(() => {
+    const query = window.matchMedia(COMPACT);
+    const onChange = () => {
+      if (!query.matches) setReading(null);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, [setReading]);
   /** The open drawer's next step: ring, stamp, or open or close the card. */
   const act = useCallback(
     (i: number) => {
@@ -709,6 +815,15 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     },
     [exhibits, openNote, busy, steps],
   );
+  /** Folds a placard's details; focus that was in them goes back to Read exhibit. */
+  const foldDetails = useCallback(
+    (i: number) => {
+      const hadFocus = !!details.current[i]?.contains(document.activeElement);
+      setReading(null);
+      if (hadFocus) readToggles.current[i]?.focus({ preventScroll: true });
+    },
+    [setReading],
+  );
   const closeNote = useCallback((i: number) => {
     // Focus goes back to the Open drawer button once it's back in the placard, if it was in the drawer.
     if (labels.current[i]?.contains(document.activeElement)) returnFocus.current = i;
@@ -723,6 +838,10 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         closeNote(openNote);
         return;
       }
+      if (event.key === "Escape" && reading !== null) {
+        foldDetails(reading);
+        return;
+      }
       const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
       if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
       if (event.key === "[" && !sheet) toggleRail();
@@ -733,7 +852,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [status, heading, go, openNote, closeNote, sheet, toggleRail]);
+  }, [status, heading, go, openNote, closeNote, reading, foldDetails, sheet, toggleRail]);
 
   // A sideways swipe or trackpad gesture moves one case; vertical scrolling stays the browser's.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -755,7 +874,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   const insidePanel = useCallback((target: EventTarget | null) => {
     if (!(target instanceof Element)) return false;
     if (target.closest("#field-guide, #guide-sheet")) return true;
-    const open = openRef.current;
+    const open = openRef.current ?? readingRef.current;
     return open !== null && !!labels.current[open]?.contains(target);
   }, []);
 
@@ -783,10 +902,13 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     if (!node || status !== "ready") return;
     const canScroll = (panel: Element, dy: number) => (dy > 0 ? panel.scrollTop + panel.clientHeight < panel.scrollHeight - 1 : dy < 0 ? panel.scrollTop > 0 : false);
     // Over an open drawer's placard, the part that scrolls is its content region.
+    // An expanded placard's details scroll the same way.
     const openPlacard = (target: EventTarget | null) => {
-      const open = openRef.current;
+      const drawer = openRef.current;
+      const open = drawer ?? readingRef.current;
       const label = open === null ? null : labels.current[open];
-      return label && target instanceof Node && label.contains(target) ? (notes.current[open!] ?? label) : null;
+      if (!label || !(target instanceof Node) || !label.contains(target)) return null;
+      return (drawer !== null ? notes.current[drawer] : details.current[open!]) ?? label;
     };
     function onWheel(event: WheelEvent) {
       if (event.ctrlKey) return;
@@ -877,12 +999,11 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           onPointerCancel={() => (swipe.current = null)}
         >
           <div className={styles.viewport}>
-            {/* First in the page, as on screen: the field guide down the left. Both forms are in the page; the
-                stylesheet shows the rail on a wide screen and the sheet on a phone. */}
+            {/* First in the page, as on screen: the field guide down the left. On a phone the stylesheet hides
+                it, and the guide is a sheet that opens from the bottom bar (with the pager, below). */}
             {fallback ? null : (
               <>
                 <GuideRail hall={hall} identity={identity} exhibits={exhibits} index={index} onGo={go} links={links} folded={folded} onToggle={toggleRail} />
-                <GuideSheet exhibits={exhibits} index={index} onGo={go} links={links} />
               </>
             )}
             {/* Inside the pinned viewport, so the sign leaves with the gallery instead of floating over the desk. */}
@@ -931,6 +1052,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                     aria-labelledby={`${exhibit.id}-title`}
                     className={`${styles.label} ${exhibit.status === "in-preparation" ? styles.pending : ""}`}
                     data-drawer={openNote === i ? "open" : undefined}
+                    data-reading={reading === i ? "" : undefined}
                     onFocus={() => {
                       scene.current?.setHighlight(i);
                       // Always walk, even if this case is the one on screen: mid-walk, "on screen" still
@@ -946,52 +1068,73 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                       {exhibit.title}
                     </h2>
                     {exhibit.lines[0] && openNote !== i ? <p className={styles.line}>{exhibit.lines[0]}</p> : null}
-                    {exhibit.lines[1] ? <p className={styles.org}>{exhibit.lines[1]}</p> : null}
                     {/* With the drawer open, the discovery takes the placard's body (below); title and context stay. */}
-                    {openNote === i ? null : (
+                    {openNote === i ? (
+                      exhibit.lines[1] ? <p className={styles.org}>{exhibit.lines[1]}</p> : null
+                    ) : (
                       <>
-                    {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
-                    {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
-                    {/* The evidence behind the case, one click away: no drawer, bell or animation needed. */}
-                    {studies[exhibit.id]?.length === 1 ? (
-                      <Link href={studies[exhibit.id][0].href} className={styles.studyLink}>
-                        Read the case study
-                        <span className="sr-only">: {studies[exhibit.id][0].title}</span>
-                        <span aria-hidden="true">→</span>
-                      </Link>
-                    ) : studies[exhibit.id]?.length ? (
-                      <div className={styles.studyLinks}>
-                        <p className={styles.studyLinksTitle} id={`${exhibit.id}-studies`}>
-                          Case studies
-                        </p>
-                        <ul aria-labelledby={`${exhibit.id}-studies`}>
-                          {studies[exhibit.id].map((study) => (
-                            <li key={study.href}>
-                              <Link href={study.href} className={styles.studyLink}>
-                                {study.shortTitle}
-                                <span className="sr-only">: {study.title}</span>
-                                <span aria-hidden="true">→</span>
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {exhibit.drawer && !fallback ? (
-                      <button
-                        ref={(node) => {
-                          noteToggles.current[i] = node;
-                        }}
-                        type="button"
-                        className={styles.noteToggle}
-                        aria-expanded="false"
-                        aria-controls={`${exhibit.id}-drawer`}
-                        onClick={() => changeDrawer(i)}
-                      >
-                        Open drawer
-                        <span className="sr-only">: {exhibit.title}</span>
-                      </button>
-                    ) : null}
+                        {/* The rest of the placard. A wide screen always shows it; a small one folds it behind
+                            Read exhibit, in a region that scrolls on its own. */}
+                        <div
+                          id={`${exhibit.id}-details`}
+                          ref={(node) => {
+                            details.current[i] = node;
+                          }}
+                          className={styles.details}
+                        >
+                          {exhibit.lines[1] ? <p className={styles.org}>{exhibit.lines[1]}</p> : null}
+                          {exhibit.description ? <p className={styles.description}>{exhibit.description}</p> : null}
+                          {exhibit.quote ? <p className={styles.quote}>&ldquo;{exhibit.quote}&rdquo;</p> : null}
+                          {/* The evidence behind the case, one click away: no drawer, bell or animation needed. */}
+                          {studies[exhibit.id]?.length === 1 ? (
+                            <ArrowLink href={studies[exhibit.id][0].href} className={styles.studyLink} srText={`: ${studies[exhibit.id][0].title}`}>
+                              Read the case study
+                            </ArrowLink>
+                          ) : studies[exhibit.id]?.length ? (
+                            <div className={styles.studyLinks}>
+                              <p className={styles.studyLinksTitle} id={`${exhibit.id}-studies`}>
+                                Case studies
+                              </p>
+                              <ul aria-labelledby={`${exhibit.id}-studies`}>
+                                {studies[exhibit.id].map((study) => (
+                                  <li key={study.href}>
+                                    <ArrowLink href={study.href} className={styles.studyLink} srText={`: ${study.title}`}>
+                                      {study.shortTitle}
+                                    </ArrowLink>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className={styles.actions}>
+                          {fallback ? null : (
+                            <ReadToggle
+                              ref={(node) => {
+                                readToggles.current[i] = node;
+                              }}
+                              controls={`${exhibit.id}-details`}
+                              expanded={reading === i}
+                              onToggle={() => (reading === i ? foldDetails(i) : setReading(i))}
+                              title={exhibit.title}
+                            />
+                          )}
+                          {exhibit.drawer && !fallback ? (
+                            <button
+                              ref={(node) => {
+                                noteToggles.current[i] = node;
+                              }}
+                              type="button"
+                              className={styles.noteToggle}
+                              aria-expanded="false"
+                              aria-controls={`${exhibit.id}-drawer`}
+                              onClick={() => changeDrawer(i)}
+                            >
+                              Open drawer
+                              <span className="sr-only">: {exhibit.title}</span>
+                            </button>
+                          ) : null}
+                        </div>
                       </>
                     )}
                     {exhibit.drawer && !fallback ? (
@@ -1063,6 +1206,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                   tabIndex={0}
                   aria-labelledby="desk-title"
                   className={`${styles.label} ${styles.deskCard}`}
+                  data-reading={reading === deskIndex ? "" : undefined}
                   onFocus={() => {
                     scene.current?.setHighlight(deskIndex);
                     go(deskIndex);
@@ -1076,6 +1220,13 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                     Information desk
                   </h2>
                   <p className={styles.line}>{desk.summary}</p>
+                  <div
+                    id="desk-details"
+                    ref={(node) => {
+                      details.current[deskIndex] = node;
+                    }}
+                    className={styles.details}
+                  >
                   <p className={styles.farewell}>{desk.farewell}</p>
                   <ul className={styles.deskLinks}>
                     <li>
@@ -1100,18 +1251,36 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
                       </a>
                     </li>
                   </ul>
+                  </div>
+                  {fallback ? null : (
+                    <div className={styles.actions}>
+                      <ReadToggle
+                        ref={(node) => {
+                          readToggles.current[deskIndex] = node;
+                        }}
+                        controls="desk-details"
+                        expanded={reading === deskIndex}
+                        onToggle={() => (reading === deskIndex ? foldDetails(deskIndex) : setReading(deskIndex))}
+                        title="Information desk"
+                        words="Read more"
+                      />
+                    </div>
+                  )}
                 </article>
               </li>
             </ol>
 
             {fallback ? null : (
               // Prev and Next never change their words or width; where they lead is in their accessible names.
+              // On a phone this is the one bar along the bottom: Prev, the field guide (which opens above it)
+              // and Next. The stop number is then in the guide's button, and the counter is for screen readers.
               <div className={styles.controls}>
                 <StepButton exhibits={exhibits} from={index} to={index - 1} onGo={() => go(heading() - 1)} edge="Previous: none, this is the first stop" />
                 <p className={styles.counter} aria-live="polite">
                   <span className="sr-only">Stop </span>
                   {pagerLabel(index, exhibits)}
                 </p>
+                <GuideSheet hall={hall} identity={identity} exhibits={exhibits} index={index} onGo={go} links={links} />
                 <StepButton exhibits={exhibits} from={index} to={index + 1} onGo={() => go(heading() + 1)} edge="Next: none, this is the last stop" />
               </div>
             )}
@@ -1155,6 +1324,49 @@ function StepButton({ exhibits, from, to, onGo, edge }: { exhibits: Exhibit[]; f
   );
 }
 
+/**
+ * A link with a trailing arrow: one link, one focus target and one name (the arrow is decorative). Only the
+ * words are underlined; the arrow sits beside them, and the two wrap together, never apart.
+ */
+function ArrowLink({ href, className, srText, children }: { href: string; className?: string; srText?: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className={`${styles.arrowLink} ${className ?? ""}`}>
+      <span className={styles.arrowText}>
+        {children}
+        {srText ? <span className="sr-only">{srText}</span> : null}
+      </span>
+      <span className={styles.arrow} aria-hidden="true">
+        →
+      </span>
+    </Link>
+  );
+}
+
+/** Read exhibit: unfolds the rest of a compact placard (small screens only; a wide one shows it all). */
+function ReadToggle({
+  ref,
+  controls,
+  expanded,
+  onToggle,
+  title,
+  words = "Read exhibit",
+}: {
+  ref: React.Ref<HTMLButtonElement>;
+  controls: string;
+  expanded: boolean;
+  onToggle: () => void;
+  title: string;
+  words?: string;
+}) {
+  return (
+    <button ref={ref} type="button" className={styles.readToggle} aria-expanded={expanded} aria-controls={controls} onClick={onToggle}>
+      {words}
+      <span className="sr-only">: {title}</span>
+      <span className={styles.chevron} aria-hidden="true" />
+    </button>
+  );
+}
+
 /** Under a drawer's discovery: one concrete line about the real work, and (for a role) the way to the
  *  write-ups. The label above already links its own case studies, so the drawer doesn't repeat them. */
 function DrawerExtra({ note, work }: { note?: string; work: string | null }) {
@@ -1164,9 +1376,7 @@ function DrawerExtra({ note, work }: { note?: string; work: string | null }) {
       {note ? <p className={styles.drawerNote}>{note}</p> : null}
       {work ? (
         <p className={styles.drawerLinks}>
-          <Link href={work}>
-            Selected work <span aria-hidden="true">→</span>
-          </Link>
+          <ArrowLink href={work}>Selected work</ArrowLink>
         </p>
       ) : null}
     </div>

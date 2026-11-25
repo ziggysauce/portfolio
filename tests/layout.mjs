@@ -10,6 +10,10 @@
 //  3. Folding and opening the guide at the first, middle and last stops, with a drawer open too.
 //  4. Resizing after load, from desktop to a short laptop to a phone and back.
 //  5. Reduced motion, and the page without WebGL.
+//  6. Phones and short landscape screens: the exhibit itself (its case and deck, from the hall) is on screen,
+//     clear of the header, placard and bottom bar, and big enough to recognise, before anything is opened;
+//     Read exhibit unfolds the rest of the placard with the case still in view, scrolls inside itself
+//     without walking the hall, and folds again on Escape.
 //
 // Where each discovery is on screen comes from the hall itself (?debug, see MuseumHall placeLabels), so
 // the check measures the 3D objects' space, not just the HTML. Look at the screenshots as well.
@@ -43,6 +47,8 @@ const SIZES = {
   "1280x600": { viewport: { width: 1280, height: 600 } },
   "390x844": { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
   "375x667": { viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  "844x390": { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  "667x375": { viewport: { width: 667, height: 375 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 };
 const only = arg("sizes")?.split(",");
 const unknown = only?.filter((size) => !(size in SIZES)) ?? [];
@@ -115,7 +121,8 @@ const scan = (page, selector) =>
     const hall = window.__hall ?? { discoveries: [], open: null };
     return {
       box: el ? edges(el) : null,
-      header: [...document.querySelectorAll("header > div > *, header > nav")].map(edges).filter((e) => e.w > 0),
+      // Visually hidden pieces (the hall's name on a phone, kept for screen readers) are 1px and take no room.
+      header: [...document.querySelectorAll("header > div > *, header > nav")].map(edges).filter((e) => e.w > 1),
       guide: [...document.querySelectorAll("#field-guide, [aria-controls=field-guide]")].map(edges).filter((e) => e.w > 0),
       bottom: [...document.querySelectorAll("[class*=sheetHandle], [class*=controls]")].map(edges).filter((e) => e.w > 0),
       canvas: canvas ? edges(canvas) : null,
@@ -123,6 +130,7 @@ const scan = (page, selector) =>
       overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       shifted,
       discoveries: hall.discoveries.map((d) => (d ? { x: d.left, y: d.top, r: d.right, b: d.bottom } : null)),
+      subjects: (hall.subjects ?? []).map((d) => (d ? { x: d.left, y: d.top, r: d.right, b: d.bottom } : null)),
       vw: innerWidth,
       vh: innerHeight,
     };
@@ -163,6 +171,32 @@ const discoveryClear = (g, n) => {
   for (const c of g.bottom) if (meets(d, c)) problems.push("pager or guide handle covers the discovery");
   for (const h of g.header) if (meets(d, h)) problems.push("header covers the discovery");
   return problems;
+};
+
+/**
+ * The exhibit itself (the case and its deck, or the desktop and bell at the desk) before anything is opened:
+ * on screen, nothing over it, and at least `share` of the screen's width, so it reads at a glance.
+ */
+const exhibitClear = (g, n, share) => {
+  const d = g.subjects[n - 1];
+  if (!d) return ["the hall reported no exhibit area (is ?debug working?)"];
+  const problems = [];
+  if (d.x < -0.5 || d.r > g.vw + 0.5 || d.y < -0.5 || d.b > g.vh + 0.5) problems.push(`exhibit off screen (${px(d)})`);
+  if (g.box && meets(d, g.box)) problems.push(`placard covers the exhibit (${px(d)}, placard top ${Math.round(g.box.y)})`);
+  for (const c of g.bottom) if (meets(d, c)) problems.push("bottom bar covers the exhibit");
+  for (const h of g.header) if (meets(d, h)) problems.push(`header covers the exhibit (${px(d)})`);
+  for (const r of g.guide) if (meets(d, r)) problems.push("field guide covers the exhibit");
+  if (d.r - d.x < g.vw * share) problems.push(`exhibit only ${Math.round(d.r - d.x)}px wide`);
+  return problems;
+};
+/** With the details unfolded: at least `least` of the exhibit's height still shows between header and placard. */
+const exhibitShows = (g, n, least) => {
+  const d = g.subjects[n - 1];
+  if (!d || !g.box) return ["no exhibit or placard"];
+  const top = Math.max(d.y, ...g.header.filter((h) => h.x < d.r && h.r > d.x).map((h) => h.b), 0);
+  const bottom = Math.min(d.b, g.box.y);
+  const shown = Math.max(0, bottom - top) / (d.b - d.y);
+  return shown < least ? [`only ${Math.round(shown * 100)}% of the exhibit shows (${px(d)}, placard top ${Math.round(g.box.y)})`] : [];
 };
 
 const ready = (page) =>
@@ -224,7 +258,60 @@ async function playDrawer(page, n, check) {
   }
 }
 
-const runs = Object.entries(SIZES).flatMap(([size, options]) => (options.viewport.width < 640 ? [[size, options, null]] : [[size, options, "open"], [size, options, "folded"]]));
+/** Read exhibit: unfolds the details (stated by aria-expanded), keeps the case in view (phones), scrolls
+ *  inside itself without walking the hall, and folds on Escape with focus back on the button. */
+async function readDetails(page, n, name, title, small) {
+  const read = page.locator(`${placard(n)} button[aria-controls$="-details"]`);
+  const problems = [];
+  if ((await read.count()) !== 1) return report(`${name}: ${title}, Read exhibit`, ["no Read exhibit button"]);
+  if ((await read.getAttribute("aria-expanded")) !== "false") problems.push("starts expanded");
+  const hidden = await page.evaluate((sel) => getComputedStyle(document.querySelector(`${sel} [id$="-details"]`)).display === "none", placard(n));
+  if (!hidden) problems.push("details showing before Read exhibit");
+  await read.focus();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(1100);
+  if ((await read.getAttribute("aria-expanded")) !== "true") problems.push("aria-expanded not true once open");
+  const g = await scan(page, placard(n));
+  problems.push(...fits(g), ...inPlace(g));
+  if (small) problems.push(...exhibitShows(g, n, 0.75));
+  const region = await page.evaluate((sel) => {
+    const d = document.querySelector(`${sel} [id$="-details"]`);
+    const card = document.querySelector(sel).getBoundingClientRect();
+    const box = d.getBoundingClientRect();
+    return { shown: getComputedStyle(d).display !== "none", inside: box.bottom <= card.bottom + 0.5 && box.top >= card.top - 0.5, scrolls: d.scrollHeight > d.clientHeight + 1 };
+  }, placard(n));
+  if (!region.shown) problems.push("details still hidden");
+  if (!region.inside) problems.push("details run outside the placard");
+  await shot(page, `${name}-${n}-read`);
+  // Reading a long placard: the wheel over it scrolls the details, never the hall.
+  const stop = await counter(page);
+  const box = await page.locator(`${placard(n)} [id$="-details"]`).boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 20));
+    for (let k = 0; k < 6; k++) await page.mouse.wheel(0, 160);
+    await page.waitForTimeout(1200);
+    if ((await counter(page)) !== stop) problems.push(`scrolling the details walked the hall to "${await counter(page)}"`);
+    if (region.scrolls && !(await page.evaluate((sel) => document.querySelector(`${sel} [id$="-details"]`).scrollTop > 0, placard(n)))) problems.push("the details didn't scroll");
+  }
+  // Escape from inside the details (a case-study link, if there is one) folds them and brings focus back.
+  const inside = page.locator(`${placard(n)} [id$="-details"] a`).first();
+  if (await inside.count()) await inside.focus();
+  else await read.focus();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(800);
+  const after = await page.evaluate((sel) => ({ expanded: document.querySelector(`${sel} button[aria-controls$="-details"]`).getAttribute("aria-expanded"), focus: document.activeElement?.getAttribute("aria-controls") ?? document.activeElement?.tagName }), placard(n));
+  if (after.expanded !== "false") problems.push("Escape didn't fold the details");
+  if (!/-details$/.test(after.focus)) problems.push(`focus went to ${after.focus} after Escape`);
+  const folded = await scan(page, placard(n));
+  if (small) problems.push(...exhibitClear(folded, n, 0.5).map((p) => `folded again: ${p}`));
+  report(`${name}: ${title}, Read exhibit`, problems);
+}
+
+// Phones have no rail. Short landscape screens start with it folded (under 900px wide) and are checked that
+// way: the open rail (340px) leaves them no room for a placard, which is a known, separate problem.
+const runs = Object.entries(SIZES).flatMap(([size, options]) =>
+  options.viewport.width < 640 ? [[size, options, null]] : options.viewport.height <= 500 ? [[size, options, "folded"]] : [[size, options, "open"], [size, options, "folded"]],
+);
 
 // ---------------------------------------------------------------- 1. every stop, every size
 for (const [size, options, rail] of runs) {
@@ -243,8 +330,13 @@ for (const [size, options, rail] of runs) {
       await page.mouse.move(2, 2);
       title = await page.locator(`${placard(n)} h2`).innerText({ timeout: 5000 });
       const closed = await scan(page, placard(n));
-      report(`${name}: ${title}`, [...fits(closed), ...inPlace(closed)]);
+      // On a phone the exhibit has its own band above the placard; nothing may cover it, before any drawer.
+      const small = options.viewport.width < 640;
+      // Short landscape: the placard beside the case, never over it.
+      const clear = small ? exhibitClear(closed, n, 0.5) : options.viewport.height <= 500 ? exhibitClear(closed, n, 0.15) : [];
+      report(`${name}: ${title}`, [...fits(closed), ...inPlace(closed), ...clear]);
       await shot(page, `${name}-${n}-label`);
+      if (small || options.viewport.height <= 500) await readDetails(page, n, name, title, small);
 
       await openDrawer(page, n);
       const drawerChecks = async (when) => {
@@ -259,8 +351,10 @@ for (const [size, options, rail] of runs) {
       if (!(await page.evaluate((sel) => !!document.querySelector(sel)?.contains(document.activeElement) && !!document.activeElement.closest('[id$="-drawer"]'), placard(n)))) problems.push("focus did not move into the drawer");
       const back = await backs.first().boundingBox({ timeout: 5000 }).catch(() => null);
       const g = await scan(page, placard(n));
-      const pager = g.bottom.length ? Math.min(...g.bottom.map((c) => c.y)) : -Infinity;
-      if (!back || back.y < 0 || back.y + back.height > pager + 1) problems.push("Back to exhibit is out of reach");
+      // On screen and clear of the bottom bar (a placard beside a short landscape screen's pager may run
+      // down past its top).
+      const reach = back && { x: back.x, y: back.y, r: back.x + back.width, b: back.y + back.height };
+      if (!reach || reach.y < 0 || reach.b > g.vh || g.bottom.some((c) => meets(reach, c))) problems.push("Back to exhibit is out of reach");
       // The placard's three parts: content above the footer (never under it), solid paper, and a filled
       // primary action wherever the drawer has one to take.
       const parts = await page.evaluate((sel) => {
@@ -300,6 +394,20 @@ for (const [size, options, rail] of runs) {
       // One broken stop is a failure to report, not a reason to lose the rest of the run.
       report(`${name}: ${title}`, [error.message.split("\n")[0]]);
       await page.keyboard.press("Escape").catch(() => {});
+    }
+  }
+  // The desk, on small screens: the desktop and its bell in view, and its placard's Read more.
+  if (options.viewport.width < 640 || options.viewport.height <= 500) {
+    try {
+      await next(page);
+      await page.mouse.move(2, 2);
+      const g = await scan(page, placard(7));
+      const small = options.viewport.width < 640;
+      report(`${name}: Information desk`, [...fits(g), ...inPlace(g), ...(small ? exhibitClear(g, 7, 0.5) : [])]);
+      await shot(page, `${name}-7-label`);
+      await readDetails(page, 7, name, "Information desk", small);
+    } catch (error) {
+      report(`${name}: Information desk`, [error.message.split("\n")[0]]);
     }
   }
   report(`${name}: no page errors`, errors.map((e) => e.slice(0, 120)));
@@ -398,10 +506,32 @@ if (!only) {
       await page.waitForTimeout(1500);
       const g = await scan(page, placard(2));
       const stillOpen = await page.evaluate((sel) => !!document.querySelector(`${sel} [id$="-drawer"]:not([hidden])`), placard(2));
-      report(`resized to ${size}, drawer ${stillOpen ? "open" : "shut"}`, [...fits(g), ...(stillOpen ? discoveryClear(g, 2) : []), ...inPlace(g)]);
+      const at = await counter(page);
+      report(`resized to ${size}, drawer ${stillOpen ? "open" : "shut"}`, [...fits(g), ...(stillOpen ? discoveryClear(g, 2) : []), ...inPlace(g), ...(at.includes("002") ? [] : [`now at "${at}", not stop 002`])]);
       await shot(page, `resized-${size}`);
     }
     report("no page errors while resizing", errors.map((e) => e.slice(0, 120)));
+    await context.close();
+  }
+  {
+    // A phone turned on its side and back, and the 640px breakpoint crossed both ways, guide folded (the
+    // default under 900px): the stop is kept, and the placard and an open drawer fit each time.
+    const context = await browser.newContext(SIZES["390x844"]);
+    const { page, errors } = await open(context, "folded");
+    await next(page);
+    await next(page);
+    await openDrawer(page, 3);
+    for (const size of ["844x390", "390x844", "667x375", "375x667", "639x800", "640x800", "639x800", "390x844"]) {
+      const [width, height] = size.split("x").map(Number);
+      await page.setViewportSize({ width, height });
+      await page.waitForTimeout(1500);
+      const g = await scan(page, placard(3));
+      const stillOpen = await page.evaluate((sel) => !!document.querySelector(`${sel} [id$="-drawer"]:not([hidden])`), placard(3));
+      const at = await counter(page);
+      report(`turned to ${size}, drawer ${stillOpen ? "open" : "shut"}`, [...fits(g), ...(stillOpen ? discoveryClear(g, 3) : []), ...inPlace(g), ...(at.includes("003") ? [] : [`now at "${at}", not stop 003`])]);
+      await shot(page, `turned-${size}`);
+    }
+    report("no page errors while turning", errors.map((e) => e.slice(0, 120)));
     await context.close();
   }
 
@@ -425,6 +555,14 @@ if (!only) {
     await page.waitForTimeout(2500);
     const state = await page.evaluate(() => ({ canvas: !!document.querySelector("canvas"), placards: document.querySelectorAll("ol[aria-label] article").length }));
     report("without WebGL: every placard as a page, no 3D", !state.canvas && state.placards === 7 && !errors.length ? [] : [JSON.stringify({ ...state, errors })]);
+    // On a phone too: every placard's whole text showing, nothing folded behind a Read exhibit button.
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(500);
+    const phone = await page.evaluate(() => ({
+      toggles: document.querySelectorAll('button[aria-controls$="-details"]').length,
+      hidden: [...document.querySelectorAll('[id$="-details"]')].filter((d) => getComputedStyle(d).display === "none").length,
+    }));
+    report("without WebGL, phone: full placards, no Read exhibit", phone.toggles === 0 && phone.hidden === 0 ? [] : [JSON.stringify(phone)]);
     await plain.close();
   }
 }

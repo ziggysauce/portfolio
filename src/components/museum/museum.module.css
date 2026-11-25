@@ -167,6 +167,8 @@
   position: sticky;
   top: 0;
   height: 100svh;
+  /* The screen as it is now, browser bars and all, so nothing at the bottom is ever pushed off it. */
+  height: 100dvh;
   overflow: hidden; /* For browsers without clip (Safari before 16). */
   /* Clipped, not just hidden: an overflow:hidden box can still be scrolled by focus and script, and the
      placards of other stops sit far off to the side. Focusing one (Tab, or the hall moving focus when a
@@ -231,6 +233,7 @@
   box-shadow: var(--card-shadow);
   pointer-events: auto;
   visibility: hidden; /* Until the scene places it. */
+  z-index: 1; /* Over the tags pinned to objects (captions, the plinth's card), which belong to the scene. */
   overflow-y: auto; /* Only when a short screen caps its height (MuseumHall). */
   overscroll-behavior: contain;
   will-change: transform, opacity;
@@ -314,23 +317,54 @@
   text-wrap: pretty;
 }
 
-/* A case's written studies: mono links, underlined. */
-.studyLink {
-  justify-self: start;
+/* Links with a trailing arrow (a case's studies, Selected work in a drawer): one link whose words are
+   underlined and whose arrow sits beside them, not underlined, centred on the words. The link is one
+   inline box, so a row of them wraps link by link and an arrow never ends up alone on a line. */
+.arrowLink {
   display: inline-flex;
   align-items: center;
-  gap: 0.5em;
+  gap: 0.55em;
+  text-decoration: none;
+}
+.arrowText {
+  text-decoration: underline;
+  text-decoration-color: rgb(43 38 32 / 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 150ms;
+}
+.arrowLink:hover .arrowText {
+  text-decoration-color: currentColor;
+}
+.arrow {
+  flex: none;
+  line-height: 1;
+  translate: 0 -0.04em; /* The mono arrow sits a hair low against capitals. */
+  transition: translate 150ms;
+}
+@media (hover: hover) {
+  .arrowLink:hover .arrow {
+    translate: 0.15em -0.04em;
+  }
+}
+/* A wide screen shows the whole placard: the details and the buttons are part of its grid, and Read
+   exhibit isn't there. Small screens fold the details behind it (below). */
+.details,
+.actions {
+  display: contents;
+}
+.label .readToggle {
+  display: none;
+}
+
+/* A case's written studies: mono links. */
+.studyLink {
+  justify-self: start;
   min-height: 32px;
   color: var(--ink);
   font: 500 11px/1.2 var(--mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  text-decoration: underline;
-  text-decoration-color: rgb(43 38 32 / 0.45);
-  text-underline-offset: 4px;
-}
-.studyLink:hover {
-  text-decoration-color: var(--ink);
 }
 .studyLink:focus-visible,
 .drawerLinks a:focus-visible,
@@ -350,7 +384,7 @@
 .studyLinks ul {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 16px;
+  gap: 0 20px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -360,6 +394,7 @@
    action (Close the card, Make room for more). Primary (filled evergreen, below): the action that moves a
    discovery on. Quiet (a text button, further down): Back to exhibit. */
 .noteToggle,
+.readToggle,
 .drawerAction,
 .pill {
   justify-self: start;
@@ -381,6 +416,7 @@
    the finger (the drawer card's close button, right where Open drawer was). */
 @media (hover: hover) {
   .noteToggle:hover,
+  .readToggle:hover,
   .drawerAction[data-tone="secondary"]:hover:not([aria-disabled="true"]),
   .pill:hover {
     background: var(--ink);
@@ -388,6 +424,7 @@
   }
 }
 .noteToggle:focus-visible,
+.readToggle:focus-visible,
 .drawerAction:focus-visible,
 .pill:focus-visible {
   outline: 2px solid var(--ink);
@@ -439,6 +476,7 @@
 }
 @media (pointer: coarse) {
   .noteToggle,
+  .readToggle,
   .drawerAction,
   .pill,
   .studyLink {
@@ -565,11 +603,8 @@
   text-transform: uppercase;
 }
 .drawerLinks a {
-  display: inline-flex;
-  align-items: center;
   min-height: 32px;
   color: var(--ink);
-  text-underline-offset: 4px;
 }
 @media (pointer: coarse) {
   .drawerLinks a {
@@ -1179,7 +1214,7 @@
   transition-timing-function: var(--ease);
 }
 
-/* The phone's guide: a handle along the bottom, and the same list and links above it. */
+/* The phone's guide: the middle of the bottom bar, opening into the lockup, the stops and the links. */
 .sheet {
   display: none;
 }
@@ -1188,56 +1223,87 @@
   .railHandle {
     display: none;
   }
-  .sheet {
-    position: absolute;
-    inset: auto 0 0;
-    z-index: 12;
-    display: flex;
-    flex-direction: column-reverse;
-    background: #16130f; /* Opaque: the placard's text would ghost through the list otherwise. */
+  /* One bar along the bottom, edge to edge: Prev, the guide, Next. Opaque, so nothing ghosts through. */
+  .controls {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    translate: none;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 4px;
+    padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 6px) max(8px, env(safe-area-inset-left, 0px));
+    border: 0;
     border-top: 1px solid var(--glass-line);
     border-radius: 14px 14px 0 0;
+    background: #16130f;
+    backdrop-filter: none;
+  }
+  .controls > button {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+  /* The stop's number is in the guide's button; the counter stays for screen readers. */
+  .counter {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sheet {
+    display: block;
     color: var(--text);
   }
   .sheetHandle {
-    display: grid;
-    justify-items: center;
-    gap: 6px;
-    width: 100%;
-    min-height: 52px;
-    padding: 8px 0 calc(env(safe-area-inset-bottom, 0px) + 10px);
-    border: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid rgb(242 235 221 / 0.22) !important;
+    border-radius: 999px;
     background: transparent;
     font: 500 11px/1 var(--mono) !important;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .sheetHandle[aria-expanded="true"] {
+    background: rgb(232 201 140 / 0.16);
   }
   .sheetHandle:focus-visible {
-    outline-offset: -4px;
+    outline-offset: 2px;
   }
-  .sheetGrip {
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgb(242 235 221 / 0.35);
+  .sheetCode {
+    color: var(--gold);
   }
+  /* Opens above the bar, as far as just under the header; the list scrolls inside it. */
   .sheetPanel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% - 14px);
     display: grid;
     gap: 18px;
-    max-height: 68svh;
-    padding: 18px 18px 6px;
+    max-height: calc(100dvh - 140px);
+    padding: 22px 18px 26px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    background: #16130f;
+    border-top: 1px solid var(--glass-line);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -12px 30px rgb(0 0 0 / 0.35);
   }
   .sheetPanel[hidden] {
     display: none;
   }
-  /* The pager sits just above the sheet's handle. */
-  .controls {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
+  .sheetPanel .lockupTitle {
+    font-size: 32px;
   }
   .viewport::after {
-    height: 150px;
+    height: 90px;
   }
 }
 
@@ -1354,36 +1420,124 @@
 
 /* ---------------------------------------------------------------- portrait screens and phones */
 
-@media (max-aspect-ratio: 4/5) {
+/* Strictly narrower than 4:5, as the script decides it (width / height < 0.8): at exactly 4:5 (640x800)
+   an inclusive query centred the placard while the script placed it by its left edge, onto the guide. */
+@media not all and (min-aspect-ratio: 4/5) {
   .label {
     width: min(88vw, 380px);
     translate: -50% 0;
   }
 }
-/* Phones: the placard runs full width above the pager, a little tighter, same hierarchy. */
-@media (max-width: 639px) {
-  .top {
+/* Small screens: a compact placard. Kicker, title, role, then Read exhibit and Open drawer; the rest of
+   it (dates, description, quote, case studies) unfolds in a region that scrolls on its own, between the
+   placard's header and its buttons, as an open drawer's content does. Phones (docked above the bottom
+   bar) and short landscape screens (beside the case). */
+@media (max-width: 639px), (max-height: 500px) {
+  .root:not(.static) .label:not([data-drawer]) {
+    display: flex;
     flex-direction: column;
+    overflow: hidden;
+  }
+  .root:not(.static) .label:not([data-drawer]) > :not(.details, .actions) {
+    flex: none;
+  }
+  .root:not(.static) .details {
+    display: none;
+  }
+  .root:not(.static) .label[data-reading] .details {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0 -6px;
+    padding: 12px 6px 6px;
+    border-top: 1px solid var(--hairline);
+    animation: drawer-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .root:not(.static) .details > .org {
+    margin-top: 0 !important;
+  }
+  .root:not(.static) .actions {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .root:not(.static) .label[data-reading] .actions {
+    padding-top: 10px;
+    border-top: 1px solid var(--hairline);
+  }
+  .root:not(.static) .label .readToggle {
+    display: inline-flex;
     gap: 10px;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  .nav {
-    margin-left: 0;
+}
+/* The fold's chevron: down to unfold, up to fold. */
+.chevron {
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: 45deg;
+  transition: rotate 200ms var(--ease), margin 200ms var(--ease);
+}
+.readToggle[aria-expanded="true"] .chevron {
+  margin-top: 3px;
+  rotate: 225deg;
+}
+
+/* Phones: a compact header (the hall's title, small, and the navigation, one row), the exhibit in its own
+   band (the camera frames it there: scene.setFrame), and the placard docked above the bottom bar, full
+   width. The hall's name and the line about who this is move into the guide's lockup. */
+@media (max-width: 639px) {
+  .root:not(.static) .top {
+    align-items: center;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) max(10px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
   }
-  .subtitle {
-    font-size: 32px;
+  .root:not(.static) .hallName,
+  .root:not(.static) .identity {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .root:not(.static) .subtitle {
+    font-size: 22px;
+    white-space: nowrap;
+  }
+  .root:not(.static) .nav {
+    padding: 3px;
+  }
+  .root:not(.static) .nav a {
+    min-height: 38px;
+    padding: 0 11px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  .root:not(.static) .viewport::before {
+    height: 84px;
   }
   .label {
     width: calc(100vw - 32px);
+    translate: -50% 0;
   }
   .label {
     gap: 10px;
-    padding: 22px 20px 18px;
+    padding: 20px 20px 16px;
   }
   .title {
     margin-bottom: 0;
     font-size: 28px;
+  }
+  .line {
+    font-size: 14px;
   }
   .org {
     margin-top: -6px !important;
@@ -1402,40 +1556,84 @@
     padding-top: 10px;
   }
 }
-/* Short phones: the title block tightens, so the placard keeps its room. */
+@media (max-width: 639px) and (pointer: coarse) {
+  .root:not(.static) .nav a {
+    min-height: 44px;
+  }
+}
+/* Short phones: the placard a little tighter, so the exhibit keeps its room. */
 @media (max-width: 639px) and (max-height: 740px) {
-  .top {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-    gap: 6px;
-  }
-  .hallName {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-  }
-  .subtitle {
-    font-size: 26px;
-  }
-  .identity {
-    margin-top: 2px;
-    font-size: 12px;
-  }
-  .nav a {
-    min-height: 38px;
-  }
   .label {
-    gap: 7px;
-    padding: 18px 18px 14px;
+    gap: 8px;
+    padding: 16px 18px 14px;
   }
   .title {
-    font-size: 24px;
+    font-size: 26px;
   }
-  .line,
   .description {
     font-size: 14px;
   }
 }
+/* Short landscape screens: the same compact header, beside the folded guide, and the pager at the left of
+   the hall (under the case, not the placard), so a placard beside the case can use the full height. */
+@media (min-width: 640px) and (max-height: 500px) {
+  .controls {
+    left: calc(var(--rail-w) + 16px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    width: 224px;
+    translate: none;
+    grid-template-columns: 72px 1fr 72px;
+  }
+  .controls button {
+    padding: 0 10px;
+    letter-spacing: 0.1em;
+  }
+  .root:not(.static) .top {
+    align-items: center;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+  }
+  .root:not(.static) .hallName,
+  .root:not(.static) .identity {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .root:not(.static) .subtitle {
+    font-size: 24px;
+  }
+  .root:not(.static) .viewport::before {
+    height: 90px;
+  }
+  .label {
+    width: 290px;
+    gap: 9px;
+    padding: 20px 22px 16px;
+  }
+  .title {
+    font-size: 28px;
+  }
+}
 
 /* ---------------------------------------------------------------- without WebGL */
+
+/* On a phone without the 3D hall, the title block keeps its full form, stacked. */
+@media (max-width: 639px) {
+  .static .top {
+    flex-direction: column;
+    gap: 10px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .static .nav {
+    margin-left: 0;
+  }
+  .static .subtitle {
+    font-size: 32px;
+  }
+}
 
 .static .stage {
   height: auto;
@@ -1488,6 +1686,9 @@
 
 
 @media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .arrow,
+  .arrowText,
   .bar > span,
   .controls button,
   .noteToggle,
@@ -1501,8 +1702,9 @@
     transition: none;
   }
   .drawerView,
+  .details,
   .drawerAction[data-busy] {
-    animation: none;
+    animation: none !important;
   }
   .backButton {
     transition: none;

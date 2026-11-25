@@ -147,6 +147,9 @@ export type LabelAnchor = {
    *  chart, the bell and its chits, the card opening, the stamp and tray, the books toppling), with the
    *  drawer pulled open. Overlays keep out of it. Null for a case without one. */
   discovery: { left: number; top: number; right: number; bottom: number } | null;
+  /** The exhibit itself on screen: the glass case and the deck it stands on (the desktop and bell at the
+   *  desk). On a phone, an expanded placard keeps out of it. */
+  subject: { left: number; top: number; right: number; bottom: number };
 };
 
 /** Where the fatherhood plinth's card goes, in CSS pixels, and how much of it shows (0 when out of view). */
@@ -176,6 +179,10 @@ export type MuseumScene = {
   setOffset(x: number, y: number, snap?: boolean): void;
   /** The slide applied right now (mid-ease, between setOffset's start and goal). */
   offset(): { x: number; y: number };
+  /** On a phone, the band of the screen the exhibit gets (CSS pixels from the canvas top, between the
+   *  header and the placard): the camera frames the case to fill its width and centres it in the band.
+   *  Null: the full-screen framing (wide screens). */
+  setFrame(band: { top: number; bottom: number } | null): void;
   resize(): void;
   dispose(): void;
 };
@@ -1107,12 +1114,26 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       desk: { lift: 0.62, look: 0.1, side: -0.12 },
     },
   };
-  const viewsFor = (size: "wide" | "phone") => exhibits.map((exhibit) => VIEWS[size][exhibit.kind === "desk" ? "desk" : (exhibit.specimen ?? "")] ?? still);
+  // In a phone's band (setFrame), the camera stands level with the case and centres it, so the desk needs
+  // its own rise and aim: down onto the desktop and the bell, not the wall above it.
+  const BANDED: Record<string, View> = { desk: { lift: 0.36, look: -0.16, side: -0.1 } };
+  const viewsFor = (size: "wide" | "phone") =>
+    exhibits.map((exhibit) => {
+      const key = exhibit.kind === "desk" ? "desk" : (exhibit.specimen ?? "");
+      return (band && BANDED[key]) || VIEWS[size][key] || still;
+    });
+  /** A phone's band for the exhibit (setFrame), in CSS pixels from the canvas top. */
+  let band: { top: number; bottom: number } | null = null;
+  /** The case (its glass, its deck and the cabinet's top edge) relative to its bay: the subject a band
+   *  frames. Centred on the glass, which stands left of the cabinet's middle, and wide enough for the wide
+   *  case (After Hours); the cabinet's right shoulder may run off the edge. */
+  const SUBJECT = { x0: -0.43, x1: 0.43, y0: DECK_Y - 0.06, y1: DECK_Y + 0.37, front: CASE_Z + 0.29 };
 
   /** The picture shifted right by the covered edge: a pure slide, no zoom, so nothing reframes as the
-   *  guide opens and folds. */
+   *  guide opens and folds. On a phone it's also moved up to centre the case in its band. */
   function offset() {
-    if (Math.abs(slide.x) > 0.5 || Math.abs(slide.y) > 0.5) camera.setViewOffset(width, height, -slide.x, slide.y, width, height);
+    const y = slide.y + (band ? height / 2 - (band.top + band.bottom) / 2 : 0);
+    if (Math.abs(slide.x) > 0.5 || Math.abs(y) > 0.5) camera.setViewOffset(width, height, -slide.x, y, width, height);
     else camera.clearViewOffset();
   }
   function frame() {
@@ -1122,7 +1143,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     offset(); // Also updates the projection matrix.
     const halfV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const halfH = halfV * aspect;
-    if (aspect >= 0.8) {
+    if (aspect >= 0.8 && !band) {
       // Back far enough for the floor and the rug, and turned a little down the hall, so the cabinet,
       // its shelf and label make one vignette left of center and the next case peeks in at the right.
       // A step closer than the room-wide view: the case fills more of the frame, and the next case is
@@ -1134,6 +1155,18 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       framing.lookY = 0.8;
       framing.height = 1.48;
       views = viewsFor("wide");
+    } else if (band) {
+      // A phone with a band for the exhibit: the case fills the band's width (or its height, if the band is
+      // short), level with the eye and a little above, centred in the band by offset().
+      const room = Math.max(1, band.bottom - band.top) / height;
+      const halfW = (SUBJECT.x1 - SUBJECT.x0) / 2 + 0.02;
+      const halfTall = (SUBJECT.y1 - SUBJECT.y0) / 2 + 0.04;
+      const near = Math.max(halfW / (halfH * 0.94), halfTall / (halfV * room * 0.9));
+      framing.distance = near + (SUBJECT.front - CASE_Z);
+      framing.camX = framing.lookX = (SUBJECT.x0 + SUBJECT.x1) / 2;
+      framing.lookY = (SUBJECT.y0 + SUBJECT.y1) / 2;
+      framing.height = framing.lookY + 0.22;
+      views = viewsFor("phone");
     } else {
       // Phones: the case in the upper half, the label below it.
       framing.distance = Math.max(2.75, 0.55 / halfH);
@@ -1190,8 +1223,32 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
         const point = toScreen(anchorPoint.copy(at));
         caption = { x: point.x, y: point.y, visible: inFront && Math.abs(point.ndc) < 1.05 };
       }
-      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y }, caption, discovery: discoveryRect(i) };
+      return { x: label.x, y: label.y, visible: label.ndc > -1.6 && label.ndc < 1.6, drawer: { x: front.x, y: front.y }, caption, discovery: discoveryRect(i), subject: subjectRect(i) };
     });
+  }
+
+  /** The exhibit on screen: its case and deck (the desktop and bell at the desk), as drawn now. */
+  function subjectRect(i: number) {
+    const x = i * BAY_WIDTH;
+    const desk = exhibits[i].kind === "desk";
+    // At the desk: the bell, the lamp and the card stand, not the whole desk (wider than a phone frames it).
+    // At a case: its glass and deck, not the cabinet's shoulders, which a placard may overlap.
+    const half = desk ? 0 : stagingFor(exhibits[i]).wide ? 0.42 : 0.27;
+    const [x0, x1, y0, y1, z0, z1] = desk ? [-0.3, 0.38, DESK.top - 0.04, 1.15, CASE_Z - 0.27, CASE_Z + 0.27] : [-half, half, SUBJECT.y0, SUBJECT.y1, CASE_Z - 0.27, SUBJECT.front];
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const cx of [x0, x1])
+      for (const cy of [y0, y1])
+        for (const cz of [z0, z1]) {
+          const point = toScreen(anchorPoint.set(x + cx, cy, cz));
+          left = Math.min(left, point.x);
+          right = Math.max(right, point.x);
+          top = Math.min(top, point.y);
+          bottom = Math.max(bottom, point.y);
+        }
+    return { left, top, right, bottom };
   }
 
   /** The discovery's envelope on screen, with the drawer pulled all the way open. */
@@ -1426,6 +1483,13 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
     },
     offset() {
       return { x: slide.x, y: slide.y };
+    },
+    setFrame(next) {
+      const same = next && band ? Math.abs(next.top - band.top) < 0.5 && Math.abs(next.bottom - band.bottom) < 0.5 : next === band;
+      if (same) return;
+      band = next ? { ...next } : null;
+      frame();
+      kick();
     },
     setOffset(x, y, snap = false) {
       if (x === slideTo.x && y === slideTo.y && (!snap || (slide.x === x && slide.y === y))) return;
