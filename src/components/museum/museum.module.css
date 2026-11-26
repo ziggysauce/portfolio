@@ -506,7 +506,21 @@
   margin: 0 -6px;
   padding: 14px 6px 6px;
   border-top: 1px solid var(--hairline);
-  animation: drawer-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* While a drawer opens or closes, the placard's box eases to its new place and size (MuseumHall sets
+   data-morph and the height); what was swapped in fades in under it, and nothing overflows meanwhile. The
+   kicker and title stay as they are. */
+.label[data-morph] {
+  overflow: hidden;
+}
+.label[data-morph] > :not(.number, .title),
+.label[data-morph] .details > * {
+  animation: morph-in 220ms ease-out both;
+}
+@keyframes morph-in {
+  from {
+    opacity: 0;
+  }
 }
 .drawerView[hidden] {
   display: none; /* Stays in the page (so the button's aria-controls resolves), out of sight and reach. */
@@ -1763,6 +1777,8 @@
   }
   .drawerView,
   .details,
+  .label[data-morph] > *,
+  .label[data-morph] .details > *,
   .scrim,
   .drawerAction[data-busy] {
     animation: none !important;

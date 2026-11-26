@@ -37,6 +37,8 @@ const RAIL_OPEN = 340;
 const RAIL_FOLDED = 72;
 /** On a phone, the least height an open drawer's sheet gets before the picture slides up to make room. */
 const PHONE_SHEET_MIN = 340;
+/** How long a placard takes to ease between its closed and open-drawer places and sizes. */
+const MORPH_MS = 260;
 const RAIL_KEY = "museum-guide"; // Also read by the inline script in app/page.tsx.
 
 // The guide's state lives on <html data-rail>, set before first paint (app/page.tsx): the remembered choice,
@@ -142,6 +144,21 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   // The extra slide that makes room for an open drawer's placard beside (or, on a phone, under) its
   // discovery, on top of the field guide's inset. Set while placing labels; zero with every drawer shut.
   const extra = useRef({ x: 0, y: 0 });
+  // Opening or closing a drawer swaps the placard's body, which changes its size and (beside the
+  // discovery) its place. placeLabels, which already places every label each frame, eases it from where it
+  // was drawn (`placed`) to wherever it now belongs, over MORPH_MS: one owner, no CSS transition on top.
+  const placed = useRef<({ x: number; y: number; h: number } | undefined)[]>([]);
+  const morphs = useRef(new Map<number, { x: number; y: number; h: number; start: number }>());
+  const remeasure = useRef<() => void>(() => {});
+  const shownDrawer = useRef<number | null>(null);
+  /** The placard stops easing: its size is its own again, and its swapped content shows in full. */
+  const endMorph = useCallback((i: number) => {
+    morphs.current.delete(i);
+    const label = labels.current[i];
+    if (!label) return;
+    label.style.height = "";
+    label.removeAttribute("data-morph");
+  }, []);
   const captions = useRef<(HTMLElement | null)[]>([]);
   const noteToggles = useRef<(HTMLButtonElement | null)[]>([]);
   const [openNote, setOpenNote] = useState<number | null>(null);
@@ -442,6 +459,9 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         : [];
       // scrollHeight, not the rendered height: a label capped to fit a short screen still knows its full height.
       for (const [i, node] of labels.current.entries()) if (node) {
+          // Mid-ease a placard has its height set (placeLabels); its own height is measured without it.
+          const forced = node.style.height;
+          if (forced) node.style.height = "";
           // An open drawer's content scrolls inside the placard (header and footer stay put), and so do a
           // compact placard's unfolded details, so its full height is the placard's plus whatever of that
           // region is scrolled out of view.
@@ -451,6 +471,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           heights.set(node, node.scrollHeight + hidden);
           widths.set(node, node.offsetWidth);
           if (!node.hasAttribute("data-drawer") && !node.hasAttribute("data-reading")) compact.set(node, node.scrollHeight);
+          if (forced) node.style.height = forced;
         }
       if (docked && Number.isFinite(floor)) {
         const reserve = Math.max(0, ...labels.current.map((node) => (node ? (compact.get(node) ?? 0) : 0)));
@@ -459,13 +480,29 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         scene.current?.setFrame({ top: ceiling - 4, bottom });
       } else scene.current?.setFrame(null);
     };
-    const sizes = new ResizeObserver(measure);
+    remeasure.current = measure;
+    // An easing placard changes size every frame on purpose; that's not news (its final size was measured
+    // as the ease began), so it doesn't set off a measure per frame.
+    const easing = (node: Element) => [...morphs.current.keys()].some((i) => labels.current[i]?.contains(node));
+    const sizes = new ResizeObserver((entries) => {
+      if (morphs.current.size && entries.every((entry) => easing(entry.target))) return;
+      measure();
+    });
+    /** Ends every ease at once: the placard takes its final place and size on the next frame. */
+    const settleMorphs = () => {
+      for (const i of morphs.current.keys()) endMorph(i);
+    };
+    const onResize = () => {
+      // A resize mid-ease would ease toward a place measured for the old size: it lands at once instead.
+      settleMorphs();
+      measure();
+    };
     const watchSizes = () => {
       for (const node of [...labels.current, ...notes.current, ...details.current]) if (node) sizes.observe(node);
       // The header too: crossing 640px it changes between its compact and full forms, and placards keep below it.
       const header = labels.current[0]?.closest("ol")?.parentElement?.querySelector("header");
       if (header) sizes.observe(header);
-      window.addEventListener("resize", measure);
+      window.addEventListener("resize", onResize);
       measure();
     };
     const above = (node: Element, y: number) => Math.min(y, floor - (heights.get(node) ?? 0));
@@ -526,6 +563,8 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         card.style.visibility = "visible";
       }
       let roomed = false; // Whether a placard asked the picture to slide this frame.
+      let easing = false; // Whether a placard is still easing after a drawer opened or closed.
+      const now = performance.now();
       anchors.forEach((anchor, i) => {
         const label = labels.current[i];
         if (!label) return;
@@ -545,6 +584,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         const w = widths.get(label) ?? 0;
         let x = anchor.x;
         let y: number;
+        let height: number; // As it will be drawn: its own height, or less where it's capped and scrolls.
         if (docked) {
           // A phone: docked above the bottom bar, full width, its height its own up to a cap; only the cap
           // differs. Compact, it never takes the exhibit's band. Reading, the case keeps its own height
@@ -566,18 +606,22 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
               roomed = true;
             }
           }
-          y = bottom - Math.min(natural, cap);
+          height = Math.min(natural, cap);
+          y = bottom - height;
           label.style.maxHeight = `${cap.toFixed(0)}px`;
         } else if (portrait) {
+          const natural = heights.get(label) ?? 0;
           if (open && room) {
             // Centred on the screen, not the case: the picture may slide sideways to fit the discovery.
             x = (insetRef.current + window.innerWidth) / 2;
             // Never down over the pager: on a very short screen it rises over the discovery's foot instead.
             y = Math.min(Math.max(ceiling, room.bottom + 8), bottom - 120);
             label.style.maxHeight = `${(bottom - y).toFixed(0)}px`;
+            height = Math.min(natural, bottom - y);
           } else {
             y = Math.max(ceiling, above(label, anchor.y));
             label.style.maxHeight = Number.isFinite(floor) ? `${Math.max(160, floor - y).toFixed(0)}px` : "";
+            height = Number.isFinite(floor) ? Math.min(natural, Math.max(160, floor - y)) : natural;
           }
         } else {
           if (open && room) x = Math.min(Math.max(anchor.x, room.right + 16), window.innerWidth - w - 16);
@@ -592,7 +636,29 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
           const fit = fitBetween(anchor.y - h / 2, h, ceilingFor(x, x + w, obstacles, 12, 16, 120), Number.isFinite(bottom) ? foot : bottom);
           y = fit.top + (fit.maxHeight ?? h) / 2; // The stylesheet centres it on this point.
           label.style.maxHeight = fit.maxHeight === null ? "" : `${fit.maxHeight.toFixed(0)}px`;
+          height = fit.maxHeight ?? h;
         }
+        // A drawer just opened or closed: from where and how big the placard was drawn to where and how big
+        // it now belongs, both read fresh each frame (the picture's slide moves the goal as it eases). Only
+        // its box changes size, never its text; the swapped content fades in (the stylesheet, data-morph).
+        const morph = morphs.current.get(i);
+        if (morph) {
+          // Timed from the first frame that draws it: the frame right after a drawer opens can be slow
+          // (its contents come into view), and shouldn't use up the ease.
+          if (Number.isNaN(morph.start)) morph.start = now;
+          const t = (now - morph.start) / MORPH_MS;
+          if (t >= 1 || reduced.current) endMorph(i);
+          else {
+            const e = 1 - (1 - t) ** 3;
+            x = morph.x + (x - morph.x) * e;
+            y = morph.y + (y - morph.y) * e;
+            height = morph.h + (height - morph.h) * e;
+            label.style.height = `${height.toFixed(1)}px`;
+            label.style.maxHeight = "";
+            easing = true;
+          }
+        }
+        placed.current[i] = { x, y, h: height };
         label.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
         if (open && room && !docked) {
           makeRoom(room, w, portrait);
@@ -626,6 +692,7 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
         extra.current = { x: 0, y: 0 };
         scene.current?.setOffset(insetRef.current, 0);
       }
+      return easing;
     }
 
     import("./scene")
@@ -671,12 +738,13 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
     return () => {
       cancelled = true;
       sizes.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
+      remeasure.current = () => {};
       motion.removeEventListener("change", onMotion);
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [exhibits, stopGlide, offsetFor, caseHeight, count]);
+  }, [exhibits, stopGlide, offsetFor, caseHeight, count, endMorph]);
 
   // Scrolling moves the camera. With reduced motion it cuts between cases instead of gliding.
   useEffect(() => {
@@ -860,6 +928,30 @@ export function MuseumHall({ hall, identity, exhibits, links, desk, fatherhood, 
   useEffect(() => {
     exhibits.forEach((_, i) => scene.current?.setDrawer(i, openNote === i));
   }, [openNote, exhibits, status]);
+  // A drawer opened or closed: its placard (and the one whose drawer closed, if it moved straight to another)
+  // starts easing from where it was drawn, before the browser paints the swapped content at its new size.
+  // With reduced motion, or a placard you can't see, it just takes its new place and size.
+  useLayoutEffect(() => {
+    const before = shownDrawer.current;
+    shownDrawer.current = openNote;
+    if (before === openNote) return;
+    for (const i of [before, openNote]) {
+      if (i === null) continue;
+      const label = labels.current[i];
+      const from = placed.current[i];
+      if (!label || !from || reduced.current || Number(label.style.opacity || 0) < 0.05) {
+        endMorph(i);
+        continue;
+      }
+      // From where it is now, mid-ease included, so a quick open-then-close turns back without a jump.
+      morphs.current.set(i, { ...from, start: Number.NaN }); // Starts on its first frame (placeLabels).
+      label.style.height = `${from.h.toFixed(1)}px`;
+      label.style.maxHeight = "";
+      label.setAttribute("data-morph", "");
+    }
+    // The final size, measured once now (the observer skips the ease's own changes), not every frame.
+    if (morphs.current.size) remeasure.current();
+  }, [openNote, endMorph]);
   // Opening a drawer replaces the placard's body, Open drawer button and all, so focus that was in the
   // placard moves into the drawer's contents; Back to exhibit (closeNote) brings it back to that button.
   const returnFocus = useRef<number | null>(null);
