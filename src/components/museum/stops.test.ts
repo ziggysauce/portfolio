@@ -1,7 +1,7 @@
 // Run with: npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hashForStop, positionLabel, stepLabel, stopFromHash, type StopExhibit } from "./stops.ts";
+import { hashForStop, kicker, pagerLabel, stepLabel, stopCode, stopFromHash, type StopExhibit } from "./stops.ts";
 
 // The walking order (newest first), with each exhibit's original catalog number.
 const exhibits: StopExhibit[] = [
@@ -45,9 +45,24 @@ test("step labels say which way in time, and where a step leaves the career", ()
   assert.equal(stepLabel(5, DESK, exhibits).short, "Desk");
 });
 
-test("the counter counts the career only", () => {
-  assert.equal(positionLabel(0, exhibits), "Current role · 1 of 5");
-  assert.equal(positionLabel(4, exhibits), "Career · 5 of 5");
-  assert.equal(positionLabel(5, exhibits), "Off the clock");
-  assert.equal(positionLabel(DESK, exhibits), "Information desk");
+test("one code per stop, everywhere: rail, floor plan, pager", () => {
+  assert.deepEqual(
+    exhibits.map((_, i) => stopCode(i, exhibits)).concat(stopCode(DESK, exhibits)),
+    ["001", "002", "003", "004", "005", "AH", "i"],
+  );
+});
+
+test("placard kickers share one format", () => {
+  assert.equal(kicker(0, exhibits), "001 · Current role");
+  assert.equal(kicker(1, exhibits), "002 · Career");
+  assert.equal(kicker(3, exhibits), "004 · Education");
+  assert.equal(kicker(5, exhibits), "AH · Off the clock");
+  assert.equal(kicker(DESK, exhibits), "i · Before you go");
+});
+
+test("the pager's middle", () => {
+  assert.equal(pagerLabel(0, exhibits), "001 / 005");
+  assert.equal(pagerLabel(4, exhibits), "005 / 005");
+  assert.equal(pagerLabel(5, exhibits), "AH");
+  assert.equal(pagerLabel(DESK, exhibits), "DESK");
 });

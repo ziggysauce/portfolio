@@ -11,8 +11,31 @@ npm run build      # static site in out/
 npm run start      # serve out/ locally
 npm run lint
 npm run typecheck
-npm test           # the hall's stop addresses and walking labels (stops.test.ts); needs Node 22.6+
+npm test           # unit tests: stop addresses, walking labels, label placement math; needs Node 22.6+
+npm run test:layout  # the hall in Chrome at seven screen sizes (see below); needs a build in out/
 ```
+
+### Layout check
+
+`tests/layout.mjs` opens the built hall in headless Chrome at 1280×744, 1280×720, 1366×768, 1440×900, 1280×600, 390×844 and 375×667. On the wide sizes it runs twice, with the field guide open and folded. It visits every exhibit with its drawer closed and open. It fails if:
+
+- a placard or drawer card is clipped by the screen, or runs into the title block, the navigation, the field guide, the pager or the phone's guide handle;
+- an open drawer card covers its placard on desktop;
+- a drawer has more or fewer than one close control (the placard's button, or on a phone the card's own, since the card covers the placard);
+- on a phone, the drawer card doesn't take the placard's place or doesn't take focus;
+- Escape doesn't close the drawer and leave focus on the placard's button.
+
+It also fails, rather than passing silently, if it can't find the exhibits, the navigation or the pager, or if the walk doesn't move on.
+
+Run it after any change to the hall's layout, placards, field guide, header or copy on the placards:
+
+```bash
+VERCEL_ENV=preview npm run build && npm run test:layout   # with draft studies linked: the tallest labels
+npm run test:layout -- --url <preview URL>                # a deployed preview
+npm run test:layout -- --sizes 1280x720,375x667           # some sizes only
+```
+
+It uses the installed Google Chrome (set `CHROME_PATH` for another Chromium). Screenshots of every state land in `test-results/layout/`. Look at them too: the check catches collisions, not ugliness.
 
 ## Routes
 
