@@ -18,6 +18,9 @@
 //     stays in it, the hall can't be walked behind it, Escape and the scrim close it, focus goes back to
 //     what opened it, and the stop, an open drawer and unfolded details are just as they were. Choosing a
 //     stop closes it and walks there. Turning or resizing with it open lands in each size's own form.
+//  8. A drawer opening and closing: the placard eases to its new place and size over several frames (no
+//     jump), lands where it did before, and nothing is left mid-ease after a quick open and close, walking
+//     on, or a resize; with reduced motion it doesn't ease at all.
 //
 // Where each discovery is on screen comes from the hall itself (?debug, see MuseumHall placeLabels), so
 // the check measures the 3D objects' space, not just the HTML. Look at the screenshots as well.
@@ -803,6 +806,156 @@ if (!only) {
     }
     report(`${name}: turned and resized with it open`, turns);
     report(`${name}: no page errors`, errors.map((e) => e.slice(0, 120)));
+    await context.close();
+  }
+
+  // ---------------------------------------------------------------- 8. a drawer opening and closing
+  // The placard eases between its closed and open places and sizes instead of jumping, lands exactly where
+  // it did before, and nothing is left half-way: after a quick open and close, walking away mid-ease, or a
+  // resize mid-ease. Sampled on every frame in the page.
+  for (const [size, turnTo] of [["1280x744", "1000x700"], ["390x844", "844x390"], ["844x390", "390x844"]]) {
+    const context = await browser.newContext(SIZES[size]);
+    const { page, errors } = await open(context, size === "1280x744" ? "folded" : null);
+    const name = `drawer ease, ${size}`;
+    /** Every frame's box of stop n's placard for `ms`, from just before `act` runs. */
+    const sample = async (n, ms, act) => {
+      await page.evaluate(
+        ({ sel, ms }) => {
+          const el = document.querySelector(sel);
+          const log = (window.__ease = []);
+          const t0 = performance.now();
+          const frame = () => {
+            const r = el.getBoundingClientRect();
+            log.push({ t: performance.now() - t0, x: r.left, y: r.top, h: r.height, b: r.bottom, morph: el.hasAttribute("data-morph") });
+            if (performance.now() - t0 < ms) requestAnimationFrame(frame);
+          };
+          requestAnimationFrame(frame);
+        },
+        { sel: placard(n), ms },
+      );
+      await act();
+      await page.waitForTimeout(ms + 100);
+      return page.evaluate(() => window.__ease);
+    };
+    /** The change is spread over frames: most of it isn't in any one frame, and it takes a while. */
+    const eased = (log, what) => {
+      const problems0 = [];
+      const keys = ["x", "y", "h", "b"];
+      if (log.length < 2) return [`${what}: no frames sampled`];
+      if (!log.some((e) => e.morph)) problems0.push(`${what}: the placard was never marked easing`);
+      const total = Math.max(...keys.map((k) => Math.abs(log[log.length - 1][k] - log[0][k])));
+      if (total < 4) return [...problems0, `${what}: the placard didn't move or resize (${total.toFixed(0)}px)`];
+      let most = 0;
+      const changed = [];
+      for (let k = 1; k < log.length; k++) {
+        const d = Math.max(...keys.map((key) => Math.abs(log[k][key] - log[k - 1][key])));
+        most = Math.max(most, d);
+        if (d > 0.5) changed.push(log[k].t);
+      }
+      const span = changed.length ? changed[changed.length - 1] - changed[0] : 0;
+      const problems = problems0;
+      if (most > total * 0.5) problems.push(`${what}: ${most.toFixed(0)}px of ${total.toFixed(0)}px in one frame`);
+      if (span < 150) problems.push(`${what}: over in ${span.toFixed(0)}ms`);
+      return problems;
+    };
+    /** Nothing left mid-ease: no placard with a set height, or marked easing, or content still faded. */
+    const finished = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll("ol[aria-label] article")].flatMap((el, i) => [
+          ...(el.hasAttribute("data-morph") ? [`placard ${i + 1} still marked easing`] : []),
+          ...(el.style.height ? [`placard ${i + 1} kept a set height (${el.style.height})`] : []),
+          ...[...el.querySelectorAll("*")].filter((c) => c.getClientRects().length && Number(getComputedStyle(c).opacity) < 0.99).map(() => `placard ${i + 1} has faded content`).slice(0, 1),
+        ]),
+      );
+    const box = (n) => page.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { x: r.left, y: r.top, h: r.height }; }, placard(n));
+    const same = (a, b, what) => (Math.abs(a.x - b.x) > 1 || Math.abs(a.y - b.y) > 1 || Math.abs(a.h - b.h) > 1 ? [`${what}: at ${a.x.toFixed(0)},${a.y.toFixed(0)} ${a.h.toFixed(0)}h, not ${b.x.toFixed(0)},${b.y.toFixed(0)} ${b.h.toFixed(0)}h`] : []);
+    const back = (n) => page.locator(placard(n)).getByRole("button", { name: /Back to exhibit/ });
+
+    // Stop 1 (a long drawer: the stamp and its note) and stop 5 (a short one: the tooth).
+    for (const n of [1, 5]) {
+      await toStart(page);
+      for (let k = 1; k < n; k++) await next(page);
+      await page.waitForTimeout(400);
+      const closed = await box(n);
+      const opening = await sample(n, 700, async () => {
+        await page.locator(openButton(n)).focus();
+        await page.keyboard.press("Enter");
+      });
+      await page.waitForTimeout(1200);
+      const g = await scan(page, placard(n));
+      const focus = await page.evaluate((sel) => !!document.activeElement?.closest(`${sel} [id$="-drawer"]`), placard(n));
+      report(`${name}: stop ${n} opens smoothly, ending where it did`, [...eased(opening, "open"), ...fits(g), ...discoveryClear(g, n), ...inPlace(g), ...(focus ? [] : ["focus isn't in the drawer"]), ...(await finished())]);
+      const closing = await sample(n, 700, () => back(n).press("Enter"));
+      await page.waitForTimeout(800);
+      const focusBack = await page.evaluate((sel) => document.activeElement?.matches(`${sel} button[aria-controls$="-drawer"]`), placard(n));
+      report(`${name}: stop ${n} closes smoothly, back where it was`, [...eased(closing, "close"), ...same(await box(n), closed, "closed"), ...(focusBack ? [] : ["focus isn't back on Open drawer"]), ...(await finished())]);
+    }
+
+    // Open and straight back: lands closed, where it was, nothing stranded.
+    await toStart(page);
+    await page.waitForTimeout(400);
+    const closed = await box(1);
+    await page.locator(openButton(1)).focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(80);
+    await back(1).press("Enter");
+    await page.waitForTimeout(80);
+    await page.locator(openButton(1)).press("Enter");
+    await page.waitForTimeout(80);
+    await back(1).press("Enter");
+    await page.waitForTimeout(1200);
+    report(`${name}: open, close, open, close in quick succession`, [...same(await box(1), closed, "after"), ...(await finished())]);
+
+    // Walking on mid-ease: the drawer shuts, and the next stop's placard is placed as usual.
+    const easingNow = () => page.evaluate((sel) => { const el = document.querySelector(sel); return el.hasAttribute("data-drawer") && el.hasAttribute("data-morph"); }, placard(1));
+    await page.locator(openButton(1)).focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(80);
+    const easingAtWalk = await easingNow();
+    await page.locator("[class*=controls]").getByRole("button", { name: /^Next/ }).click({ timeout: 5000 });
+    await settle(page, 0);
+    await page.waitForTimeout(400);
+    const walked = await scan(page, placard(2));
+    const shut = await page.evaluate(() => !document.querySelector("article[data-drawer]"));
+    report(`${name}: walking on mid-ease`, [...fits(walked), ...inPlace(walked), ...(easingAtWalk ? [] : ["wasn't mid-ease with the drawer open when walking on"]), ...(shut ? [] : ["a drawer is still open"]), ...(await finished())]);
+
+    // A resize (or a turn) mid-ease: lands at once in the new size's place, drawer still open.
+    await prev(page);
+    await page.waitForTimeout(300);
+    await page.locator(openButton(1)).focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(80);
+    const easingAtTurn = await easingNow();
+    const [w, h] = turnTo.split("x").map(Number);
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(1800);
+    const turned = await scan(page, placard(1));
+    await shot(page, `${name} resized mid-ease to ${turnTo}`);
+    report(`${name}: resized to ${turnTo} mid-ease`, [...(easingAtTurn ? [] : ["wasn't mid-ease with the drawer open when resized"]), ...fits(turned), ...discoveryClear(turned, 1), ...inPlace(turned), ...(await finished())]);
+    report(`${name}: no page errors`, errors.map((e) => e.slice(0, 120)));
+    await context.close();
+  }
+  // Reduced motion: the final place and size at once, never easing.
+  {
+    const context = await browser.newContext({ ...SIZES["1280x744"], reducedMotion: "reduce" });
+    const { page } = await open(context, "folded");
+    const marked = await page.evaluate(
+      (sel) =>
+        new Promise((resolve) => {
+          const el = document.querySelector(sel);
+          let seen = false;
+          const watch = new MutationObserver(() => (seen ||= el.hasAttribute("data-morph") || !!el.style.height));
+          watch.observe(el, { attributes: true, attributeFilter: ["data-morph", "style"] });
+          el.querySelector('button[aria-controls$="-drawer"]').click();
+          setTimeout(() => {
+            watch.disconnect();
+            resolve(seen);
+          }, 600);
+        }),
+      placard(1),
+    );
+    const g = await scan(page, placard(1));
+    report("reduced motion: a drawer opens with no ease", [...(marked ? ["the placard eased (data-morph or a set height)"] : []), ...fits(g), ...discoveryClear(g, 1)]);
     await context.close();
   }
 

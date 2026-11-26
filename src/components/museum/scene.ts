@@ -222,8 +222,9 @@ type Options = {
   url: string;
   reducedMotion: boolean;
   onProgress?: (fraction: number) => void;
-  /** Called after each rendered frame with each case's label anchor, in CSS pixels. */
-  onFrame?: (anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) => void;
+  /** Called after each rendered frame with each case's label anchor, in CSS pixels. Returns true while
+   *  the labels are still animating (a placard easing between sizes), to get another frame from this loop. */
+  onFrame?: (anchors: LabelAnchor[], progress: number, plinth: PlinthAnchor) => boolean | void;
   /** Frame times in ms, for measuring smoothness. Only collected when provided. */
   frameLog?: number[];
 };
@@ -1428,7 +1429,7 @@ export async function createMuseumScene(options: Options): Promise<MuseumScene> 
       last = now;
       moving = update(dt);
       renderer.render(scene, camera);
-      options.onFrame?.(anchors(), current, plinthAnchor());
+      if (options.onFrame?.(anchors(), current, plinthAnchor())) moving = true;
       if (options.frameLog) options.frameLog.push(dt * 1000);
     } finally {
       // Even if a frame throws, the next kick can start the loop again.
